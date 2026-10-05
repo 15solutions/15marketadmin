@@ -1948,13 +1948,18 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       while (Date.now() - startedAt < MAX_WAIT_MS) {
         await new Promise((r) => setTimeout(r, POLL_MS));
         let rows = [];
+        // Bounded fetch: without an abort a dead link hangs here past
+        // MAX_WAIT_MS and the submit lock is held indefinitely instead of 90s.
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
         try {
-          const res = await fetch(`${KEEPER_URL_ARC}/history/${userAddr}`);
+          const res = await fetch(`${KEEPER_URL_ARC}/history/${userAddr}`, { signal: controller.signal });
           if (res.ok) {
             const data = await res.json();
             rows = Array.isArray(data) ? data : (data?.trades || []);
           }
         } catch (_) { /* backend still down; keep waiting */ }
+        finally { clearTimeout(timeoutId); }
 
         const found = rows.some((t) => String(t.id ?? t.betId ?? t.bet_id) === String(betId));
         if (found) {
@@ -2937,8 +2942,11 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
   useEffect(() => {
     if (!isExecuting) return;
     const t = setTimeout(() => {
+      // Overdue trades don't count: past countdown + grace with no verdict is
+      // a stuck trade, not an in-flight placement, and must never pin the
+      // submit flag (and with it the mobile buttons) down.
       const live = (activeTradesRef.current || []).some(tr =>
-        ['PENDING', 'RESOLVING'].includes(tr.status));
+        ['PENDING', 'RESOLVING'].includes(tr.status) && !isTradeOverdue(tr));
       if (!live && !unresolvedSubmitRef.current) setIsExecuting(false);
     }, 8000);
     return () => clearTimeout(t);
