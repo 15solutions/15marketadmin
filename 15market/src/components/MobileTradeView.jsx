@@ -144,16 +144,15 @@ function MobileSteppedChart({
   // Cache helpers — synchronous localStorage first, async Redis background sync
   const getCacheKey = (sym) => `15market_mobile_chart_${sym?.toLowerCase()}`;
   const loadCachedHistorySync = (sym) => {
-    // Synchronous load from localStorage (instant)
+    // Synchronous load from localStorage (instant) — fresh buffers only.
+    // Stale data is refused, never time-shifted into fake continuity.
     try {
       const cached = localStorage.getItem(getCacheKey(sym));
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed.length > 0) {
-          const lastTs = parsed[parsed.length - 1].t;
-          const now = Date.now();
-          const shift = now - lastTs;
-          return parsed.map(p => ({ t: p.t + shift, p: p.p }));
+        if (Array.isArray(parsed) && parsed.length > 10 &&
+            Date.now() - parsed[parsed.length - 1].t < 120000) {
+          return parsed;
         }
       }
     } catch {}
@@ -205,35 +204,27 @@ function MobileSteppedChart({
         interpolatedPriceRef.current = cached[cached.length - 1].p;
         targetPriceRef.current = cached[cached.length - 1].p;
       } else {
-        // Fallback: generate synthetic data
+        // Fallback: flat line at the live price while real ticks arrive.
+        // Never synthetic wiggle — fabricated history is worse than none.
         const now = Date.now();
         const initial = [];
-        let walk = basePrice;
         const stepCount = 35;
         const timeStep = windowMs / stepCount;
-
         for (let i = stepCount; i >= 0; i--) {
-          const t = now - (i * timeStep);
-          if (i % 3 === 0) {
-            walk += (Math.random() - 0.48) * (basePrice * 0.0015);
-          }
-          initial.push({ t, p: walk });
+          initial.push({ t: now - (i * timeStep), p: basePrice });
         }
         priceHistoryRef.current = initial;
-        interpolatedPriceRef.current = walk;
+        interpolatedPriceRef.current = basePrice;
         targetPriceRef.current = basePrice;
       }
 
-      // 2. Background sync from Redis (updates localStorage for next load)
+      // 2. Background sync from Redis. Server-recorded ticks carry real
+      // timestamps and replace the buffer verbatim — no shifting.
       syncFromRedis(symbol).then(redisData => {
         if (redisData && redisData.length > 10) {
-          const lastTs = redisData[redisData.length - 1].t;
-          const now = Date.now();
-          const shift = now - lastTs;
-          const shifted = redisData.map(p => ({ t: p.t + shift, p: p.p }));
-          priceHistoryRef.current = shifted;
-          interpolatedPriceRef.current = shifted[shifted.length - 1].p;
-          targetPriceRef.current = shifted[shifted.length - 1].p;
+          priceHistoryRef.current = redisData;
+          interpolatedPriceRef.current = redisData[redisData.length - 1].p;
+          targetPriceRef.current = redisData[redisData.length - 1].p;
         }
       });
     }
@@ -514,6 +505,75 @@ function MobileSteppedChart({
       ctx.lineTo(W + 40, lineY);
       ctx.stroke();
       ctx.restore();
+
+      // 7b. PRICE + TIME AXES — same recipe as the desktop chart, sized down:
+      // static price grid labels in the right scale, time ticks along the
+      // bottom. Drawn after the line so labels sit on top, before markers.
+      {
+        const roughStep = range / 5;
+        const mag = Math.pow(10, Math.floor(Math.log10(roughStep)));
+        const normStep = roughStep / mag;
+        let stepMulti = 1;
+        if (normStep < 1.5) stepMulti = 1;
+        else if (normStep < 3) stepMulti = 2;
+        else if (normStep < 7) stepMulti = 5;
+        else stepMulti = 10;
+        const tickStep = stepMulti * mag;
+        const firstTick = Math.ceil(lo / tickStep) * tickStep;
+        const maxF = mag < 1 ? -Math.floor(Math.log10(mag)) + 1 : 2;
+
+        ctx.save();
+        ctx.textAlign = 'left';
+        ctx.font = '9px Comfortaa, sans-serif';
+        ctx.beginPath();
+        ctx.rect(liveXBoundary, 0, W - liveXBoundary, H);
+        ctx.clip();
+        for (let priceVal = firstTick; priceVal <= hi; priceVal += tickStep) {
+          const y = toY(priceVal);
+          if (isLight) {
+            ctx.setLineDash([3, 6]);
+            ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(liveXBoundary, y);
+            ctx.stroke();
+          }
+          if (Math.abs(y - liveY) < 12) continue;
+          ctx.setLineDash([]);
+          ctx.fillStyle = isLight ? '#4B5563' : '#9CA3AF';
+          ctx.fillText(priceVal.toLocaleString(undefined, { minimumFractionDigits: maxF, maximumFractionDigits: maxF }), liveXBoundary + 8, y + 3);
+        }
+        ctx.restore();
+
+        const tickInterval = windowMs / 4;
+        const startTick = Math.ceil(startTime / tickInterval) * tickInterval;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = '9px Comfortaa, sans-serif';
+        ctx.beginPath();
+        ctx.rect(0, 0, liveXBoundary, H);
+        ctx.clip();
+        for (let t = startTick; t <= now; t += tickInterval) {
+          const x = getX(t);
+          if (isLight && x >= 0 && x <= liveXBoundary) {
+            ctx.setLineDash([3, 6]);
+            ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, H);
+            ctx.stroke();
+          }
+          const date = new Date(t);
+          const timeStr = date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          ctx.setLineDash([]);
+          ctx.fillStyle = isLight ? '#4B5563' : '#9CA3AF';
+          ctx.fillText(timeStr, x, H - 6);
+        }
+        ctx.restore();
+        ctx.setLineDash([]);
+      }
 
       // 8. ACTIVE TRADE ENTRY MARKERS — Dotted vertical lines + LIVE badge
       const trades = activeTradesRef.current;

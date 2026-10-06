@@ -2407,9 +2407,13 @@ app.post('/active-market', (req, res) => res.json({ success: true }));
 app.post('/record-fee', (req, res) => res.json({ success: true }));
 
 // --- Chart History Redis Endpoints ---
+// Server-recorded ticks first (authoritative, shared, always fresh while the
+// backend runs); legacy client-posted buffers only as fallback.
 app.get('/chart/history/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
+    const ticks = await cache.loadChartTicks(symbol);
+    if (ticks.length > 0) return res.json(ticks);
     const history = await cache.loadChartHistory(symbol);
     res.json(history);
   } catch (e) {

@@ -35,16 +35,17 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
     // Cache helpers — synchronous localStorage first, async Redis background sync
     const getCacheKey = (sym) => `15market_chart_${sym?.toLowerCase()}`;
+    // Instant paint from localStorage — but only if FRESH (<120s). Stale
+    // buffers are refused outright instead of time-shifted to the present:
+    // shifting fabricates continuity the market never had.
     const loadCachedHistorySync = (sym) => {
         try {
             const cached = localStorage.getItem(getCacheKey(sym));
             if (cached) {
                 const parsed = JSON.parse(cached);
-                if (parsed.length > 0) {
-                    const lastTs = parsed[parsed.length - 1].t;
-                    const now = Date.now();
-                    const shift = now - lastTs;
-                    return parsed.map(p => ({ t: p.t + shift, p: p.p }));
+                if (Array.isArray(parsed) && parsed.length > 10 &&
+                    Date.now() - parsed[parsed.length - 1].t < 120000) {
+                    return parsed;
                 }
             }
         } catch {}
@@ -117,16 +118,13 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         yMinRef.current = null;
         yMaxRef.current = null;
 
-        // 2. Background sync from Redis
+        // 2. Background sync from Redis. Server-recorded ticks carry real
+        // timestamps and replace the buffer verbatim — no shifting.
         syncFromRedis(symbol).then(redisData => {
-            if (redisData && redisData.length > 0) {
-                const lastTs = redisData[redisData.length - 1].t;
-                const now = Date.now();
-                const shift = now - lastTs;
-                const shifted = redisData.map(p => ({ t: p.t + shift, p: p.p }));
-                priceHistoryRef.current = shifted;
-                interpolatedPriceRef.current = shifted[shifted.length - 1].p;
-                startTimeRef.current = shifted[shifted.length - 1].t;
+            if (redisData && redisData.length > 10) {
+                priceHistoryRef.current = redisData;
+                interpolatedPriceRef.current = redisData[redisData.length - 1].p;
+                startTimeRef.current = redisData[redisData.length - 1].t;
             }
         });
     }, [symbol]);
@@ -203,9 +201,6 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                 const now = Date.now();
                 if ((now - (debugProbeRef.current.emptyDrawTs || 0)) > 5000) {
                     debugProbeRef.current.emptyDrawTs = now;
-                    // #region agent log
-                    fetch('http://127.0.0.1:7763/ingest/3594a004-3d00-491a-a04f-c0eea15a4941',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'488cf3'},body:JSON.stringify({sessionId:'488cf3',runId:'initial',hypothesisId:'H11',location:'LiveStreamingChart.jsx:draw:noData',message:'chart draw skipped due to missing data',data:{symbol,latestPriceVal,historyLength:history.length,hasStart:!!startTimeRef.current},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
                 }
                 rafRef.current = requestAnimationFrame(draw);
                 return;

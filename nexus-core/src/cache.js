@@ -420,6 +420,49 @@ class Cache {
       return [];
     }
   }
+
+  // --- Server-recorded chart ticks ---
+  // The backend appends its own polled price every second, so a login always
+  // finds real shared history instead of depending on whichever browser
+  // POSTed its buffer last (last-writer-wins) or starting from nothing.
+  // Only real feed sources are recorded — synthetic oracle drift must never
+  // become "history". 900 ticks ≈ 15 minutes at 1s cadence.
+  async appendChartTick(symbol, t, p) {
+    try {
+      const r = getRedis();
+      const key = `15market:chart:${String(symbol || '').toLowerCase()}:ticks`;
+      const pipe = r.pipeline();
+      pipe.rpush(key, JSON.stringify({ t: Number(t), p: Number(p) }));
+      pipe.ltrim(key, -900, -1);
+      pipe.expire(key, 86400);
+      // exec() resolves even when individual commands fail ([err, res]
+      // pairs), so verify rather than assuming the write landed.
+      const res = await pipe.exec();
+      if (!res || res.some(([err]) => !!err)) return false;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async loadChartTicks(symbol) {
+    try {
+      const r = getRedis();
+      const key = `15market:chart:${String(symbol || '').toLowerCase()}:ticks`;
+      const rows = await r.lrange(key, 0, -1);
+      if (!rows || !rows.length) return [];
+      const out = [];
+      for (const json of rows) {
+        try {
+          const pt = JSON.parse(json);
+          if (pt && isFinite(pt.t) && isFinite(pt.p) && pt.p > 0) out.push({ t: pt.t, p: pt.p });
+        } catch {}
+      }
+      return out;
+    } catch (e) {
+      return [];
+    }
+  }
 }
 
 module.exports = new Cache();

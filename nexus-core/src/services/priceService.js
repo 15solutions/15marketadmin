@@ -235,9 +235,16 @@ function start(io) {
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Poll timeout')), 5000))
             ]);
             if (ioRef) {
+                const nowTs = Date.now();
                 for (const r of results) {
                     if (r && r.price > 0) {
-                        ioRef.emit('price', { key: r.key, price: r.price, ts: Date.now() });
+                        ioRef.emit('price', { key: r.key, price: r.price, ts: nowTs });
+                        // Record the stream server-side (fire-and-forget — never
+                        // block the poll). Synthetic oracle drift is excluded so
+                        // fabricated prices can never become chart history.
+                        if (r.source !== 'oracle_fallback' && r.source !== 'oracle_stale') {
+                            cache.appendChartTick(r.key, nowTs, r.price).catch(() => {});
+                        }
                     }
                 }
             }
