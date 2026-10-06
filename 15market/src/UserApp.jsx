@@ -2933,24 +2933,19 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     // The frontend will receive 'balance_update' and 'trade_settled' events via Socket.io.
   }, [activeTrades, serverTimeOffset]);
 
-  // isExecuting is only a placement-in-flight flag, but several flows can leave
-  // it true with no live trade behind it (failed validation after the flag was
-  // set, a remount mid-flight, a backgrounded tab). A stuck flag lets the
-  // PLACING branch cover settling/verdict states it must never cover, so
-  // release it once nothing is genuinely in flight. (The unresolved-submit
-  // path holds its own separate lock, untouched here.)
+  // isExecuting must mirror reality on every render, not once. The old
+  // one-shot check ran 8s after the flag was set: if the trade was alive at
+  // that moment but its verdict was missed later, the flag stuck true forever
+  // and PLACING covered everything after the countdown. Overdue zombies don't
+  // count as in-flight. (The unresolved-submit path holds its own separate
+  // lock, untouched here.)
   useEffect(() => {
     if (!isExecuting) return;
-    const t = setTimeout(() => {
-      // Overdue trades don't count: past countdown + grace with no verdict is
-      // a stuck trade, not an in-flight placement, and must never pin the
-      // submit flag (and with it the mobile buttons) down.
-      const live = (activeTradesRef.current || []).some(tr =>
-        ['PENDING', 'RESOLVING'].includes(tr.status) && !isTradeOverdue(tr));
-      if (!live && !unresolvedSubmitRef.current) setIsExecuting(false);
-    }, 8000);
-    return () => clearTimeout(t);
-  }, [isExecuting]);
+    const live = (activeTradesRef.current || []).some(tr =>
+      ['PENDING', 'RESOLVING'].includes(tr.status) && !isTradeOverdue(tr));
+    if (live || unresolvedSubmitRef.current) return;
+    setIsExecuting(false);
+  }, [isExecuting, activeTrades]);
 
   // Safety Cleanup: Remove finalized trades after showing result.
   // RESOLVING is deliberately NOT in this list: it means "countdown done,
