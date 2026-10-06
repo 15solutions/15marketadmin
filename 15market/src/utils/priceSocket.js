@@ -3,11 +3,6 @@ import { KEEPER_URL_ARC } from '../constants';
 
 const ALL_KEYS = ['btc', 'eth', 'sol'];
 
-const SYMBOL_TO_KEY = {
-    'BTCUSDT': 'btc', 'ETHUSDT': 'eth', 'SOLUSDT': 'sol',
-    'btcusdt': 'btc', 'ethusdt': 'eth', 'solusdt': 'sol'
-};
-
 const MEXC_SYMBOLS = { btc: 'BTCUSDT', eth: 'ETHUSDT', sol: 'SOLUSDT' };
 
 class PriceSocketService {
@@ -16,22 +11,18 @@ class PriceSocketService {
         this.latestPrices = { btc: 0, eth: 0, sol: 0 };
         this.lastMessageAt = 0;
         this.priceSocket = null;
-        this.binanceWs = null;
         this.pollingInterval = null;
         this.isSocketConnecting = false;
         this.isConnecting = false;
-        // Direct-Binance backoff state. The backend relay owns the feed; the
-        // direct stream is only a latency enhancement, so a link that cannot
-        // complete the Binance handshake must back off and eventually yield
-        // instead of hammering it every 5s forever (battery + log spam).
-        this.isBinanceConnecting = false;
-        this.binanceFailures = 0;
-        this.binanceDeadForSession = false;
     }
 
     connect() {
+        // Relay-only, by policy: the backend aggregates MEXC + Kraken +
+        // Binance server-side, so a direct browser stream adds no data —
+        // only a second failure domain plus handshake spam on links that
+        // cannot reach Binance. Frontend prices are display-only anyway;
+        // settlement runs on backend prices.
         this._connectBackendPriceStream();
-        this._connectBinanceWs();
         this._startMexcPolling();
 
         if (!this.pollingInterval) {
@@ -90,64 +81,6 @@ class PriceSocketService {
             socket.on('connect_error', () => { this.isSocketConnecting = false; });
         } catch (e) {
             this.isSocketConnecting = false;
-        }
-    }
-
-    _connectBinanceWs() {
-        // One socket max: connect() runs per subscriber, and without this
-        // guard N subscribers meant N parallel Binance sockets each retrying.
-        if (this.binanceDeadForSession || this.isBinanceConnecting) return;
-        if (this.binanceWs && this.binanceWs.readyState <= 1) return;
-        this.isBinanceConnecting = true;
-        try {
-            const streams = 'btcusdt@trade/ethusdt@trade/solusdt@trade';
-            const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${streams}`);
-            this.binanceWs = ws;
-
-            ws.onopen = () => {
-                this.isBinanceConnecting = false;
-                this.binanceFailures = 0;
-                console.log('[PriceStream] Binance Direct Stream active');
-            };
-
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data && data.s && data.p) {
-                        const key = SYMBOL_TO_KEY[data.s];
-                        if (key) this._emitPrice(key, parseFloat(data.p), data.T || Date.now(), 'binance_ws');
-                    }
-                } catch (e) {}
-            };
-
-            // onerror AND onclose both fire for one failed handshake — run
-            // the backoff exactly once per socket or failures double-count.
-            let settled = false;
-            const backoff = () => {
-                if (settled) return;
-                settled = true;
-                this.binanceWs = null;
-                this.isBinanceConnecting = false;
-                this.binanceFailures += 1;
-                // Past 8 straight failures the link clearly cannot reach
-                // Binance (blocked egress, captive portal, dead route). Stop
-                // for the session — the backend relay already owns the feed —
-                // instead of error-spamming every 5s forever.
-                if (this.binanceFailures > 8) {
-                    if (!this.binanceDeadForSession) {
-                        this.binanceDeadForSession = true;
-                        console.warn('[PriceStream] Binance unreachable (8 failed handshakes) — relay-only feed for this session.');
-                    }
-                    return;
-                }
-                const delay = Math.min(5000 * Math.pow(2, this.binanceFailures - 1), 300000);
-                setTimeout(() => this._connectBinanceWs(), delay);
-            };
-
-            ws.onerror = backoff;
-            ws.onclose = backoff;
-        } catch (e) {
-            this.isBinanceConnecting = false;
         }
     }
 
