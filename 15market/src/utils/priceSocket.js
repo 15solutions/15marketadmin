@@ -20,6 +20,13 @@ class PriceSocketService {
         this.pollingInterval = null;
         this.isSocketConnecting = false;
         this.isConnecting = false;
+        // Direct-Binance backoff state. The backend relay owns the feed; the
+        // direct stream is only a latency enhancement, so a link that cannot
+        // complete the Binance handshake must back off and eventually yield
+        // instead of hammering it every 5s forever (battery + log spam).
+        this.isBinanceConnecting = false;
+        this.binanceFailures = 0;
+        this.binanceDeadForSession = false;
     }
 
     connect() {
@@ -57,9 +64,11 @@ class PriceSocketService {
                 transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionDelay: 1000,
-                reconnectionDelayMax: 5000,
+                reconnectionDelayMax: 30000,
                 reconnectionAttempts: Infinity,
-                timeout: 5000,
+                // Slow links need more than 5s to finish the handshake; same
+                // reasoning as the adaptive timeout in utils/socket.js.
+                timeout: 15000,
             });
             this.priceSocket = socket;
 
@@ -85,12 +94,19 @@ class PriceSocketService {
     }
 
     _connectBinanceWs() {
+        // One socket max: connect() runs per subscriber, and without this
+        // guard N subscribers meant N parallel Binance sockets each retrying.
+        if (this.binanceDeadForSession || this.isBinanceConnecting) return;
+        if (this.binanceWs && this.binanceWs.readyState <= 1) return;
+        this.isBinanceConnecting = true;
         try {
             const streams = 'btcusdt@trade/ethusdt@trade/solusdt@trade';
             const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${streams}`);
             this.binanceWs = ws;
 
             ws.onopen = () => {
+                this.isBinanceConnecting = false;
+                this.binanceFailures = 0;
                 console.log('[PriceStream] Binance Direct Stream active');
             };
 
@@ -104,12 +120,35 @@ class PriceSocketService {
                 } catch (e) {}
             };
 
-            ws.onerror = () => { this.binanceWs = null; };
-            ws.onclose = () => {
+            // onerror AND onclose both fire for one failed handshake — run
+            // the backoff exactly once per socket or failures double-count.
+            let settled = false;
+            const backoff = () => {
+                if (settled) return;
+                settled = true;
                 this.binanceWs = null;
-                setTimeout(() => this._connectBinanceWs(), 5000);
+                this.isBinanceConnecting = false;
+                this.binanceFailures += 1;
+                // Past 8 straight failures the link clearly cannot reach
+                // Binance (blocked egress, captive portal, dead route). Stop
+                // for the session — the backend relay already owns the feed —
+                // instead of error-spamming every 5s forever.
+                if (this.binanceFailures > 8) {
+                    if (!this.binanceDeadForSession) {
+                        this.binanceDeadForSession = true;
+                        console.warn('[PriceStream] Binance unreachable (8 failed handshakes) — relay-only feed for this session.');
+                    }
+                    return;
+                }
+                const delay = Math.min(5000 * Math.pow(2, this.binanceFailures - 1), 300000);
+                setTimeout(() => this._connectBinanceWs(), delay);
             };
-        } catch (e) {}
+
+            ws.onerror = backoff;
+            ws.onclose = backoff;
+        } catch (e) {
+            this.isBinanceConnecting = false;
+        }
     }
 
     _startMexcPolling() {
