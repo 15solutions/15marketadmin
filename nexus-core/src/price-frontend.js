@@ -1,67 +1,62 @@
 // ============================================================
 // nexus-core/src/price-frontend.js
-// High-performance price streaming service (Port 3012)
+// DIRECT RELAY: Price Stream Proxy (Port 3012)
+// ============================================================
+// Routes price updates from the backend's concurrent WebSocket feeds
+// DIRECTLY to connected clients with zero buffering or batching.
+// Redis relay removed — introduces latency and message loss under load.
 // ============================================================
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const Redis = require('ioredis');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' },
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  maxHttpBufferSize: 1e6,
+  upgradeTimeout: 10000,
+  pingInterval: 25000,
+  pingTimeout: 60000,
 });
-
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-const redis = new Redis(redisUrl);
-const sub = new Redis(redisUrl);
 
 // Cache latest prices to send on connection
-const priceCache = { btc: 0, eth: 0, sol: 0, ts: {} };
-let lastRedisUpdate = Date.now();
+const priceCache = { btc: 0, eth: 0, sol: 0, xrp: 0, jup: 0, avax: 0, mon: 0, ts: {} };
+let lastUpdate = Date.now();
 
-// Subscribe to price updates from index.js (or price-backend)
-sub.subscribe('price_updates', (err) => {
-  if (err) console.error('[Price-Frontend] Subscribe error:', err.message);
-  else console.log('[Price-Frontend] Subscribed to price_updates channel');
-});
+/**
+ * receivePrice(data)
+ * Called directly from the backend's priceService.start(io).
+ * Broadcasts immediately to all connected clients with zero latency.
+ */
+function receivePrice(data) {
+  if (!data || !data.key || !data.price) return;
 
-sub.on('message', (channel, message) => {
-  if (channel === 'price_updates') {
-    try {
-      const data = JSON.parse(message);
-      priceCache[data.key] = data.price;
-      priceCache.ts[data.key] = data.ts;
-      lastRedisUpdate = Date.now();
-      
-      // Broadcast to all connected clients
-      io.emit('price', data);
-    } catch (e) {}
-  }
-});
+  priceCache[data.key] = data.price;
+  priceCache.ts[data.key] = data.ts || Date.now();
+  lastUpdate = Date.now();
 
-// Watchdog: Restart Redis sub if no messages for 10 seconds
+  io.emit('price', {
+    key: data.key,
+    price: data.price,
+    ts: priceCache.ts[data.key],
+    source: 'backend'
+  });
+}
+
 setInterval(() => {
-  if (Date.now() - lastRedisUpdate > 10000) {
-    console.warn('[Price-Frontend] Redis sub stalled. Reconnecting...');
-    sub.disconnect();
-    sub.connect().then(() => {
-        sub.subscribe('price_updates');
-    });
-    lastRedisUpdate = Date.now(); // Reset to avoid loop
-  }
-}, 5000);
+  const activeClients = io.engine.clientsCount;
+  console.log(`[Price-Frontend] Active clients: ${activeClients}, Last update: ${new Date(lastUpdate).toLocaleTimeString()}`);
+}, 30000);
 
 io.on('connection', (socket) => {
   console.log(`[Price-Frontend] Client connected: ${socket.id}`);
-  
-  // Send current cache immediately to avoid "Stuck in Loading"
+
   for (const [key, price] of Object.entries(priceCache)) {
     if (key === 'ts') continue;
     if (price > 0) {
-      socket.emit('price', { key, price, ts: priceCache.ts[key] });
+      socket.emit('price', { key, price, ts: priceCache.ts[key], source: 'cache' });
     }
   }
 
@@ -70,13 +65,9 @@ io.on('connection', (socket) => {
   });
 });
 
-// Warmup logging
-setInterval(() => {
-  const activeClients = io.engine.clientsCount;
-  console.log(`[Price-Frontend] Heatcheck: ${activeClients} clients active. Last update: ${new Date(lastRedisUpdate).toLocaleTimeString()}`);
-}, 30000);
-
 const PORT = process.env.PRICE_FRONTEND_PORT || 3012;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Price Stream Server listening on port ${PORT}`);
+  console.log(`🚀 Price Stream Relay listening on port ${PORT}`);
 });
+
+module.exports = { server, io, receivePrice };
