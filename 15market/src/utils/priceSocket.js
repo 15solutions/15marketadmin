@@ -1,34 +1,58 @@
 import { io } from 'socket.io-client';
-import { KEEPER_URL_ARC } from '../constants';
+import { KEEPER_URL_ARC, PRICE_FEED_URL } from '../constants';
 
-const ALL_KEYS = ['btc', 'eth', 'sol'];
+// All keys supported across the platform
+const ALL_KEYS = ['btc', 'eth', 'sol', 'avax', 'mon'];
 
-const MEXC_SYMBOLS = { btc: 'BTCUSDT', eth: 'ETHUSDT', sol: 'SOLUSDT' };
+// Direct Binance WS symbols for real-time sub-50ms browser stream
+const BINANCE_WS_SYMBOLS = {
+    btc: 'btcusdt',
+    eth: 'ethusdt',
+    sol: 'solusdt',
+    avax: 'avaxusdt',
+};
+
+const BINANCE_SYMBOL_TO_KEY = {
+    'BTCUSDT': 'btc', 'ETHUSDT': 'eth', 'SOLUSDT': 'sol', 'AVAXUSDT': 'avax',
+    'btcusdt': 'btc', 'ethusdt': 'eth', 'solusdt': 'sol', 'avaxusdt': 'avax',
+};
+
+// REST fallback via backend relay (CORS-safe)
+const REST_SYMBOLS = { btc: 'BTCUSDT', eth: 'ETHUSDT', sol: 'SOLUSDT', avax: 'AVAXUSDT' };
 
 class PriceSocketService {
     constructor() {
         this.listeners = new Set();
-        this.latestPrices = { btc: 0, eth: 0, sol: 0 };
+        this.latestPrices = { btc: 0, eth: 0, sol: 0, avax: 0, mon: 0 };
         this.lastMessageAt = 0;
         this.priceSocket = null;
+        this.binanceWs = null;
+        this.binanceReconnectTimer = null;
         this.pollingInterval = null;
         this.isSocketConnecting = false;
         this.isConnecting = false;
     }
 
     connect() {
-        // Relay-only, by policy: the backend aggregates MEXC + Kraken +
-        // Binance server-side, so a direct browser stream adds no data —
-        // only a second failure domain plus handshake spam on links that
-        // cannot reach Binance. Frontend prices are display-only anyway;
-        // settlement runs on backend prices.
-        this._connectBackendPriceStream();
-        this._startMexcPolling();
+        if (this.isConnecting) return;
+        this.isConnecting = true;
 
+        // 1. Direct Binance combined-stream WS for real-time sub-50ms ticks
+        //    This is what made the chart smooth two months ago — each price
+        //    tick arrives as soon as Binance publishes it, without a server hop.
+        this._connectBinanceWs();
+
+        // 2. Backend relay socket as authoritative source (settlement prices)
+        //    The backend uses concurrent per-asset WS feeds (priceService.js)
+        //    and broadcasts to all clients. This is the ONLY source for MON
+        //    (no Binance pair) and ensures chart prices match settlement.
+        this._connectBackendPriceStream();
+
+        // 3. REST polling fallback — kicks in if both WS feeds go silent > 5s
         if (!this.pollingInterval) {
             this.pollingInterval = setInterval(() => {
                 if (Date.now() - this.lastMessageAt > 5000) {
-                    this._mexcPoll();
+                    this._restPoll();
                 }
             }, 3000);
         }
@@ -44,34 +68,93 @@ class PriceSocketService {
         });
     }
 
+    // ─── Direct Binance combined-stream WebSocket ────────────────────────────
+    _connectBinanceWs() {
+        if (this.binanceWs && this.binanceWs.readyState === WebSocket.OPEN) return;
+
+        try {
+            // Combined stream: one WS handles all assets simultaneously.
+            // Binance's combined endpoint: wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/...
+            const streams = Object.values(BINANCE_WS_SYMBOLS).map(s => `${s}@trade`).join('/');
+            const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+
+            ws.onopen = () => {
+                this.binanceWs = ws;
+                if (this.binanceReconnectTimer) {
+                    clearTimeout(this.binanceReconnectTimer);
+                    this.binanceReconnectTimer = null;
+                }
+                console.log('[PriceStream] Binance direct WS connected (real-time stream active)');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    // Combined stream wraps: { stream: "btcusdt@trade", data: { s, p, T } }
+                    const payload = msg.data || msg;
+                    if (payload && payload.s && payload.p) {
+                        const key = BINANCE_SYMBOL_TO_KEY[payload.s] || BINANCE_SYMBOL_TO_KEY[payload.s.toLowerCase()];
+                        if (key) {
+                            const price = parseFloat(payload.p);
+                            if (price > 0) {
+                                this._emitPrice(key, price, payload.T || Date.now(), 'binance_ws');
+                            }
+                        }
+                    }
+                } catch (e) {}
+            };
+
+            ws.onerror = () => {};
+
+            ws.onclose = () => {
+                this.binanceWs = null;
+                if (!this.binanceReconnectTimer) {
+                    this.binanceReconnectTimer = setTimeout(() => {
+                        this.binanceReconnectTimer = null;
+                        this._connectBinanceWs();
+                    }, 5000);
+                }
+            };
+        } catch (e) {
+            // WebSocket not available (SSR, etc.) — fall back to backend relay only
+        }
+    }
+
+    // ─── Backend socket relay ────────────────────────────────────────────────
     _connectBackendPriceStream() {
         if (this.isSocketConnecting || (this.priceSocket && this.priceSocket.connected)) return;
-        if (!KEEPER_URL_ARC) return;
+        // Use PRICE_FEED_URL which is the dedicated price relay (port 3012 in dev,
+        // same as KEEPER_URL_ARC in production where the relay is colocated).
+        const streamUrl = PRICE_FEED_URL || KEEPER_URL_ARC;
+        if (!streamUrl) return;
 
         this.isSocketConnecting = true;
 
         try {
-            const socket = io(KEEPER_URL_ARC, {
+            const socket = io(streamUrl, {
                 transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionDelay: 1000,
                 reconnectionDelayMax: 30000,
                 reconnectionAttempts: Infinity,
-                // Slow links need more than 5s to finish the handshake; same
-                // reasoning as the adaptive timeout in utils/socket.js.
+                // Slow links need more than 5s to finish the handshake
                 timeout: 15000,
             });
             this.priceSocket = socket;
 
             socket.on('connect', () => {
                 this.isSocketConnecting = false;
-                console.log('[PriceStream] Backend price relay connected');
+                console.log('[PriceStream] Backend relay connected');
             });
 
             socket.on('price', (data) => {
                 if (data && data.key && data.price) {
                     const key = data.key.toLowerCase();
                     if (ALL_KEYS.includes(key)) {
+                        // Backend prices are authoritative for MON and settlement.
+                        // For BTC/ETH/SOL/AVAX the Binance WS already covers it in
+                        // real-time, but the backend value is also accepted so charts
+                        // that filter for source==='backend' still receive ticks.
                         this._emitPrice(key, parseFloat(data.price), data.ts || Date.now(), 'backend');
                     }
                 }
@@ -84,17 +167,11 @@ class PriceSocketService {
         }
     }
 
-    _startMexcPolling() {
-        this._mexcPoll();
-    }
-
-    async _mexcPoll() {
-        // Browser fetch to exchange REST APIs is ALWAYS CORS-blocked (MEXC/Binance/
-        // Kraken send no Access-Control-Allow-Origin), so the "REST fallback" goes
-        // through the backend relay which performs the exchange call server-side.
+    // ─── REST fallback (CORS-safe via backend relay) ─────────────────────────
+    async _restPoll() {
         try {
             const results = await Promise.allSettled(
-                Object.entries(MEXC_SYMBOLS).map(async ([key, symbol]) => {
+                Object.entries(REST_SYMBOLS).map(async ([key, symbol]) => {
                     const res = await fetch(`${KEEPER_URL_ARC}/price/${key}`, { signal: AbortSignal.timeout(4000) });
                     if (res.ok) {
                         const data = await res.json();
@@ -121,6 +198,8 @@ class PriceSocketService {
         this.connect();
         this.listeners.add(callback);
 
+        // Replay cached prices to newly attached listener so the chart
+        // doesn't wait for the next tick before showing a value.
         Object.entries(this.latestPrices).forEach(([key, price]) => {
             if (price > 0) {
                 try { callback({ key, price, ts: Date.now(), source: 'cache' }); } catch (e) {}

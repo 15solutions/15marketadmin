@@ -1287,6 +1287,7 @@ export default function MobileTradeView({
               style={{
                 height: `${wheelBoxH}px`,
                 overflow: 'hidden',
+                position: 'relative',
                 touchAction: 'none',
                 WebkitUserSelect: 'none',
                 userSelect: 'none',
