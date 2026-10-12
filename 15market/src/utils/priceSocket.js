@@ -48,7 +48,9 @@ class PriceSocketService {
         //    (no Binance pair) and ensures chart prices match settlement.
         this._connectBackendPriceStream();
 
-        // 3. REST polling fallback — kicks in if both WS feeds go silent > 5s
+        // 3. REST polling fallback — fires immediately on connect, then every 3s
+        //    if both WS feeds go silent for > 5s.
+        this._restPoll(); // immediate seed on first connect
         if (!this.pollingInterval) {
             this.pollingInterval = setInterval(() => {
                 if (Date.now() - this.lastMessageAt > 5000) {

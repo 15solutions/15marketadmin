@@ -60,6 +60,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         return () => unbind();
     }, [symbol]);
 
+    // Reset chart state on symbol change, then immediately seed from currentPrice
+    // so the chart draws straight away without waiting for the next socket tick.
     useEffect(() => {
         priceHistoryRef.current = [];
         targetPriceRef.current = null;
@@ -67,7 +69,31 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         startTimeRef.current = null;
         yMinRef.current = null;
         yMaxRef.current = null;
+
+        // Seed immediately from the prop so startTimeRef is set and the draw
+        // loop doesn't stall until the next socket message arrives.
+        const seed = parseFloat(currentPrice);
+        if (!isNaN(seed) && seed > 0) {
+            targetPriceRef.current = seed;
+            interpolatedPriceRef.current = seed;
+            startTimeRef.current = Date.now();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [symbol]);
+
+    // Update target from parent's 5Hz pulse — fast path when socket relay is slow.
+    useEffect(() => {
+        const p = parseFloat(currentPrice);
+        if (!isNaN(p) && p > 0) {
+            targetPriceRef.current = p;
+            if (interpolatedPriceRef.current === null) {
+                interpolatedPriceRef.current = p;
+            }
+            if (startTimeRef.current === null) {
+                startTimeRef.current = Date.now();
+            }
+        }
+    }, [currentPrice]);
 
     useEffect(() => {
         const historyInterval = setInterval(() => {
@@ -77,9 +103,6 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
                 if (targetPriceRef.current !== null) {
                     const diff = targetPriceRef.current - interpolatedPriceRef.current;
-                    // 0.45 lerp factor: fast enough to track 1 tick/s backend relay
-                    // without visibly jumping. Was 0.18 which caused ~300ms of lag
-                    // per tick when the backend relay is the sole source.
                     interpolatedPriceRef.current += diff * 0.45;
                 }
 
@@ -94,21 +117,6 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         }, 50);
         return () => clearInterval(historyInterval);
     }, []);
-
-    // Accept currentPrice prop as an immediate target seed — covers the case
-    // where the socket relay is slow but the parent's 5Hz pulse loop is running.
-    useEffect(() => {
-        const p = parseFloat(currentPrice);
-        if (!isNaN(p) && p > 0) {
-            targetPriceRef.current = p;
-            if (interpolatedPriceRef.current === null) {
-                interpolatedPriceRef.current = p;
-            }
-            if (startTimeRef.current === null) {
-                startTimeRef.current = Date.now();
-            }
-        }
-    }, [currentPrice]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
