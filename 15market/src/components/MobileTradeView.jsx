@@ -240,10 +240,10 @@ function MobileSteppedChart({
         const history = priceHistoryRef.current;
         const last = history[history.length - 1];
 
-        // Smoothly step toward target with a gentler lerp
+        // Step toward target — 0.45 tracks backend relay ticks (1Hz) without lag
         if (targetPriceRef.current !== null) {
           const diff = targetPriceRef.current - interpolatedPriceRef.current;
-          interpolatedPriceRef.current += diff * 0.18;
+          interpolatedPriceRef.current += diff * 0.45;
         }
 
         if (!last || now > last.t) {

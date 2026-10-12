@@ -41,11 +41,14 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         const handlePrice = (data) => {
             if (data.key === symbol.replace('USDT', '').toLowerCase()) {
                 const price = parseFloat(data.price);
-                if (!isNaN(price)) {
-                    targetPriceRef.current = price;
-                    if (interpolatedPriceRef.current === null) {
+                if (!isNaN(price) && price > 0) {
+                    const prev = interpolatedPriceRef.current;
+                    // Snap immediately if this is the first tick or a large jump (>0.5%)
+                    const isLargeJump = prev !== null && Math.abs(price - prev) / prev > 0.005;
+                    if (prev === null || isLargeJump) {
                         interpolatedPriceRef.current = price;
                     }
+                    targetPriceRef.current = price;
                     if (startTimeRef.current === null) {
                         startTimeRef.current = Date.now();
                     }
@@ -74,7 +77,10 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
                 if (targetPriceRef.current !== null) {
                     const diff = targetPriceRef.current - interpolatedPriceRef.current;
-                    interpolatedPriceRef.current += diff * 0.18;
+                    // 0.45 lerp factor: fast enough to track 1 tick/s backend relay
+                    // without visibly jumping. Was 0.18 which caused ~300ms of lag
+                    // per tick when the backend relay is the sole source.
+                    interpolatedPriceRef.current += diff * 0.45;
                 }
 
                 const lastPt = history[history.length - 1];
@@ -88,6 +94,21 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         }, 50);
         return () => clearInterval(historyInterval);
     }, []);
+
+    // Accept currentPrice prop as an immediate target seed — covers the case
+    // where the socket relay is slow but the parent's 5Hz pulse loop is running.
+    useEffect(() => {
+        const p = parseFloat(currentPrice);
+        if (!isNaN(p) && p > 0) {
+            targetPriceRef.current = p;
+            if (interpolatedPriceRef.current === null) {
+                interpolatedPriceRef.current = p;
+            }
+            if (startTimeRef.current === null) {
+                startTimeRef.current = Date.now();
+            }
+        }
+    }, [currentPrice]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -120,7 +141,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
             if (targetPriceRef.current !== null && interpolatedPriceRef.current !== null) {
                 const diff = targetPriceRef.current - interpolatedPriceRef.current;
-                interpolatedPriceRef.current += diff * 0.12;
+                interpolatedPriceRef.current += diff * 0.45;
             }
 
             const history = priceHistoryRef.current;
