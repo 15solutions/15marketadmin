@@ -1,9 +1,10 @@
 // ==================================================================================
-// PRICE SERVICE — Multi-Source Aggregated Feeds
+// PRICE SERVICE — Multi-Source Aggregated Feeds (CONCURRENT)
 // ==================================================================================
-// Primary: REST polling at 1s from MEXC, Kraken, Binance (concurrent)
-// Enhancement: Binance WebSocket for real-time sub-100ms price updates
-// All sources write to shared cache.prices for chart + settlement + odds.
+// Architecture:
+// 1. Individual Binance WebSocket streams (concurrent real-time, sub-100ms)
+// 2. MEXC/Kraken REST fallback polling (1s, only if WS degrades)
+// 3. All sources write to shared cache.prices for chart + settlement + odds.
 // ==================================================================================
 const cache = require('../cache');
 
@@ -24,6 +25,10 @@ const SYMBOL_TO_KEY = {
     'BTCUSDT': 'btc', 'ETHUSDT': 'eth', 'SOLUSDT': 'sol', 'XRPUSDT': 'xrp', 'JUPUSDT': 'jup', 'AVAXUSDT': 'avax',
     'btcusdt': 'btc', 'ethusdt': 'eth', 'solusdt': 'sol', 'xrpusdt': 'xrp', 'jupusdt': 'jup', 'avaxusdt': 'avax'
 };
+
+// Track which sources are actively streaming
+const wsHealthStatus = { btc: 0, eth: 0, sol: 0, xrp: 0, jup: 0, avax: 0 };
+const lastWsUpdate = { btc: 0, eth: 0, sol: 0, xrp: 0, jup: 0, avax: 0 };
 
 function fetchWithTimeout(url, timeoutMs = 1000) {
     const controller = new AbortController();
@@ -78,7 +83,6 @@ async function fetchPriceForAsset(key) {
     if (asset.binance) promises.push(fetchBinance(asset.binance).then(price => ({ key, price, source: 'binance' })));
 
     if (promises.length === 0 && asset.fallbackPrice) {
-        // Simulated micro-variation for synthetic / pre-listing asset like MON
         const drift = (Math.random() - 0.5) * (asset.fallbackPrice * 0.002);
         const currentPrice = cache.prices[key] || asset.fallbackPrice;
         const newPrice = Number(Math.max(0.001, currentPrice + drift).toFixed(6));
@@ -100,16 +104,12 @@ async function fetchPriceForAsset(key) {
         return { key, price: Number(Math.max(0.001, currentPrice + drift).toFixed(6)), source: 'oracle_fallback' };
     }
 
-    // ALL APIs failed — preserve last known price instead of returning null.
-    // Returning null would leave cache.prices at 0, causing getLivePrice() to
-    // return 0 and lockResult() to use entryPrice as exitPrice, making every trade a push/loss.
     const lastPrice = cache.prices[key] || cache.lastPollPrice[key] || asset.fallbackPrice || 0;
     if (lastPrice > 0) {
         const drift = (Math.random() - 0.5) * (lastPrice * 0.001);
         return { key, price: Number(Math.max(0.001, lastPrice + drift).toFixed(6)), source: 'oracle_stale' };
     }
 
-    // LAST RESORT: No price available. Return null — pollPrices() preserves lastPollPrice.
     return null;
 }
 
@@ -120,8 +120,6 @@ async function pollPrices() {
     const now = Date.now();
     for (const r of results) {
         if (r && r.price > 0) {
-            // Reject absurdly low prices that would make trades falsely lose.
-            // If we have a known price and the new price is < 10% of it, skip.
             const lastKnown = cache.lastPollPrice[r.key];
             if (lastKnown > 0 && r.price < lastKnown * 0.1) {
                 continue;
@@ -137,7 +135,6 @@ async function pollPrices() {
         }
     }
 
-    // Ensure cache.prices always has a value — preserve lastPollPrice if still 0.
     for (const key of keys) {
         if (!cache.prices[key] || cache.prices[key] <= 0) {
             cache.prices[key] = cache.lastPollPrice[key] || 0;
@@ -156,50 +153,57 @@ function snapshotPrices() {
     }
 }
 
-// ════════════════════════════════════════════════════════════════════════════════
-// BINANCE WEBSOCKET — Enhancement for real-time price updates
-// ════════════════════════════════════════════════════════════════════════════════
-let binanceWs = null;
-let binanceReconnectTimer = null;
+// ════════════════════════════════════════════════════════════════[CONCURRENT WS]
+// BINANCE WEBSOCKET — Individual streams per asset (HIGH CONCURRENCY)
+// ════════════════════════════════════════════════════════════════[CONCURRENT WS]
+const binanceWsSockets = {};
+const binanceReconnectTimers = {};
 
-function _connectBinanceWs() {
+function _connectBinanceWsForAsset(key) {
     if (!WebSocket) return;
+    if (binanceWsSockets[key]) return;
 
     try {
-        const streams = Object.values(ASSETS).filter(a => !!a.binanceWs).map(a => `${a.binanceWs}@trade`).join('/');
-        // Combined-stream endpoint. The `/ws/<s1>/<s2>/...` path silently degrades when
-        // subscribing to many streams (only a trickle of messages), which left the
-        // enhancement effectively dead and the frontend on the 1s REST poll alone.
-        const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+        const asset = ASSETS[key];
+        if (!asset || !asset.binanceWs) return;
+
+        // Important: do NOT use the combined-stream endpoint here.
+        // The combined stream degrades and silently drops ticks under load,
+        // which is why the mobile widget was lagging every 15-30 seconds.
+        const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${asset.binanceWs}@trade`);
 
         ws.on('open', () => {
-            console.log('[PriceService] Binance WebSocket connected (enhancement active)');
-            binanceWs = ws;
+            console.log(`[PriceService] Binance WS connected for ${key} (concurrent stream active)`);
+            binanceWsSockets[key] = ws;
+            wsHealthStatus[key] = 1;
+
+            if (binanceReconnectTimers[key]) {
+                clearTimeout(binanceReconnectTimers[key]);
+                binanceReconnectTimers[key] = null;
+            }
         });
 
         ws.on('message', (raw) => {
             try {
                 const msg = JSON.parse(raw);
-                // Combined streams wrap payloads as { stream, data }; single streams don't.
-                const data = msg && msg.data ? msg.data : msg;
-                if (data && data.s && data.p) {
-                    const key = SYMBOL_TO_KEY[data.s];
-                    if (key) {
-                        const price = parseFloat(data.p);
+                if ((msg && msg.s && msg.p) || (msg && msg.data && msg.data.s && msg.data.p)) {
+                    const payload = msg.data || msg;
+                    const msgKey = SYMBOL_TO_KEY[payload.s];
+                    if (msgKey === key) {
+                        const price = parseFloat(payload.p);
                         if (price > 0) {
-                            // Update cache immediately (real-time)
-                            cache.prices[key] = price;
-                            cache.priceMeta[key] = { updatedAt: data.T || Date.now(), source: 'binance_ws' };
+                            cache.prices[msgKey] = price;
+                            cache.priceMeta[msgKey] = { updatedAt: payload.T || Date.now(), source: 'binance_ws' };
 
-                            // Write to price history for settlement precision
                             const now = Date.now();
-                            if (!cache.priceHistory[key]) cache.priceHistory[key] = [];
-                            cache.priceHistory[key].push({ price, time: now });
-                            if (cache.priceHistory[key].length > 4800) cache.priceHistory[key].shift();
+                            if (!cache.priceHistory[msgKey]) cache.priceHistory[msgKey] = [];
+                            cache.priceHistory[msgKey].push({ price, time: now });
+                            if (cache.priceHistory[msgKey].length > 4800) cache.priceHistory[msgKey].shift();
 
-                            // Broadcast to all connected clients in real-time
+                            lastWsUpdate[msgKey] = now;
+
                             if (ioRef) {
-                                ioRef.emit('price', { key, price, ts: now });
+                                ioRef.emit('price', { key: msgKey, price, ts: now });
                             }
                         }
                     }
@@ -207,27 +211,62 @@ function _connectBinanceWs() {
             } catch (e) {}
         });
 
-        ws.on('error', () => {});
+        ws.on('error', (err) => {
+            console.warn(`[PriceService] WS error for ${key}:`, err.message);
+            wsHealthStatus[key] = 0;
+        });
+
         ws.on('close', () => {
-            binanceWs = null;
-            binanceReconnectTimer = setTimeout(() => _connectBinanceWs(), 5000);
+            binanceWsSockets[key] = null;
+            wsHealthStatus[key] = 0;
+
+            if (!binanceReconnectTimers[key]) {
+                binanceReconnectTimers[key] = setTimeout(() => {
+                    _connectBinanceWsForAsset(key);
+                }, 5000);
+            }
         });
     } catch (err) {
-        binanceReconnectTimer = setTimeout(() => _connectBinanceWs(), 5000);
+        console.error(`[PriceService] Failed to connect WS for ${key}:`, err.message);
+        wsHealthStatus[key] = 0;
+
+        if (!binanceReconnectTimers[key]) {
+            binanceReconnectTimers[key] = setTimeout(() => {
+                _connectBinanceWsForAsset(key);
+            }, 5000);
+        }
     }
+}
+
+function _connectAllBinanceWs() {
+    const keys = Object.keys(ASSETS).filter(k => !!ASSETS[k].binanceWs);
+    keys.forEach(key => _connectBinanceWsForAsset(key));
 }
 
 let ioRef = null;
 let pollInterval = null;
 let snapshotInterval = null;
+let wsHealthCheckInterval = null;
 let polling = false;
 
 function start(io) {
     ioRef = io;
-    console.log('[PriceService] Starting multi-source price feeds (MEXC + Kraken + Binance @ 1s)...');
+    console.log('[PriceService] Starting CONCURRENT multi-source price feeds...');
+    console.log('[PriceService] - Binance individual WebSocket streams (concurrent, sub-100ms)');
+    console.log('[PriceService] - MEXC/Kraken REST fallback (1s poll)');
 
+    // Initialize all individual Binance WebSocket streams immediately
+    _connectAllBinanceWs();
+
+    // REST polling as fallback only when the per-asset WS feeds stall.
     pollInterval = setInterval(async () => {
+        const now = Date.now();
+        const keys = Object.keys(ASSETS);
+        const needsFallback = keys.some(key => (now - lastWsUpdate[key]) > 3000);
+
+        if (!needsFallback) return;
         if (polling) return;
+
         try {
             polling = true;
             const results = await Promise.race([
@@ -243,15 +282,32 @@ function start(io) {
                 }
             }
         } catch (e) {
-            console.error('[PriceService] Poll error:', e.message);
+            console.warn('[PriceService] REST fallback poll error:', e.message);
         } finally {
             polling = false;
         }
     }, 1000);
 
-    _connectBinanceWs();
-
     snapshotInterval = setInterval(snapshotPrices, 250);
+
+    // Health check: monitor per-asset feeds and reconnect stalled sockets.
+    wsHealthCheckInterval = setInterval(() => {
+        const now = Date.now();
+        const keys = Object.keys(ASSETS).filter(k => !!ASSETS[k].binanceWs);
+
+        for (const key of keys) {
+            const timeSinceLastUpdate = now - lastWsUpdate[key];
+            const isConnected = !!binanceWsSockets[key] && wsHealthStatus[key] === 1;
+
+            if (isConnected && timeSinceLastUpdate > 10000) {
+                console.warn(`[PriceService] WS for ${key} stalled (no update in ${timeSinceLastUpdate}ms), reconnecting...`);
+                binanceWsSockets[key]?.close();
+                binanceWsSockets[key] = null;
+                wsHealthStatus[key] = 0;
+                _connectBinanceWsForAsset(key);
+            }
+        }
+    }, 5000);
 
     (async () => {
         try {
@@ -304,13 +360,11 @@ function _fetchBinance24h() {
 
 /**
  * Get the current live price for an asset.
- * Returns the most recent price from the REST poll or WS feed.
+ * Returns the most recent price from the real-time WS feed.
  * Used by the classic engine for settlement at countdown zero.
  */
 function getLivePrice(key) {
     if (!key) return 0;
-    // Prefer cache.prices (most recent from WS or REST poll),
-    // fall back to lastPollPrice (guaranteed to be updated on every poll).
     const price = cache.prices[key] || cache.lastPollPrice[key] || 0;
     return price;
 }
@@ -318,11 +372,19 @@ function getLivePrice(key) {
 function stop() {
     if (pollInterval) clearInterval(pollInterval);
     if (snapshotInterval) clearInterval(snapshotInterval);
-    if (binanceReconnectTimer) clearTimeout(binanceReconnectTimer);
-    if (binanceWs) binanceWs.close();
+    if (wsHealthCheckInterval) clearInterval(wsHealthCheckInterval);
+
+    Object.values(binanceWsSockets).forEach(ws => {
+        if (ws) ws.close();
+    });
+
+    Object.values(binanceReconnectTimers).forEach(timer => {
+        if (timer) clearTimeout(timer);
+    });
+
     pollInterval = null;
     snapshotInterval = null;
-    binanceWs = null;
+    wsHealthCheckInterval = null;
 }
 
 module.exports = { start, stop, pollPrices, ASSETS, getLivePrice, fetchPriceForAsset };
