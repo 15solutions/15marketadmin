@@ -15,6 +15,22 @@ const LOGO_MAP = {
   avax: '/avax.png',
 };
 
+const ASSET_META = {
+  BTC: { glyph: '₿', color: '#f7931a' },
+  ETH: { glyph: '◆', color: '#627eea' },
+  SOL: { glyph: '≡', color: '#9945ff' },
+  AVAX: { glyph: '▲', color: '#e84142' },
+  MON: { glyph: 'M', color: '#836ef9' },
+};
+
+const getAssetMeta = (token) => {
+  const symbol = (token?.symbol || token?.id || '').toUpperCase();
+  return ASSET_META[symbol] || {
+    glyph: (symbol || '•').charAt(0) || '•',
+    color: '#ffffff',
+  };
+};
+
 const WHEEL_ROW_H = 58;
 // Most rows the wheel will show at once. The window is sized from the token
 // count at runtime so the whole list fits on a phone without repeating an
@@ -43,72 +59,88 @@ function getLogoFilter(isLight) {
  * derived from a motion value, so the row scales and fades continuously with
  * the drag instead of snapping between discrete states.
  */
-function WheelRow({ token, index, isLight, isUnavailable, logo, wheelPos, boxH, onTap }) {
+function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol }) {
   const distance = useTransform(wheelPos, (v) => Math.abs(v - index));
-  const scale = useTransform(distance, [0, 1, 2, 3], [1, 0.82, 0.68, 0.58]);
-  const opacity = useTransform(distance, [0, 1, 2, 3], [1, 0.72, 0.4, 0.16]);
-  const fontSize = useTransform(distance, [0, 1, 2, 3], [28, 19, 13, 11]);
-  const logoSize = useTransform(distance, [0, 1, 2, 3], [40, 28, 20, 17]);
-  const blur = useTransform(distance, [0, 1, 2, 3], [0, 0, 0.4, 0.9]);
-  const rowFilter = useTransform(blur, (b) => (b > 0.01 ? `blur(${b}px)` : 'blur(0px)'));
-  // Each row offsets itself from the shared position, so when the window slides
-  // one row the offset resolves unchanged and no DOM node ever jumps.
-  const y = useTransform(
-    wheelPos,
-    (v) => (boxH / 2 - WHEEL_ROW_H / 2) - (index - v) * WHEEL_ROW_H
-  );
+  const scale = useTransform(distance, [0, 1, 2, 3], [1.6, 1.08, 0.72, 0.28]);
+  const opacity = useTransform(distance, [0, 1, 2, 3], [1, 0.82, 0.45, 0.12]);
+  const y = useTransform(wheelPos, (v) => (boxH / 2 - 22) - (index - v) * WHEEL_ROW_H);
+
+  const assetMeta = getAssetMeta(token);
+  const isActive = (activeAssetSymbol || '').toUpperCase() === (token?.symbol || '').toUpperCase();
 
   return (
     <motion.button
       type="button"
-      onClick={(e) => { e.stopPropagation(); onTap(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTap();
+      }}
       className="w-full flex items-center justify-center gap-2 px-6 bg-transparent border-none outline-none"
       style={{
         height: `${WHEEL_ROW_H}px`,
+        position: 'absolute',
+        left: '50%',
+        width: '120px',
+        marginLeft: '-60px',
         y,
         scale,
         opacity,
-        filter: rowFilter,
-        pointerEvents: isUnavailable ? 'none' : 'auto',
-        cursor: isUnavailable ? 'default' : 'pointer',
+        background: 'transparent',
+        boxShadow: 'none',
+        border: 'none',
+        outline: 'none',
+        pointerEvents: 'auto',
+        cursor: 'pointer',
         touchAction: 'none',
+        transformOrigin: 'center',
+        willChange: 'transform, opacity',
       }}
     >
-      {logo ? (
-        <motion.img
-          src={logo}
-          alt={token.symbol}
-          className="object-contain shrink-0"
-          style={{
-            width: logoSize,
-            height: logoSize,
-            filter: getLogoFilter(isLight),
-            opacity: isUnavailable ? 0.3 : 1,
-          }}
-          crossOrigin="anonymous"
-        />
-      ) : (
-        <motion.span
-          className="font-black shrink-0"
-          style={{
-            fontSize: logoSize,
-            width: logoSize,
-            color: isLight ? '#0a261a' : '#fff',
-            opacity: isUnavailable ? 0.3 : 1,
-          }}
-        >{token.symbol[0]}</motion.span>
-      )}
-      <motion.span
-        className="font-black tracking-wider"
+      <motion.small
         style={{
-          fontSize,
-          color: isLight ? '#0a261a' : '#fff',
-          opacity: isUnavailable ? 0.3 : 1,
-          fontFamily: '"Comfortaa", cursive',
+          fontSize: 15,
+          color: assetMeta.color,
+          filter: 'brightness(1.4)',
+          lineHeight: 1,
+          minWidth: 14,
+          textAlign: 'center',
+          opacity: isActive ? 1 : 0.8,
+        }}
+      >
+        {assetMeta.glyph}
+      </motion.small>
+
+      <motion.span
+        style={{
+          fontSize: 15,
+          letterSpacing: '0.06em',
+          color: isActive ? '#3ddc84' : '#ffffff',
+          textShadow: isActive ? '0 0 18px rgba(61,220,132,0.8)' : 'none',
+          fontWeight: 800,
+          lineHeight: 1,
+          opacity: isActive ? 1 : 0.95,
+          position: 'relative',
         }}
       >
         {token.symbol}
       </motion.span>
+
+      {isActive && (
+        <span
+          style={{
+            position: 'absolute',
+            bottom: '-4px',
+            left: '50%',
+            width: '6px',
+            height: '6px',
+            marginLeft: '-3px',
+            borderRadius: '50%',
+            background: '#3ddc84',
+            boxShadow: '0 0 10px rgba(61,220,132,0.9)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
     </motion.button>
   );
 }
@@ -826,6 +858,8 @@ export default function MobileTradeView({
   const [wheelCenter, setWheelCenter] = useState(0);
   const wheelCenterRef = useRef(0);
 
+  const [activeAssetSymbol, setActiveAssetSymbol] = useState(() => (activeMarket?.symbol || activeMarket?.id || 'ETH').toUpperCase());
+
   // Global / settled trades for the live market scroller
   const [tickerHistory, setTickerHistory] = useState(() => {
     try {
@@ -833,6 +867,10 @@ export default function MobileTradeView({
       return saved ? JSON.parse(saved) : [];
     } catch (e) { return []; }
   });
+
+  useEffect(() => {
+    setActiveAssetSymbol((activeMarket?.symbol || activeMarket?.id || 'ETH').toUpperCase());
+  }, [activeMarket]);
 
   useEffect(() => {
     let active = true;
@@ -964,12 +1002,12 @@ export default function MobileTradeView({
 
   const isTradeActive = !!currentActiveTrade || isExecuting || showOutcome;
 
-useEffect(() => {
+  useEffect(() => {
     if (!currentActiveTrade) {
-        setRemainingSec(0);
-        setTradeProgress(0);
-        setCountdownEnded(false);
-        return;
+      setRemainingSec(0);
+      setTradeProgress(0);
+      setCountdownEnded(false);
+      return;
     }
     setCountdownEnded(false);
     const duration = currentActiveTrade.duration || 15;
@@ -977,19 +1015,19 @@ useEffect(() => {
     let rafId;
 
     const tick = () => {
-        const now = Date.now();
-        const startTime = currentActiveTrade.startTime || currentActiveTrade.createdAt || currentActiveTrade.timestamp || Date.now();
-        const expiry = currentActiveTrade.expiryMs || (startTime + totalMs);
-        const remaining = Math.max(0, expiry - now);
-        const secs = Math.ceil(remaining / 1000);
-        const prog = Math.min(100, ((totalMs - remaining) / totalMs) * 100);
-        setRemainingSec(secs);
-        setTradeProgress(prog);
-        rafId = requestAnimationFrame(tick);
+      const now = Date.now();
+      const startTime = currentActiveTrade.startTime || currentActiveTrade.createdAt || currentActiveTrade.timestamp || Date.now();
+      const expiry = currentActiveTrade.expiryMs || (startTime + totalMs);
+      const remaining = Math.max(0, expiry - now);
+      const secs = Math.ceil(remaining / 1000);
+      const prog = Math.min(100, ((totalMs - remaining) / totalMs) * 100);
+      setRemainingSec(secs);
+      setTradeProgress(prog);
+      rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-}, [currentActiveTrade]);
+  }, [currentActiveTrade]);
 
   // Odds calculation (defaults to 61¢ / 39¢ like in screenshot)
   const symLower = (activeMarket?.id || 'eth').toLowerCase();
@@ -1147,18 +1185,19 @@ useEffect(() => {
     const total = tokens.length;
     if (!total) return;
 
+    const rowToken = tokens[wrapIdx(virtualIdx, total)];
+    if (!rowToken) return;
+
+    // non-middle row: just scroll it to centre and do not activate it
     if (Math.abs(virtualIdx - wheelPos.get()) > 0.5) {
       settleWheelTo(virtualIdx, 0);
       return;
     }
 
-    const token = tokens[wrapIdx(virtualIdx, total)];
-    if (!token) return;
-    const id = token.id?.toLowerCase();
-    if (id === 'mon' || id === 'avax') return; // listed but not tradeable
-    pickAsset(token);
-    setAssetOpen(false);
-  }, [tokens, settleWheelTo, wheelPos]);
+    const nextSymbol = (rowToken.symbol || '').toUpperCase();
+    setActiveAssetSymbol(nextSymbol);
+    pickAsset(rowToken);
+  }, [tokens, settleWheelTo, wheelPos, pickAsset]);
 
   const onWheelBackdropClick = useCallback(() => {
     if (Date.now() - wheelSwipedAt.current < 350) return;
@@ -1242,8 +1281,6 @@ useEffect(() => {
             }}
             onClick={onWheelBackdropClick}
           >
-            {/* Continuous wheel — drag, flick or scroll to browse, tap the row in
-                the middle to select. Scrolls forever in both directions. */}
             <div
               ref={assetWheelRef}
               className="relative w-full flex flex-col items-center justify-center select-none"
@@ -1253,6 +1290,7 @@ useEffect(() => {
                 touchAction: 'none',
                 WebkitUserSelect: 'none',
                 userSelect: 'none',
+                paddingBottom: 'env(safe-area-inset-bottom, 12px)',
               }}
               onTouchStart={onWheelTouchStart}
               onTouchMove={onWheelTouchMove}
@@ -1263,20 +1301,15 @@ useEffect(() => {
               <motion.div className="absolute inset-x-0 top-0">
                 {wheelRows.map(({ token, virtualIdx }, slot) => {
                   const isUnavailable = token.id?.toLowerCase() === 'mon' || token.id?.toLowerCase() === 'avax';
-                  const logo = LOGO_MAP[token.id.toLowerCase()];
                   return (
                     <WheelRow
-                      // Keyed by slot so rows keep their nodes and loaded
-                      // logos; only the asset each slot shows changes.
                       key={`wheel-slot-${slot}`}
                       token={token}
                       index={virtualIdx}
-                      isLight={isLight}
-                      isUnavailable={isUnavailable}
-                      logo={logo}
                       wheelPos={wheelPos}
                       boxH={wheelBoxH}
                       onTap={() => onWheelRowTap(virtualIdx)}
+                      activeAssetSymbol={activeAssetSymbol}
                     />
                   );
                 })}
@@ -1479,7 +1512,7 @@ useEffect(() => {
               <button
                 onClick={() => handleTrade('UP')}
                 disabled={currentStake <= 0 || isExecuting}
-                className={`flex-1 h-[52px] rounded-full bg-[#17A364] text-white flex items-center justify-center gap-3 font-black text-[18px] tracking-wide active:scale-[0.98] transition-all shadow-md ${
+                className={`flex-1 h-[52px] rounded-full bg-[#17A364] text-white flex items-center justify-center gap-3 font-black text-[18px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
                   currentStake <= 0 || isExecuting ? 'opacity-85' : 'hover:brightness-105'
                 }`}
               >
@@ -1496,7 +1529,7 @@ useEffect(() => {
               <button
                 onClick={() => handleTrade('DOWN')}
                 disabled={currentStake <= 0 || isExecuting}
-                className={`flex-1 h-[52px] rounded-full bg-[#EF5350] text-white flex items-center justify-center gap-3 font-black text-[18px] tracking-wide active:scale-[0.98] transition-all shadow-md ${
+                className={`flex-1 h-[52px] rounded-full bg-[#EF5350] text-white flex items-center justify-center gap-3 font-black text-[18px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
                   currentStake <= 0 || isExecuting ? 'opacity-85' : 'hover:brightness-105'
                 }`}
               >
