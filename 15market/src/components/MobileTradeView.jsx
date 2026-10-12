@@ -128,8 +128,7 @@ function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol, isLi
         style={{
           fontSize: 15,
           letterSpacing: '0.06em',
-          color: isActive ? '#3ddc84' : (isLight ? '#111827' : '#ffffff'),
-          textShadow: isActive ? '0 0 18px rgba(61,220,132,0.8)' : 'none',
+          color: isLight ? '#111827' : '#ffffff',
           fontWeight: 800,
           lineHeight: 1,
           position: 'relative',
@@ -137,23 +136,6 @@ function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol, isLi
       >
         {token.symbol}
       </motion.span>
-
-      {isActive && (
-        <span
-          style={{
-            position: 'absolute',
-            bottom: '-4px',
-            left: '50%',
-            width: '6px',
-            height: '6px',
-            marginLeft: '-3px',
-            borderRadius: '50%',
-            background: '#3ddc84',
-            boxShadow: '0 0 10px rgba(61,220,132,0.9)',
-            pointerEvents: 'none',
-          }}
-        />
-      )}
     </motion.button>
   );
 }
@@ -1286,8 +1268,9 @@ export default function MobileTradeView({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="absolute inset-x-0 top-[44px] bottom-0 z-50 flex flex-col items-center justify-center"
+            className="absolute inset-x-0 top-[44px] bottom-0 z-50 flex flex-col items-center justify-start"
             style={{
+              paddingTop: '10%',
               backgroundColor: isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(6, 9, 7, 0.95)',
               WebkitBackdropFilter: 'blur(20px)',
               backdropFilter: 'blur(20px)',
