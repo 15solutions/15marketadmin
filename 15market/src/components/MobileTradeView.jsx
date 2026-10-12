@@ -59,7 +59,7 @@ function getLogoFilter(isLight) {
  * derived from a motion value, so the row scales and fades continuously with
  * the drag instead of snapping between discrete states.
  */
-function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol }) {
+function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol, isLight }) {
   const distance = useTransform(wheelPos, (v) => Math.abs(v - index));
   const scale = useTransform(distance, [0, 1, 2, 3], [1.6, 1.08, 0.72, 0.28]);
   const opacity = useTransform(distance, [0, 1, 2, 3], [1, 0.82, 0.45, 0.12]);
@@ -67,6 +67,7 @@ function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol }) {
 
   const assetMeta = getAssetMeta(token);
   const isActive = (activeAssetSymbol || '').toUpperCase() === (token?.symbol || '').toUpperCase();
+  const logoSrc = LOGO_MAP[(token?.id || token?.symbol || '').toLowerCase()];
 
   return (
     <motion.button
@@ -75,13 +76,13 @@ function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol }) {
         e.stopPropagation();
         onTap();
       }}
-      className="w-full flex items-center justify-center gap-2 px-6 bg-transparent border-none outline-none"
+      className="w-full flex items-center justify-center gap-2 bg-transparent border-none outline-none"
       style={{
         height: `${WHEEL_ROW_H}px`,
         position: 'absolute',
         left: '50%',
-        width: '120px',
-        marginLeft: '-60px',
+        width: '140px',
+        marginLeft: '-70px',
         y,
         scale,
         opacity,
@@ -96,29 +97,41 @@ function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol }) {
         willChange: 'transform, opacity',
       }}
     >
-      <motion.small
-        style={{
-          fontSize: 15,
-          color: assetMeta.color,
-          filter: 'brightness(1.4)',
-          lineHeight: 1,
-          minWidth: 14,
-          textAlign: 'center',
-          opacity: isActive ? 1 : 0.8,
-        }}
-      >
-        {assetMeta.glyph}
-      </motion.small>
+      {logoSrc ? (
+        <img
+          src={logoSrc}
+          alt={token.symbol}
+          style={{
+            width: 22,
+            height: 22,
+            objectFit: 'contain',
+            flexShrink: 0,
+            filter: getLogoFilter(isLight),
+          }}
+        />
+      ) : (
+        <motion.small
+          style={{
+            fontSize: 15,
+            color: assetMeta.color,
+            filter: 'brightness(1.4)',
+            lineHeight: 1,
+            minWidth: 14,
+            textAlign: 'center',
+          }}
+        >
+          {assetMeta.glyph}
+        </motion.small>
+      )}
 
       <motion.span
         style={{
           fontSize: 15,
           letterSpacing: '0.06em',
-          color: isActive ? '#3ddc84' : '#ffffff',
+          color: isActive ? '#3ddc84' : (isLight ? '#111827' : '#ffffff'),
           textShadow: isActive ? '0 0 18px rgba(61,220,132,0.8)' : 'none',
           fontWeight: 800,
           lineHeight: 1,
-          opacity: isActive ? 1 : 0.95,
           position: 'relative',
         }}
       >
@@ -1311,6 +1324,7 @@ export default function MobileTradeView({
                       boxH={wheelBoxH}
                       onTap={() => onWheelRowTap(virtualIdx)}
                       activeAssetSymbol={activeAssetSymbol}
+                      isLight={isLight}
                     />
                   );
                 })}
