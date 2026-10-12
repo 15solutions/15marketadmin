@@ -2,51 +2,33 @@
 // nexus-core/src/cache.js
 // In-process cache layer for the unified backend.
 // ============================================================
-const Redis = require('ioredis');
+// Local-first by design: every cache lives in server memory, so there is no
+// connection to fail, no handshake to time out, no external dependency in any
+// hot path. The open-trade registry additionally persists to a local file so
+// it survives restarts (Supabase rows + this file are the recovery sources).
+const fs = require('fs');
+const path = require('path');
 
-let redis = null;
-function getRedis() {
-  if (!redis) {
-    redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-      // These MUST stay bounded. With `maxRetriesPerRequest: null` a command
-      // issued while the connection is down sits in the offline queue forever
-      // and never settles — so the `try/catch` around every `await r.get(...)`
-      // never runs and the HTTP response is never sent. A dead Redis endpoint
-      // then shows up in the browser as a request that hangs and is finally
-      // reported as a CORS / ERR_FAILED failure, with nothing in the server
-      // logs. A finite retry count turns that hang into an ordinary thrown
-      // error, which every caller already handles by degrading.
-      maxRetriesPerRequest: 3,
-      connectTimeout: 5000,
-      // Keep backing off and reconnecting; just never let a single command
-      // wait on it indefinitely.
-      retryStrategy: (times) => Math.min(times * 1000, 30000)
-    });
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const OPEN_TRADES_PATH = path.join(DATA_DIR, 'open-trades.json');
 
-    // Rate-limit the noise: ioredis retries forever, and an unreachable
-    // endpoint would otherwise print one line per retry, per process, forever.
-    let lastLogged = 0;
-    let loggedAny = false;
-    redis.on('error', (err) => {
-      const now = Date.now();
-      if (!loggedAny || now - lastLogged > 30000) {
-        loggedAny = true;
-        lastLogged = now;
-        console.error('[Redis] connection error (Redis-backed features are degraded):', err?.message);
-      }
-    });
-    redis.on('ready', () => {
-      console.log('[Redis] connected.');
-    });
-  }
-  return redis;
-}
+try {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+} catch (e) { }
 
 class Cache {
   constructor() {
     this.sessions = new Map(); // address/identityKey -> session object
     this.trades = new Map(); // tradeId -> trade object
     this.userHistory = new Map(); // address -> array of history records
+    // Settled-result cache: tradeId -> { result, exp }. Best-effort and
+    // memory-only by nature (1h TTL); a restart simply starts it empty.
+    this.tradeResults = new Map();
+    // Balance snapshots: addr -> { bal, exp }. Served instantly without a
+    // chain read; 24h TTL like the old snapshot store.
+    this.sessionSnapshots = new Map();
+    // Durable open-trade registry, loaded once below.
+    this.openTradesStore = this._loadRegistry();
     
     // In-memory queues (unused)
     this.settlementQueue = [];
@@ -235,23 +217,31 @@ class Cache {
     this.roundsState.set(asset, state);
   }
 
-  // --- Redis Trade Result Caching ---
-  // Pre-locks the result (exit price + won/lost) in Redis so the backend
+  // --- Trade Result Caching (memory, 1h TTL) ---
+  // Pre-locks the result (exit price + won/lost) so the backend
   // settler can read it instantly when the countdown hits 0.
 
   async cacheTradeResult(tradeId, result) {
     try {
-      const r = getRedis();
-      const key = `trade:${tradeId}:result`;
-      await r.set(key, JSON.stringify(result), 'EX', 3600); // 1h TTL
+      const id = String(tradeId || '');
+      if (!id) return;
+      this.tradeResults.set(id, { result, exp: Date.now() + 3600 * 1000 });
+      if (this.tradeResults.size > 5000) {
+        const oldest = this.tradeResults.keys().next().value;
+        this.tradeResults.delete(oldest);
+      }
     } catch (e) {}
   }
 
   async getCachedTradeResult(tradeId) {
     try {
-      const r = getRedis();
-      const data = await r.get(`trade:${tradeId}:result`);
-      return data ? JSON.parse(data) : null;
+      const entry = this.tradeResults.get(String(tradeId || ''));
+      if (!entry) return null;
+      if (Date.now() > entry.exp) {
+        this.tradeResults.delete(String(tradeId || ''));
+        return null;
+      }
+      return entry.result;
     } catch (e) {
       return null;
     }
@@ -259,32 +249,46 @@ class Cache {
 
   async deleteCachedTradeResult(tradeId) {
     try {
-      const r = getRedis();
-      await r.del(`trade:${tradeId}:result`);
+      this.tradeResults.delete(String(tradeId || ''));
     } catch (e) {}
   }
 
-  // --- Redis Open-Trade Registry ---
+  // --- Durable Open-Trade Registry (local file) ---
   //
   // Every bet that has been broadcast but not yet given a final verdict.
   //
-  // cache.trades is in-memory, so after a restart the settlement engine has no
-  // working set at all and the only way an open trade can come back is a durable
-  // store. That used to mean Supabase alone: if it was unreachable, recovery
-  // returned an empty list, which is indistinguishable from "nothing to do", and
-  // every open trade was silently abandoned with no way to ever settle it.
-  //
-  // Redis is the right tier for this. It is shared across instances (so a deploy
-  // that replaces the process does not lose the set), it survives a restart, and
-  // unlike a local file it is not per-machine. A hash keyed by bet id keeps both
-  // operations idempotent: HSET overwrites, HDEL removes, HGETALL enumerates.
+  // cache.trades is memory-only, so after a restart the settlement engine has
+  // no working set at all and the only way an open trade can come back is a
+  // durable store. This file is that store: written on every mutation, so a
+  // restart loses nothing, with zero network involved. Keyed by bet id, so
+  // both operations stay idempotent: re-registering overwrites, resolving
+  // removes.
+
+  _loadRegistry() {
+    try {
+      if (fs.existsSync(OPEN_TRADES_PATH)) {
+        const data = JSON.parse(fs.readFileSync(OPEN_TRADES_PATH, 'utf8'));
+        if (data && typeof data === 'object') return data;
+      }
+    } catch (e) {
+      console.warn('[Registry] Failed to load open-trades file:', e.message);
+    }
+    return {};
+  }
+
+  _saveRegistry() {
+    try {
+      fs.writeFileSync(OPEN_TRADES_PATH, JSON.stringify(this.openTradesStore));
+    } catch (e) {
+      console.warn('[Registry] Failed to save open-trades file:', e.message);
+    }
+  }
 
   async registerOpenTrade(trade) {
     try {
       const id = String(trade?.id || trade?.betId || '');
       if (!id) return false;
-      const r = getRedis();
-      await r.hset('15market:open-trades', id, JSON.stringify({
+      this.openTradesStore[id] = {
         id,
         userAddr: trade.userAddr,
         symbol: trade.symbol,
@@ -297,11 +301,12 @@ class Cache {
         status: trade.status || 'PENDING',
         sessionAddress: trade.sessionAddress,
         stakeTxHash: trade.stakeTxHash || null
-      }));
+      };
+      this._saveRegistry();
       return true;
     } catch (e) {
       // Never throw upward: losing the registry must not block placing a trade.
-      console.warn('[Redis] registerOpenTrade failed:', e.message);
+      console.warn('[Registry] registerOpenTrade failed:', e.message);
       return false;
     }
   }
@@ -323,7 +328,10 @@ class Cache {
     try {
       const id = String(betId || '');
       if (!id) return;
-      await getRedis().hdel('15market:open-trades', id);
+      if (this.openTradesStore[id]) {
+        delete this.openTradesStore[id];
+        this._saveRegistry();
+      }
     } catch (e) {}
   }
 
@@ -331,18 +339,14 @@ class Cache {
   // place, so this reflects the live working set.
   async listOpenTrades() {
     try {
-      const raw = await getRedis().hgetall('15market:open-trades');
-      return Object.entries(raw || {})
-        .map(([id, json]) => {
-          try {
-            return { ...JSON.parse(json), id };
-          } catch (e) {
-            return null;
-          }
+      return Object.entries(this.openTradesStore || {})
+        .map(([id, record]) => {
+          if (!record || typeof record !== 'object') return null;
+          return { ...record, id: String(record.id || id) };
         })
-        .filter(Boolean);
+        .filter(t => t && t.id);
     } catch (e) {
-      console.warn('[Redis] listOpenTrades failed:', e.message);
+      console.warn('[Registry] listOpenTrades failed:', e.message);
       return [];
     }
   }
@@ -355,17 +359,15 @@ class Cache {
       const rows = await this.listOpenTrades();
       const stale = rows.filter(t => isTerminal(t));
       if (!stale.length) return 0;
-      const r = getRedis();
-      const pipeline = r.pipeline();
-      for (const t of stale) pipeline.hdel('15market:open-trades', String(t.id));
-      await pipeline.exec();
+      for (const t of stale) delete this.openTradesStore[String(t.id)];
+      this._saveRegistry();
       return stale.length;
     } catch (e) {
       return 0;
     }
   }
 
-  // --- Redis Session Snapshot ---
+  // --- Session Snapshot (memory, 24h TTL) ---
   //
   // The last known good trading balance per user, so a cold instance can answer
   // /session/balance immediately instead of waiting on a chain read. Deliberately
@@ -379,7 +381,7 @@ class Cache {
       const addr = String(userAddr || '').toLowerCase();
       const bal = Number(balance);
       if (!addr || !isFinite(bal) || bal < 0) return false;
-      await getRedis().set(`15market:session:${addr}:balance`, String(bal), 'EX', 86400);
+      this.sessionSnapshots.set(addr, { bal, exp: Date.now() + 86400 * 1000 });
       return true;
     } catch (e) {
       return false;
@@ -390,79 +392,21 @@ class Cache {
     try {
       const addr = String(userAddr || '').toLowerCase();
       if (!addr) return null;
-      const raw = await getRedis().get(`15market:session:${addr}:balance`);
-      if (raw === null) return null;
-      const bal = parseFloat(raw);
-      return isFinite(bal) && bal >= 0 ? bal : null;
+      const entry = this.sessionSnapshots.get(addr);
+      if (!entry) return null;
+      if (Date.now() > entry.exp) {
+        this.sessionSnapshots.delete(addr);
+        return null;
+      }
+      return isFinite(entry.bal) && entry.bal >= 0 ? entry.bal : null;
     } catch (e) {
       return null;
     }
   }
 
-  // --- Redis Chart History Caching ---
-  // Persists chart price history across server restarts for all users.
-
-  async saveChartHistory(symbol, history) {
-    try {
-      const r = getRedis();
-      const key = `15market_chart:${symbol.toLowerCase()}`;
-      const toSave = history.slice(-300); // last 300 points (~30s)
-      await r.set(key, JSON.stringify(toSave), 'EX', 86400); // 24h TTL
-    } catch (e) {}
-  }
-
-  async loadChartHistory(symbol) {
-    try {
-      const r = getRedis();
-      const data = await r.get(`15market_chart:${symbol.toLowerCase()}`);
-      return data ? JSON.parse(data) : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // --- Server-recorded chart ticks ---
-  // The backend appends its own polled price every second, so a login always
-  // finds real shared history instead of depending on whichever browser
-  // POSTed its buffer last (last-writer-wins) or starting from nothing.
-  // Only real feed sources are recorded — synthetic oracle drift must never
-  // become "history". 900 ticks ≈ 15 minutes at 1s cadence.
-  async appendChartTick(symbol, t, p) {
-    try {
-      const r = getRedis();
-      const key = `15market:chart:${String(symbol || '').toLowerCase()}:ticks`;
-      const pipe = r.pipeline();
-      pipe.rpush(key, JSON.stringify({ t: Number(t), p: Number(p) }));
-      pipe.ltrim(key, -900, -1);
-      pipe.expire(key, 86400);
-      // exec() resolves even when individual commands fail ([err, res]
-      // pairs), so verify rather than assuming the write landed.
-      const res = await pipe.exec();
-      if (!res || res.some(([err]) => !!err)) return false;
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  async loadChartTicks(symbol) {
-    try {
-      const r = getRedis();
-      const key = `15market:chart:${String(symbol || '').toLowerCase()}:ticks`;
-      const rows = await r.lrange(key, 0, -1);
-      if (!rows || !rows.length) return [];
-      const out = [];
-      for (const json of rows) {
-        try {
-          const pt = JSON.parse(json);
-          if (pt && isFinite(pt.t) && isFinite(pt.p) && pt.p > 0) out.push({ t: pt.t, p: pt.p });
-        } catch {}
-      }
-      return out;
-    } catch (e) {
-      return [];
-    }
-  }
+  // NOTE: chart history is deliberately NOT stored anywhere. Every login
+  // starts from an empty buffer that fills with live streamed ticks — no
+  // stored, shifted, seeded or synthetic values, ever.
 }
 
 module.exports = new Cache();

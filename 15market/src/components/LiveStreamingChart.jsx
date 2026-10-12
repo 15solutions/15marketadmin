@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { priceSocketService } from '../utils/priceSocket';
-import { KEEPER_URL_ARC } from '../constants';
+
 
 /**
  * LiveStreamingChart — A specialized Canvas-based line chart for 1s timeframe.
@@ -15,8 +15,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
     const interpolatedPriceRef = useRef(null);
     const startTimeRef = useRef(null);
     const gradRef = useRef(null);
-    const symbolRef = useRef(symbol);
-    const mountTimeRef = useRef(Date.now());
+
     
     // Y-Axis Smoothing
     const yMinRef = useRef(null);
@@ -33,49 +32,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
     const isLight = theme === 'light';
     const GREEN = '#17A364';
 
-    // Cache helpers — synchronous localStorage first, async Redis background sync
-    const getCacheKey = (sym) => `15market_chart_${sym?.toLowerCase()}`;
-    // Instant paint from localStorage — but only if FRESH (<120s). Stale
-    // buffers are refused outright instead of time-shifted to the present:
-    // shifting fabricates continuity the market never had.
-    const loadCachedHistorySync = (sym) => {
-        try {
-            const cached = localStorage.getItem(getCacheKey(sym));
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                if (Array.isArray(parsed) && parsed.length > 10 &&
-                    Date.now() - parsed[parsed.length - 1].t < 120000) {
-                    return parsed;
-                }
-            }
-        } catch {}
-        return [];
-    };
-    const syncFromRedis = async (sym) => {
-        try {
-            const res = await fetch(`${KEEPER_URL_ARC}/chart/history/${encodeURIComponent(sym)}`);
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    localStorage.setItem(getCacheKey(sym), JSON.stringify(data));
-                    return data;
-                }
-            }
-        } catch {}
-        return null;
-    };
-    const saveHistoryToCache = (sym, history) => {
-        try {
-            localStorage.setItem(getCacheKey(sym), JSON.stringify(history.slice(-300)));
-        } catch {}
-        try {
-            fetch(`${KEEPER_URL_ARC}/chart/history/${encodeURIComponent(sym)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ history: history.slice(-300) }),
-            });
-        } catch {}
-    };
+    // Live-only: no stored history anywhere. Every mount starts from an
+    // empty buffer that fills with real streamed ticks.
 
     // Listen for price updates from the direct Pyth stream
     useEffect(() => {
@@ -101,38 +59,18 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         };
     }, [symbol]);
 
-    // Reset state on symbol change — load cached data synchronously, sync Redis in background
+    // Reset state on symbol change — start empty, fill with live ticks.
     useEffect(() => {
-        // Save current symbol's data before switching
-        if (symbolRef.current !== symbol && priceHistoryRef.current.length > 0) {
-            saveHistoryToCache(symbolRef.current, priceHistoryRef.current);
-        }
-        symbolRef.current = symbol;
-
-        // 1. Instant load from localStorage
-        const cached = loadCachedHistorySync(symbol);
-        priceHistoryRef.current = cached;
+        priceHistoryRef.current = [];
         targetPriceRef.current = null;
-        interpolatedPriceRef.current = cached.length > 0 ? cached[cached.length - 1].p : null;
-        startTimeRef.current = cached.length > 0 ? cached[cached.length - 1].t : null;
+        interpolatedPriceRef.current = null;
+        startTimeRef.current = null;
         yMinRef.current = null;
         yMaxRef.current = null;
-
-        // 2. Background sync from Redis. Server-recorded ticks carry real
-        // timestamps and replace the buffer verbatim — no shifting.
-        syncFromRedis(symbol).then(redisData => {
-            if (redisData && redisData.length > 10) {
-                priceHistoryRef.current = redisData;
-                interpolatedPriceRef.current = redisData[redisData.length - 1].p;
-                startTimeRef.current = redisData[redisData.length - 1].t;
-            }
-        });
     }, [symbol]);
 
-    // History management + periodic cache save (only save real SSE data)
+    // History management (rolling live buffer only — never persisted)
     useEffect(() => {
-        let saveCounter = 0;
-        const mountTime = mountTimeRef.current;
         const historyInterval = setInterval(() => {
             if (interpolatedPriceRef.current !== null) {
                 const now = Date.now();
@@ -150,15 +88,6 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                 }
                 if (history.length > 1000) {
                     priceHistoryRef.current = history.slice(-600);
-                }
-                // Save to cache every 2 seconds, but only data from real SSE (after mount)
-                saveCounter++;
-                if (saveCounter >= 40) {
-                    saveCounter = 0;
-                    const realData = history.filter(p => p.t >= mountTime);
-                    if (realData.length >= 10) {
-                        saveHistoryToCache(symbolRef.current, realData);
-                    }
                 }
             }
         }, 50);

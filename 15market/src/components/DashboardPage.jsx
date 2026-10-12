@@ -13,7 +13,7 @@ import { KEEPER_URL_ARC, ARC_CONTRACT_ADDRESS, ARC_RPC, KEEPER_URL_ROUNDS, ADMIN
 import { socketService } from "../utils/socket";
 import { parseEther } from "viem";
 import GlobalLoader from "./GlobalLoader";
-import { useCreateWallet, usePrivy } from '@privy-io/react-auth';
+import { useCreateWallet, usePrivy, useWallets } from '@privy-io/react-auth';
 
 // ─── Animate-UI Style: Framer Motion Animated Icon Wrappers ──────────────────
 // Each icon has a unique, semantically-appropriate looping micro-animation.
@@ -191,7 +191,13 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     onAssistedTrading
 }) {
     const isLight = theme === 'light';
-    const { isConnected, address } = useAccount();
+    const { isConnected, address, connector } = useAccount();
+    const { wallets } = useWallets();
+    // Wallet model: a "main" wallet exists ONLY for external connections.
+    // Email/Google/Discord users get the trading wallet alone. Privy embedded
+    // wallets (walletClientType 'privy') never count, whichever layer reports.
+    const hasExternalWallet = (wallets || []).some(w => w.walletClientType && w.walletClientType !== 'privy')
+        || (isConnected && !!address && !/privy/i.test(String(connector?.id || connector?.name || '')));
     const { createWallet } = useCreateWallet();
     const { user, linkDiscord, unlinkDiscord } = usePrivy();
     const [selectedWallet, setSelectedWallet] = useState('trading');
@@ -712,7 +718,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <div className="text-base font-black text-[#249C6C] tabular-nums">${parseFloat(sessionBalance || 0).toFixed(2)}</div>
                             </div>
 
-                            {/* Main Wallet Balance */}
+                            {/* Main Wallet Balance — external wallets only */}
+                            {hasExternalWallet && (
                             <div className={`rounded-xl border px-3 py-2 flex items-center justify-between ${isLight ? 'bg-white/60 border-white/80' : 'bg-white/5 border-white/10'}`} style={{ boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)' : '0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)', backdropFilter: 'blur(10px)' }}>
                                 <div>
                                     <div className={`text-[6px] font-black uppercase tracking-widest mb-0.5 ${isLight ? 'text-[#0a261a]/40' : 'text-white/30'}`}>Main Wallet Balance</div>
@@ -724,8 +731,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 </div>
                                 <div className={`text-xs font-black tabular-nums ${isLight ? 'text-[#0a261a]' : 'text-white/90'}`}>${parseFloat(evmBalance || 0).toFixed(2)}</div>
                             </div>
-
-                            {/* Action Buttons */}
+                            )}
                             <div className="grid grid-cols-2 gap-2 mt-auto" style={{ filter: 'drop-shadow(0 4px 12px rgba(36, 156, 108,0.15))' }}>
                                 <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Deposit to Trading Wallet", placeholder: "USDC Amount", onConfirm: (val) => onDeposit(parseFloat(val)) }); }}
                                     className={`py-2 ${isLight ? 'bg-[#249C6C] text-white' : 'bg-[#249C6C] text-white'} text-[8px] font-black uppercase tracking-[0.2em] rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-lg`}>Deposit</button>
@@ -922,7 +928,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <div className="text-xl font-black text-[#249C6C] tabular-nums">${parseFloat(sessionBalance || 0).toFixed(2)}</div>
                             </div>
 
-                            {/* Main Wallet Balance Panel */}
+                            {/* Main Wallet Balance Panel — external wallets only */}
+                            {hasExternalWallet && (
                             <div className={`rounded-2xl border px-4 py-3 flex items-center justify-between ${isLight ? 'bg-white/60 border-white/80' : 'bg-white/5 border-white/10'}`} style={{ boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)' : '0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)', backdropFilter: 'blur(10px)' }}>
                                 <div>
                                     <div className={`text-[7px] font-black uppercase tracking-widest mb-1 ${isLight ? 'text-[#0a261a]/40' : 'text-white/30'}`}>Main Wallet Balance</div>
@@ -934,8 +941,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 </div>
                                 <div className={`text-sm font-black tabular-nums ${isLight ? 'text-[#0a261a]' : 'text-white/90'}`}>${parseFloat(evmBalance || 0).toFixed(2)}</div>
                             </div>
-
-                            {/* Action Buttons */}
+                            )}
                             <div className="grid grid-cols-2 gap-3 mt-auto" style={{ filter: 'drop-shadow(0 4px 12px rgba(36, 156, 108,0.15))' }}>
                                 <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Deposit to Trading Wallet", placeholder: "USDC Amount", onConfirm: (val) => onDeposit(parseFloat(val)) }); }}
                                     className={`py-3 ${isLight ? 'bg-[#249C6C] text-white' : 'bg-[#249C6C] text-white'} text-[9px] font-black uppercase tracking-[0.2em] rounded-2xl hover:brightness-110 active:scale-95 transition-all shadow-lg`}>Deposit</button>

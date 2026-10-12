@@ -141,94 +141,17 @@ function MobileSteppedChart({
 
   const numericPrice = parseFloat(currentPrice) || 0;
 
-  // Cache helpers — synchronous localStorage first, async Redis background sync
-  const getCacheKey = (sym) => `15market_mobile_chart_${sym?.toLowerCase()}`;
-  const loadCachedHistorySync = (sym) => {
-    // Synchronous load from localStorage (instant) — fresh buffers only.
-    // Stale data is refused, never time-shifted into fake continuity.
-    try {
-      const cached = localStorage.getItem(getCacheKey(sym));
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 10 &&
-            Date.now() - parsed[parsed.length - 1].t < 120000) {
-          return parsed;
-        }
-      }
-    } catch {}
-    return [];
-  };
-  const syncFromRedis = async (sym) => {
-    // Background sync from Redis → localStorage
-    try {
-      const { KEEPER_URL_ARC } = await import('../constants');
-      const res = await fetch(`${KEEPER_URL_ARC}/chart/history/${encodeURIComponent(sym)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          // Update localStorage with Redis data
-          localStorage.setItem(getCacheKey(sym), JSON.stringify(data));
-          return data;
-        }
-      }
-    } catch {}
-    return null;
-  };
-  const saveHistoryToCache = (sym, history) => {
-    // Save to localStorage (instant)
-    try {
-      localStorage.setItem(getCacheKey(sym), JSON.stringify(history.slice(-300)));
-    } catch {}
-    // Background save to Redis
-    try {
-      import('../constants').then(({ KEEPER_URL_ARC }) => {
-        fetch(`${KEEPER_URL_ARC}/chart/history/${encodeURIComponent(sym)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ history: history.slice(-300) }),
-        });
-      });
-    } catch {}
-  };
+  // Live-only: no stored history anywhere. Every mount starts from an
+  // empty buffer that fills with real streamed ticks — never seeded,
+  // shifted or synthesised.
 
-  // Initialize: load cached history synchronously, then sync from Redis in background
+  // Initialize: start empty on every mount/symbol. Live streamed ticks fill
+  // the buffer within a second — nothing stored, nothing seeded.
   useEffect(() => {
-    const symKey = (symbol || 'ETHUSDT').replace('USDT', '').toLowerCase();
-    const basePrice = numericPrice > 0 ? numericPrice : (symKey === 'btc' ? 68000 : symKey === 'sol' ? 140 : 1880.89);
-
-    if (priceHistoryRef.current.length === 0) {
-      // 1. Instant load from localStorage
-      const cached = loadCachedHistorySync(symbol);
-      if (cached.length > 10) {
-        priceHistoryRef.current = cached;
-        interpolatedPriceRef.current = cached[cached.length - 1].p;
-        targetPriceRef.current = cached[cached.length - 1].p;
-      } else {
-        // Fallback: flat line at the live price while real ticks arrive.
-        // Never synthetic wiggle — fabricated history is worse than none.
-        const now = Date.now();
-        const initial = [];
-        const stepCount = 35;
-        const timeStep = windowMs / stepCount;
-        for (let i = stepCount; i >= 0; i--) {
-          initial.push({ t: now - (i * timeStep), p: basePrice });
-        }
-        priceHistoryRef.current = initial;
-        interpolatedPriceRef.current = basePrice;
-        targetPriceRef.current = basePrice;
-      }
-
-      // 2. Background sync from Redis. Server-recorded ticks carry real
-      // timestamps and replace the buffer verbatim — no shifting.
-      syncFromRedis(symbol).then(redisData => {
-        if (redisData && redisData.length > 10) {
-          priceHistoryRef.current = redisData;
-          interpolatedPriceRef.current = redisData[redisData.length - 1].p;
-          targetPriceRef.current = redisData[redisData.length - 1].p;
-        }
-      });
-    }
-  }, [symbol, numericPrice, windowMs]);
+    priceHistoryRef.current = [];
+    interpolatedPriceRef.current = null;
+    targetPriceRef.current = null;
+  }, [symbol]);
 
   // Listen to the BACKEND price relay only. The backend engine (cache.prices) is
   // the single source of truth for settlement, so the chart must NEVER stream a
@@ -281,10 +204,9 @@ function MobileSteppedChart({
     }
   }, [numericPrice]);
 
-  // Append new points to rolling history every 50ms and periodically save to cache
+  // Append live points to the rolling history every 50ms (memory only,
+  // never persisted).
   useEffect(() => {
-    let saveCounter = 0;
-    const mountTime = Date.now();
     const iv = setInterval(() => {
       if (interpolatedPriceRef.current !== null) {
         const now = Date.now();
@@ -302,15 +224,6 @@ function MobileSteppedChart({
         }
         if (history.length > 500) {
           priceHistoryRef.current = history.slice(-300);
-        }
-        // Save to cache every 2 seconds (40 * 50ms)
-        saveCounter++;
-        if (saveCounter >= 40) {
-          saveCounter = 0;
-          const realData = history.filter(p => p.t >= mountTime);
-          if (realData.length >= 10) {
-            saveHistoryToCache(symbol, realData);
-          }
         }
       }
     }, 50);
@@ -344,7 +257,13 @@ function MobileSteppedChart({
       ctx.clearRect(0, 0, W, H);
 
       const history = priceHistoryRef.current;
-      const latestPrice = interpolatedPriceRef.current || (history.length > 0 ? history[history.length - 1].p : 1880.89);
+      const latestPrice = interpolatedPriceRef.current || (history.length > 0 ? history[history.length - 1].p : NaN);
+      // No live price yet (fresh login, stream not arrived): draw nothing
+      // rather than a hardcoded fallback value.
+      if (!isFinite(latestPrice) || latestPrice <= 0) {
+        rafRef.current = requestAnimationFrame(draw);
+        return;
+      }
 
       const now = Date.now();
       const startTime = now - windowMs;

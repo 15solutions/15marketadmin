@@ -31,7 +31,6 @@ const provider = rpc.provider;
 const ClassicEngine = require('./classic');
 const profiles = require('./profiles');
 const { ethers } = require('ethers');
-const Redis = require('ioredis');
 const circleService = require('./services/circleService');
 const fundingService = require('./services/fundingService');
 const notificationService = require('./services/notificationService');
@@ -56,15 +55,6 @@ if (config.SOL_GAS_TANK_KEY) {
   }
 }
 
-
-const redis = new Redis(config.REDIS_URL || 'redis://localhost:6379', {
-    retryStrategy: (times) => {
-        return Math.min(times * 1000, 30000); // progressive reconnect up to 30s
-    }
-});
-
-// Suppress unhandled connection errors to prevent process crashes
-redis.on('error', (err) => {});
 
 // --- Setup Server ---
 const app = express();
@@ -333,7 +323,7 @@ setInterval(async () => {
 }, 300000);
 
 // Initialize Odds Engine
-const oddsEngine = new OddsEngine(io, redis);
+const oddsEngine = new OddsEngine(io);
 oddsEngine.start();
 
 // --- DEDICATED PRICE FEED SERVICES ---
@@ -1819,6 +1809,18 @@ app.post('/rounds/access/redeem', async (req, res) => {
 
 // ─── PROFILES ─────────────────────────────────────────────────────────────────
 
+// Username availability check for signup validation. Boolean only — no
+// profile data. Must sit ABOVE /profiles/:address or "username" parses as
+// an address.
+app.get('/profiles/username/:username', async (req, res) => {
+  const name = String(req.params.username || '');
+  if (!/^[A-Za-z0-9_]{3,20}$/.test(name.trim())) {
+    return res.json({ available: false, reason: 'format' });
+  }
+  const r = await profiles.isUsernameTaken(name, req.query.address);
+  res.json({ available: !r.taken, reason: r.reason, degraded: !!r.degraded });
+});
+
 app.get('/profiles/:address', async (req, res) => {
   const addr = req.params.address.toLowerCase();
   try {
@@ -1851,6 +1853,11 @@ app.get('/stats/global', (req, res) => {
 app.post('/profiles', async (req, res) => {
   const { address, xHandle, avatar, onboardedAt } = req.body;
   const username = typeof req.body.username === 'string' ? req.body.username.trim() : req.body.username;
+  // Country of residence for gateway matching (ISO alpha-2). Validated and
+  // normalised; anything else is ignored rather than stored.
+  const country = typeof req.body.country === 'string' && /^[A-Za-z]{2}$/.test(req.body.country.trim())
+    ? req.body.country.trim().toUpperCase()
+    : undefined;
   if (!address) return res.status(400).json({ error: 'Address required' });
   const sessionWallet = deriveSessionWallet(address.toLowerCase());
   const onboarded = req.body.onboarded === true || onboardedAt != null || !!username;
@@ -1860,6 +1867,13 @@ app.post('/profiles', async (req, res) => {
     avatar,
     walletAddress: sessionWallet.address
   };
+  if (country) profileData.country = country;
+  if (typeof req.body.firstName === 'string' && req.body.firstName.trim()) {
+    profileData.firstName = req.body.firstName.trim().slice(0, 60);
+  }
+  if (typeof req.body.lastName === 'string' && req.body.lastName.trim()) {
+    profileData.lastName = req.body.lastName.trim().slice(0, 60);
+  }
   if (onboarded) {
     profileData.onboarded = true;
     profileData.onboardedAt = onboardedAt || Date.now();
@@ -1868,6 +1882,63 @@ app.post('/profiles', async (req, res) => {
   await profiles.syncToSupabase(address.toLowerCase());
   emitAdminStats();
   res.json({ success: true, profile, walletAddress: sessionWallet.address });
+});
+
+// ─── NATIVE EMAIL/PASSWORD AUTH ───────────────────────────────────────────
+// Passwords exist because the signup flow promises them (Bayse parity).
+// Privy has no password auth, so verification happens here and a successful
+// login mints a Privy CUSTOM JWT — the frontend exchanges it via
+// linkWithCustomJwt and lands in the SAME Privy identity + embedded wallet
+// as the OTP path. One identity, however you log in.
+//
+// NEVER returns hashes. Requires dashboard custom-auth trust + env keys
+// (see auth.js); otherwise minting fails closed with a configuration error.
+app.post('/auth/set-password', async (req, res) => {
+  const auth = require('./auth');
+  const { address, privyUserId, email, password, oldPassword } = req.body || {};
+  const addr = String(address || '').toLowerCase();
+  if (!addr) return res.status(400).json({ error: 'Address required' });
+  if (!auth.setAllowed(addr)) {
+    return res.status(429).json({ error: 'Too many attempts. Wait 10 minutes.' });
+  }
+  if (!privyUserId || !email || !auth.validPassword(password)) {
+    return res.status(400).json({ error: 'Valid Privy user, email and a password of 8+ characters are required.' });
+  }
+  const existing = auth.getCredentialByAddress(addr);
+  if (existing) {
+    // Changes require the old password. No reset flow yet — OTP login always
+    // works as the fallback, so nobody is ever locked out of their account.
+    if (!oldPassword || !auth.verifyPassword(oldPassword, existing.hash)) {
+      return res.status(403).json({ error: 'A password already exists. Provide the old one to change it.' });
+    }
+  }
+  auth.setCredential({ address: addr, privyUserId, email, password });
+  res.json({ success: true });
+});
+
+app.post('/auth/login-password', async (req, res) => {
+  const auth = require('./auth');
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
+  if (!auth.loginAllowed(email)) {
+    return res.status(429).json({ error: 'Too many attempts. Wait 10 minutes.' });
+  }
+  const cred = auth.getCredentialByEmail(email);
+  if (!cred || !auth.verifyPassword(password, cred.hash)) {
+    auth.recordLoginFailure(email);
+    return res.status(401).json({ error: 'Wrong email or password.' });
+  }
+  if (!cred.privyUserId) {
+    return res.status(500).json({ error: 'Account is missing its identity link. Log in another way and re-set your password.' });
+  }
+  auth.recordLoginSuccess(email);
+  try {
+    const token = auth.mintCustomJwt(cred.privyUserId);
+    res.json({ success: true, token, address: cred.address });
+  } catch (e) {
+    console.error('[Auth] mint failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.patch('/profiles/:address', async (req, res) => {
@@ -1887,6 +1958,12 @@ app.patch('/profiles/:address', async (req, res) => {
   }
 
   const updates = { ...req.body };
+  if (updates.country !== undefined) {
+    updates.country = (typeof updates.country === 'string' && /^[A-Za-z]{2}$/.test(updates.country.trim()))
+      ? updates.country.trim().toUpperCase()
+      : undefined;
+    if (updates.country === undefined) delete updates.country;
+  }
   if (typeof updates.username === 'string' && updates.username.trim() && updates.onboarded === undefined) {
     updates.username = updates.username.trim();
     updates.onboarded = true;
@@ -2406,32 +2483,8 @@ app.get('/winner-banner', (req, res) => res.json(null));
 app.post('/active-market', (req, res) => res.json({ success: true }));
 app.post('/record-fee', (req, res) => res.json({ success: true }));
 
-// --- Chart History Redis Endpoints ---
-// Server-recorded ticks first (authoritative, shared, always fresh while the
-// backend runs); legacy client-posted buffers only as fallback.
-app.get('/chart/history/:symbol', async (req, res) => {
-  try {
-    const { symbol } = req.params;
-    const ticks = await cache.loadChartTicks(symbol);
-    if (ticks.length > 0) return res.json(ticks);
-    const history = await cache.loadChartHistory(symbol);
-    res.json(history);
-  } catch (e) {
-    res.json([]);
-  }
-});
-
-app.post('/chart/history/:symbol', async (req, res) => {
-  try {
-    const { symbol } = req.params;
-    const { history } = req.body;
-    if (!Array.isArray(history)) return res.status(400).json({ error: 'history must be an array' });
-    await cache.saveChartHistory(symbol, history);
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to save' });
-  }
-});
+// Chart history is not stored anywhere by design: every login starts from
+// an empty buffer that fills with live streamed ticks. No endpoints needed.
 
 app.get('/health', (req, res) => {
   res.json({

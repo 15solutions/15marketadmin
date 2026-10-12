@@ -229,6 +229,12 @@ function profileToRow(profile, includeTrades, includeOnboarding = true, includeC
     const row = {
         address: profile.address,
         username: profile.username ?? null,
+        // Country of residence (ISO alpha-2, set at onboarding). Dropped per
+        // payload in syncToSupabase while migration 006 is unapplied, so a
+        // missing column can never break profile sync.
+        country: (typeof profile.country === 'string' && /^[A-Za-z]{2}$/.test(profile.country.trim()))
+            ? profile.country.trim().toUpperCase()
+            : null,
         x_handle: profile.xHandle ?? null,
         x_id: profile.xId ?? null,
         x_connected: profile.xConnected ?? false,
@@ -269,6 +275,12 @@ function profileToRow(profile, includeTrades, includeOnboarding = true, includeC
         row.onboarded_at = profile.onboardedAt != null
             ? (typeof profile.onboardedAt === 'number' ? profile.onboardedAt : Date.parse(profile.onboardedAt))
             : null;
+        if (typeof profile.firstName === 'string' && profile.firstName.trim()) {
+            row.first_name = profile.firstName.trim().slice(0, 60);
+        }
+        if (typeof profile.lastName === 'string' && profile.lastName.trim()) {
+            row.last_name = profile.lastName.trim().slice(0, 60);
+        }
     }
     // Optional columns (added via supabase-migration.sql). Only sent when
     // the columns actually exist on the table.
@@ -287,6 +299,15 @@ function rowToProfile(row) {
     const p = {
         address: row.address,
         username: row.username,
+        country: (typeof row.country === 'string' && /^[A-Za-z]{2}$/.test(row.country.trim()))
+            ? row.country.trim().toUpperCase()
+            : undefined,
+        firstName: (typeof row.first_name === 'string' && row.first_name.trim())
+            ? row.first_name.trim().slice(0, 60)
+            : undefined,
+        lastName: (typeof row.last_name === 'string' && row.last_name.trim())
+            ? row.last_name.trim().slice(0, 60)
+            : undefined,
         xHandle: row.x_handle,
         xId: row.x_id,
         xConnected: row.x_connected,
@@ -333,6 +354,7 @@ class ProfileService {
         this.sbTradeTableAvailable = null;
         this.sbIdempotencyAvailable = null; // null = unprobed, false = table missing
     this.sbBetIdempotencyAvailable = null; // same, for placed_bets (005)
+    this.sbCountryAvailable = null; // null = unprobed, false = column missing (006 not applied)
         this.sbInitPromise = null;
         this.sbLoggedDisabled = false;
 
@@ -467,6 +489,7 @@ class ProfileService {
             await this.probeSupabaseTradeTable();
             await this.probeSupabaseIdempotencyTable();
             await this.probeSupabaseBetIdempotencyTable();
+            await this.probeSupabaseCountryColumn();
             if (this.sbTradeTableAvailable === null) {
                 // Transient probe failure. Drop the memo so the next caller
                 // retries instead of running degraded for the whole process.
@@ -759,6 +782,22 @@ class ProfileService {
         }
     }
 
+    async probeSupabaseCountryColumn() {
+        if (this.sbCountryAvailable !== null) return;
+        if (!SUPABASE_ENABLED) return;
+        try {
+            // One probe covers country (006) and legal names (007): any 400
+            // means at least one is missing, and the sync path below strips
+            // all three rather than letting one unknown column 400 the row.
+            const res = await supabaseRequest('/rest/v1/profiles?select=country,first_name,last_name&limit=1', { timeout: 20000 });
+            this.sbCountryAvailable = res.ok;
+            if (!res.ok) console.warn('[Supabase] country/name columns missing — run supabase/migrations/006_profile_country.sql and 007_profile_names.sql. Those fields skip sync until then.');
+        } catch (e) {
+            this.sbCountryAvailable = null; // retry on next boot, don't latch
+            console.warn('[Supabase] country probe failed:', e.message);
+        }
+    }
+
     async probeSupabaseIdempotencyTable() {
         if (!SUPABASE_ENABLED || this.sbIdempotencyAvailable !== null) return;
         try {
@@ -870,6 +909,12 @@ class ProfileService {
             profileToRow(profile, false, true, false),
             profileToRow(profile, false, false, false)
         ];
+        // Migrations 006/007 not applied (or probe never ran green): strip
+        // these fields from every variant rather than letting one unknown
+        // column 400 the whole profile upsert.
+        if (this.sbCountryAvailable === false) {
+            for (const a of attempts) { delete a.country; delete a.first_name; delete a.last_name; }
+        }
         let lastError = '';
         for (let i = 0; i < attempts.length; i++) {
             try {
@@ -954,6 +999,41 @@ class ProfileService {
         this.save().catch(e => console.warn('[Profiles] Background save failed:', e.message));
         this.syncToSupabase(addr).catch(() => {});
         return this.profiles[addr];
+    }
+
+    // Username availability for signup validation. Memory first (recent,
+    // unsynced signups live here), then the durable store case-insensitively.
+    // Fail-open: when the database is unreachable we report available — a
+    // duplicate display name is cosmetic (address is the identity key) while
+    // blocking signup on a network blip loses the user. Never returns profile
+    // data, only taken/free (same exposure as any availability check).
+    async isUsernameTaken(name, excludeAddr = '') {
+        const lower = String(name || '').trim().toLowerCase();
+        if (!/^[a-z0-9_]{3,20}$/.test(lower)) return { taken: true, reason: 'format' };
+        const excl = String(excludeAddr || '').toLowerCase();
+        for (const addr of Object.keys(this.profiles || {})) {
+            if (addr === excl) continue;
+            const u = this.profiles[addr]?.username;
+            if (typeof u === 'string' && u.trim().toLowerCase() === lower) {
+                return { taken: true, reason: 'taken' };
+            }
+        }
+        try {
+            await this.initSupabase();
+            if (!SUPABASE_ENABLED) return { taken: false, degraded: true };
+            const res = await supabaseRequest(
+                `/rest/v1/profiles?select=address,username&username=ilike.${encodeURIComponent(lower)}&limit=5`,
+                { timeout: 10000 }
+            );
+            if (!res.ok) return { taken: false, degraded: true };
+            const rows = await res.json();
+            const hit = (rows || []).some(r =>
+                String(r.address || '').toLowerCase() !== excl &&
+                String(r.username || '').trim().toLowerCase() === lower);
+            return hit ? { taken: true, reason: 'taken' } : { taken: false };
+        } catch (e) {
+            return { taken: false, degraded: true };
+        }
     }
 
     async getHistoryAsync(address) {

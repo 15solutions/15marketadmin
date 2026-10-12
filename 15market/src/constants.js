@@ -201,3 +201,45 @@ export const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN;
 // 2. Project ID (Reown / WalletConnect)
 export const projectId = import.meta.env.VITE_REOWN_PROJECT_ID;
 
+// ─── Country → fiat gateway matching ─────────────────────────────────────
+// Collected once at onboarding (ISO 3166-1 alpha-2) and stored on the
+// profile. The funding UI offers exactly the rails listed for the user's
+// country; unknown/unset countries fall back to DEFAULT_GATEWAYS.
+// Nigeria first: launch corridor (bank transfer rails).
+export const COUNTRY_LIST = [
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'GH', name: 'Ghana' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'IN', name: 'India' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'PK', name: 'Pakistan' },
+  { code: 'BD', name: 'Bangladesh' },
+];
+
+export const DEFAULT_GATEWAYS = ['transak'];
+
+export const GATEWAYS_BY_COUNTRY = {
+  NG: ['yellowcard', 'onramper', 'transak'],
+  GH: ['yellowcard', 'onramper', 'transak'],
+  KE: ['yellowcard', 'onramper', 'transak'],
+  ZA: ['yellowcard', 'onramper', 'transak'],
+};
+
+export const gatewaysForCountry = (code) => {
+  const c = String(code || '').trim().toUpperCase();
+  return GATEWAYS_BY_COUNTRY[c] || DEFAULT_GATEWAYS;
+};
+

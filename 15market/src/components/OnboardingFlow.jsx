@@ -1,12 +1,23 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Check, ChevronRight, Zap, Shield, Sparkles, Twitter, Camera } from 'lucide-react';
+import { useWallets } from '@privy-io/react-auth';
+import { useAccount } from 'wagmi';
 import { KEEPER_URL_ARC } from '../constants';
+import { CountrySelect } from './CountrySelect';
 
 export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSessionWallet }) => {
     const [step, setStep] = useState(1);
     const [username, setUsername] = useState(userProfile?.username || '');
     const [selectedAvatar, setSelectedAvatar] = useState(userProfile?.avatar || '');
+    // Country of residence (ISO alpha-2) — decides which fiat gateways the
+    // funding UI offers. Optional: unset means default gateways.
+    const [country, setCountry] = useState(userProfile?.country || '');
+    // Wallet model: a main wallet is shown ONLY for external connections.
+    const { isConnected: wagmiConnected, address: wagmiAddress, connector } = useAccount();
+    const { wallets } = useWallets();
+    const hasExternalWallet = (wallets || []).some(w => w.walletClientType && w.walletClientType !== 'privy')
+        || (wagmiConnected && !!wagmiAddress && !/privy/i.test(String(connector?.id || connector?.name || '')));
     const [saveError, setSaveError] = useState('');
     const [savedProfile, setSavedProfile] = useState(null);
     const isLight = theme === 'light';
@@ -27,6 +38,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                     address: address.toLowerCase(),
                     username: username.trim(),
                     avatar: selectedAvatar.trim(),
+                    country: country || undefined,
                     onboarded: true,
                     onboardedAt: Date.now()
                 })
@@ -148,8 +160,8 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                         <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20">
                                             <User size={18} />
                                         </div>
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             maxLength={20}
                                             value={username}
                                             onChange={(e) => {
@@ -160,6 +172,16 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                             className={`w-full py-5 pl-14 pr-8 rounded-2xl ${isLight ? 'bg-gray-50 border-gray-200 text-black' : 'bg-white/5 border-white/10 text-white'} border focus:border-[#249C6C] outline-none text-lg font-black transition-all placeholder:opacity-30 shadow-inner`}
                                         />
                                     </div>
+
+                                    <CountrySelect
+                                        theme={theme}
+                                        value={country}
+                                        onChange={(code) => {
+                                            setCountry(code);
+                                            setSaveError('');
+                                        }}
+                                        placeholder="Country of residence"
+                                    />
                                 </div>
 
 
@@ -197,6 +219,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                     </p>
                                 </div>
                                 <div className="space-y-4">
+                                    {hasExternalWallet && (
                                     <div className={`p-5 rounded-2xl border ${isLight ? 'bg-black/5 border-[#249C6C]/20' : 'bg-white/5 border-white/10'}`}>
                                         <div className="flex items-center gap-3 mb-2">
                                             <Shield size={16} className="text-[#249C6C]" />
@@ -207,6 +230,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                         </p>
                                         <p className={`text-[9px] font-bold mt-2 ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'} uppercase tracking-widest`}>Connected via Privy / Web3</p>
                                     </div>
+                                    )}
 
                                     <div className={`p-5 rounded-2xl border ${isLight ? 'bg-[#249C6C]/10 border-[#249C6C]/30' : 'bg-[#249C6C]/10 border-[#249C6C]/20'}`}>
                                         <div className="flex items-center gap-3 mb-2">
