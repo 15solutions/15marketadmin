@@ -5,6 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "build": "echo 'nexus-core: no build step'",
+    "build:ui": "echo 'nexus-core: no UI build step'",
     "price-frontend": "node src/price-frontend.js",
     "price-backend": "node src/price-backend.js",
     "dev": "node --watch src/index.js"
