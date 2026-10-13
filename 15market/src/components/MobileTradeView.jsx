@@ -792,7 +792,7 @@ function MobileSteppedChart({
         <img
           src={isLight ? '/goblogo.png' : '/gowlogo.png'}
           alt="15market"
-          className="w-[180px] object-contain select-none"
+          className="w-[270px] object-contain select-none"
           style={{
             opacity: isLight ? 0.05 : 0.08,
             filter: isLight ? 'grayscale(1) brightness(0.1)' : 'grayscale(1) brightness(0.7)',
