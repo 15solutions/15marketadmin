@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { KEEPER_URL_ARC } from '../constants';
 import {
     Gift, Users, Copy, Check, ArrowLeft, Wallet, TrendingUp,
-    Percent, BadgeCheck, Clock, LogOut, XCircle, Sparkles, RefreshCw
+    Percent, BadgeCheck, Clock, LogOut, XCircle, Sparkles, RefreshCw, ChevronDown
 } from 'lucide-react';
 
 // Minimum commission withdrawal — requests below this are rejected server-side.
@@ -30,6 +30,13 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
     const [wdBusy, setWdBusy] = useState(false);
     const [error, setError] = useState('');
     const [copiedKey, setCopiedKey] = useState(null);
+    // Ref-code entry (for users who skipped at signup): verified once, then
+    // stored on their profile so the referrer starts earning.
+    const [refCodeInput, setRefCodeInput] = useState('');
+    const [refCodeBusy, setRefCodeBusy] = useState(false);
+    const [refCodeMsg, setRefCodeMsg] = useState(null);
+    const briefingRef = useRef(null);
+    const enrollCtaRef = useRef(null);
 
     const enrolled = info?.referralEnrolled === true;
     const referralCode = info?.referralCode || '';
@@ -83,6 +90,45 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
         }
     };
 
+    const applyRefCode = async () => {
+        const code = (refCodeInput || '').trim().toUpperCase();
+        if (!code) { setRefCodeMsg({ type: 'error', text: 'Enter a referral code first.' }); return; }
+        if (!address) { setRefCodeMsg({ type: 'error', text: 'Connect a wallet first.' }); return; }
+        setRefCodeBusy(true);
+        setRefCodeMsg(null);
+        try {
+            const res = await fetch(`${KEEPER_URL_ARC}/referral/apply/${address.toLowerCase()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                // Applied codes are consumed once — clear any lingering link prefills.
+                try { localStorage.removeItem('15market_ref_code'); } catch {}
+                setRefCodeInput('');
+                setRefCodeMsg({ type: 'success', text: data.referrerUsername ? `Code verified. You were referred by @${data.referrerUsername}!` : 'Code verified and stored!' });
+                await refresh();
+            } else {
+                setRefCodeMsg({ type: 'error', text: data.error || 'Code not found. Check the spelling and try again.' });
+            }
+        } catch (e) {
+            setRefCodeMsg({ type: 'error', text: 'Network error. Try again.' });
+        } finally {
+            setRefCodeBusy(false);
+        }
+    };
+
+    const scrollToBriefing = () => {
+        briefingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+            enrollCtaRef.current?.classList.add('ref-cta-pulse');
+        }, 700);
+        setTimeout(() => {
+            enrollCtaRef.current?.classList.remove('ref-cta-pulse');
+        }, 2600);
+    };
+
     const requestWithdrawal = async () => {
         const amt = parseFloat(wdAmount);
         if (!(amt > 0)) { setError('Enter an amount to withdraw.'); return; }
@@ -128,6 +174,13 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                     .ref-scroll::-webkit-scrollbar-thumb:hover { background: rgba(26,97,64,0.6); }
                     .ref-scroll::-webkit-scrollbar-corner { background: transparent; }
                 }
+                /* Enroll CTA pulses briefly when the header Enroll button is tapped */
+                .ref-cta-pulse { animation: ref-cta-pulse 1.1s ease-in-out 2; }
+                @keyframes ref-cta-pulse {
+                    0% { box-shadow: 0 0 0 0 rgba(26,97,64,0.55); }
+                    70% { box-shadow: 0 0 0 16px rgba(26,97,64,0); }
+                    100% { box-shadow: 0 0 0 0 rgba(26,97,64,0); }
+                }
             `}</style>
             {/* Header — aligned with the dashboard navbar (same padding, safe-area
                 handling and 40px icon buttons). Logo centered between them. */}
@@ -169,9 +222,58 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                         <RefreshCw size={24} className="animate-spin text-[#1A6140]/40 mr-3" /><span className="text-[10px] font-black uppercase tracking-widest opacity-40">Loading referral program…</span>
                     </div>
                 ) : !enrolled ? (
-                    /* ── PRE-ENROLLMENT: sectioned guide + enroll ── */
+                    /* ── PRE-ENROLLMENT: ref-code entry + sectioned briefing + enroll ── */
                     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-5 max-w-2xl mx-auto w-full">
 
+                        {/* ENTRY: enter a referral code (verified + stored) · Enroll beside it */}
+                        <div className={card}>
+                            <div className="flex flex-col md:flex-row md:items-center gap-3">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] font-black uppercase tracking-widest mb-2">Have a referral code?</p>
+                                    {!info?.referredBy ? (
+                                        <>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    maxLength={7}
+                                                    value={refCodeInput}
+                                                    onChange={(e) => { setRefCodeInput(e.target.value.toUpperCase().slice(0, 7)); setRefCodeMsg(null); }}
+                                                    placeholder="REF CODE"
+                                                    className={`flex-1 min-w-0 px-4 py-3 rounded-2xl border text-[11px] font-black tracking-[0.25em] uppercase outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-[#1A6140]' : 'bg-white/5 border-white/10 focus:border-[#1A6140]'}`}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') applyRefCode(); }}
+                                                />
+                                                <button
+                                                    onClick={applyRefCode}
+                                                    disabled={refCodeBusy}
+                                                    className="px-4 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-40 shrink-0"
+                                                >
+                                                    {refCodeBusy ? '…' : 'Verify'}
+                                                </button>
+                                            </div>
+                                            {refCodeMsg && (
+                                                <p className={`text-[9px] font-bold mt-2 ${refCodeMsg.type === 'error' ? 'text-red-400' : 'text-[#1A6140]'}`}>
+                                                    {refCodeMsg.text}
+                                                </p>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="text-[10px] font-bold text-[#1A6140]">
+                                            <Check size={11} className="inline mr-1 -mt-0.5" />
+                                            Referred by <span className="font-mono">{truncateAddr(info.referredBy)}</span>. Their earnings on your activity are live.
+                                        </p>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={scrollToBriefing}
+                                    className="self-stretch md:self-auto px-5 py-3 rounded-2xl border border-[#1A6140]/40 bg-[#1A6140]/10 text-[#1A6140] text-[9px] font-black uppercase tracking-widest hover:bg-[#1A6140]/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 shrink-0"
+                                >
+                                    Enroll <ChevronDown size={13} />
+                                </button>
+                            </div>
+                        </div>
+
+                {/* Ref-code entry, briefing sections, enroll CTA */}
+                        <div ref={briefingRef}>
                         {/* SECTION 1: ENROLLMENT */}
                         <div className={card}>
                             <div className="flex items-center gap-2.5 mb-4">
@@ -229,12 +331,14 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                         </div>
 
                         <button
+                            ref={enrollCtaRef}
                             onClick={enroll}
                             disabled={enrolling}
                             className="w-full py-5 bg-[#1A6140] text-white rounded-[24px] font-black uppercase tracking-widest text-xs shadow-[0_15px_30px_-10px_rgba(26,97,64,0.4)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
                         >
                             <Sparkles size={16} />{enrolling ? 'Enrolling…' : 'Enroll now, get my code'}
                         </button>
+                        </div>
                     </motion.div>
                 ) : (
                     /* ── ENROLLED: referral dashboard ── */
