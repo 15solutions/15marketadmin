@@ -23,14 +23,14 @@ export default function MobileAssetPicker({ tokens = [], initialActive = null, o
 
     // Inject styles scoped to the stage (so we don't rely on global CSS)
     const style = document.createElement('style');
-    style.innerHTML = `:root{--green2:#3ddc84}
+    style.innerHTML = `:root{--green2:#1A6140}
 html,body{margin:0}
 #mobile-asset-stage{position:relative;height:100vh;background:#050807;overflow:hidden}
 #mobile-asset-stage #anchor{position:absolute;left:50%;top:50%;width:0;height:0;touch-action:none}
 #mobile-asset-stage .item{position:absolute;left:-60px;top:-22px;width:120px;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;color:#fff;background:none;border:0;cursor:pointer;will-change:transform,opacity;transform-origin:center;user-select:none}
 #mobile-asset-stage .item small{font-size:15px;color:var(--c);filter:brightness(1.4)}
 #mobile-asset-stage .item em{font-style:normal;font-weight:800;font-size:15px;letter-spacing:.06em}
-#mobile-asset-stage .item.active em{color:var(--green2);text-shadow:0 0 18px #3ddc84cc}
+#mobile-asset-stage .item.active em{color:var(--green2);text-shadow:0 0 18px #1A6140cc}
 #mobile-asset-stage .item.active::after{content:"";position:absolute;bottom:-4px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:var(--green2);box-shadow:0 0 10px var(--green2)}
 `;
     container.appendChild(style);

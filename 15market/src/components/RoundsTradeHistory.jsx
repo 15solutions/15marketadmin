@@ -27,7 +27,7 @@ function RoundsTradeHistoryComponent({
                 
                 <div className="flex items-center justify-between mb-4 px-1">
                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[#249C6C] animate-pulse" />
+                        <div className="w-2 h-2 rounded-full bg-[#1A6140] animate-pulse" />
                         <h3 className={`text-xs lg:text-base font-black uppercase tracking-widest ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Rounds History</h3>
                     </div>
                     <span className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em]">P2P Pooled Model</span>
@@ -39,18 +39,18 @@ function RoundsTradeHistoryComponent({
                     <div className="space-y-2">
                         {paginatedTrades.map((t) => {
                             const isUp = t.direction === "UP" || t.direction === 1 || String(t.direction) === "1";
-                            const color = isUp ? '#249C6C' : '#FF7F50';
+                            const color = isUp ? '#1A6140' : '#FF7F50';
                             const isWon = t.status === "WON";
-                            const statusColor = isWon ? '#249C6C' : '#FF7F50';
+                            const statusColor = isWon ? '#1A6140' : '#FF7F50';
 
                             return (
                                 <div key={t.id} className={`flex flex-row items-center justify-between p-3 lg:p-4 rounded-xl border transition-all ${isLight
-                                    ? 'bg-[#f0f9f4] border-[#249C6C]/10 hover:border-[#249C6C]/30'
-                                    : 'bg-black/40 border-white/10 hover:border-[#249C6C]/20'}`}>
+                                    ? 'bg-[#f0f9f4] border-[#1A6140]/10 hover:border-[#1A6140]/30'
+                                    : 'bg-black/40 border-white/10 hover:border-[#1A6140]/20'}`}>
                                     
                                     <div className="flex items-center gap-4">
                                         <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-white/5 min-w-[50px]">
-                                            {isUp ? <ArrowUp size={14} className="text-[#249C6C]" /> : <ArrowDown size={14} className="text-[#FF7F50]" />}
+                                            {isUp ? <ArrowUp size={14} className="text-[#1A6140]" /> : <ArrowDown size={14} className="text-[#FF7F50]" />}
                                             <span className="text-[8px] font-black uppercase" style={{ color }}>{isUp ? 'LONG' : 'SHORT'}</span>
                                         </div>
                                         <div className="flex flex-col items-end">
@@ -80,7 +80,7 @@ function RoundsTradeHistoryComponent({
                                         {isTradeSettled(t) && (
                                         <button
                                             onClick={() => { setSelectedPnLTrade(t); setIsPnLOpen(true); }}
-                                            className={`p-2 rounded-xl transition-all ${isLight ? 'bg-black/5 hover:bg-black/10' : 'bg-white/5 hover:bg-white/10'} text-white/40 hover:text-[#249C6C]`}
+                                            className={`p-2 rounded-xl transition-all ${isLight ? 'bg-black/5 hover:bg-black/10' : 'bg-white/5 hover:bg-white/10'} text-white/40 hover:text-[#1A6140]`}
                                         >
                                             <Share2 size={16} />
                                         </button>

@@ -16,7 +16,7 @@ if (fs.existsSync(envPath)) {
 
 const NEW_TREASURY = "0xDd90060508D7844991511bCc8F4A8500AB326F30";
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
-const ARC_RPC = "https://rpc.testnet.arc.network";
+const ARC_RPC = "https://rpc.testnet.arc.io";
 
 async function main() {
   const network = new ethers.Network("arc-testnet", 5042002);

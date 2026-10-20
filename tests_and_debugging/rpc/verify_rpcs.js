@@ -1,7 +1,7 @@
 const { ethers } = require('ethers');
 
 const rpcs = [
-    "https://rpc.testnet.arc.network"
+    "https://rpc.testnet.arc.io"
 ];
 
 async function run() {

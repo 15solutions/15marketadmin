@@ -101,8 +101,8 @@ function TradeTerminalComponent({
             <div className="relative w-full flex items-center p-0.5 rounded-full border border-white/5 bg-white/5 backdrop-blur-3xl overflow-hidden">
                 {/* 3-way Sliding Pill Background */}
                 <motion.div
-                    className="absolute top-0.5 bottom-0.5 w-[calc(33.33%-2px)] rounded-full bg-[#17A364]"
-                    style={{ boxShadow: isLight ? 'none' : '0 0 15px rgba(23, 163, 100,0.3)' }}
+                    className="absolute top-0.5 bottom-0.5 w-[calc(33.33%-2px)] rounded-full bg-[#1A6140]"
+                    style={{ boxShadow: isLight ? 'none' : '0 0 15px rgba(26, 97, 64,0.3)' }}
                     initial={false}
                     animate={{
                         x: duration === 15 ? 1 : duration === 10 ? 'calc(100% + 1px)' : 'calc(200% + 1px)',
@@ -129,9 +129,9 @@ function TradeTerminalComponent({
               <div className="flex items-center justify-between px-1.5">
                   <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/70' : 'text-white/40'}`}>Amount</span>
               </div>
-            <div className={`flex flex-col gap-1 py-1 px-4 rounded-full border transition-all duration-300 ${isFocused ? (isLight ? 'bg-white border-[#17A364] shadow-[0_0_15px_rgba(23,163,100,0.15)]' : 'bg-black/40 border-[#17A364] shadow-[0_0_20px_rgba(23,163,100,0.2)]') : (isLight ? 'bg-white/60 border-[#17A364]/30 hover:border-[#17A364]/60' : 'bg-black/20 border-white/10 hover:border-white/20')}`}>
+            <div className={`flex flex-col gap-1 py-1 px-4 rounded-full border transition-all duration-300 ${isFocused ? (isLight ? 'bg-white border-[#1A6140] shadow-[0_0_15px_rgba(26, 97, 64,0.15)]' : 'bg-black/40 border-[#1A6140] shadow-[0_0_20px_rgba(26, 97, 64,0.2)]') : (isLight ? 'bg-white/60 border-[#1A6140]/30 hover:border-[#1A6140]/60' : 'bg-black/20 border-white/10 hover:border-white/20')}`}>
                 <div className="flex items-center justify-center relative w-full h-6 lg:h-8">
-                    <span className={`absolute left-0 text-[12px] md:text-sm font-black transition-opacity duration-300 ${isFocused ? 'opacity-80 text-[#17A364]' : (isLight ? 'text-[#0a261a]/40' : 'text-white/40')}`}>$</span>
+                    <span className={`absolute left-0 text-[12px] md:text-sm font-black transition-opacity duration-300 ${isFocused ? 'opacity-80 text-[#1A6140]' : (isLight ? 'text-[#0a261a]/40' : 'text-white/40')}`}>$</span>
                     <input
                         type="number"
                         value={amount}
@@ -140,7 +140,7 @@ function TradeTerminalComponent({
                         onBlur={() => setTimeout(() => setIsFocused(false), 200)}
                         placeholder="STAKE"
                         disabled={timerActive}
-                        className={`w-full bg-transparent force-transparent-bg text-center text-sm md:text-[15px] font-black uppercase tracking-widest outline-none border-none transition-all focus:!ring-0 focus:!shadow-none focus:!border-none focus:!outline-none ${timerActive ? 'opacity-40 cursor-not-allowed' : ''} ${isLight ? 'text-[#17A364] placeholder:text-[#17A364]/60' : 'text-white placeholder:text-white/40'}`}
+                        className={`w-full bg-transparent force-transparent-bg text-center text-sm md:text-[15px] font-black uppercase tracking-widest outline-none border-none transition-all focus:!ring-0 focus:!shadow-none focus:!border-none focus:!outline-none ${timerActive ? 'opacity-40 cursor-not-allowed' : ''} ${isLight ? 'text-[#1A6140] placeholder:text-[#1A6140]/60' : 'text-white placeholder:text-white/40'}`}
                     />
                 </div>
             </div>
@@ -150,7 +150,7 @@ function TradeTerminalComponent({
                     <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/70' : 'text-white/40'}`} style={{ fontFamily: '"Comfortaa", cursive' }}>Payout</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className={`text-[9px] lg:text-[11px] font-black text-[#17A364]`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+                    <span className={`text-[9px] lg:text-[11px] font-black text-[#1A6140]`} style={{ fontFamily: '"Comfortaa", cursive' }}>
                         YES ${yesPayout.toFixed(2)}
                     </span>
                     <span className={`text-[9px] lg:text-[11px] font-black ${isLight ? 'text-black/20' : 'text-white/15'}`}>|</span>
@@ -166,9 +166,9 @@ function TradeTerminalComponent({
         <div className="relative pt-2 pb-1 px-2 pointer-events-auto shrink-0">
             <div className="relative h-0.5">
                 <div className={`absolute inset-0 rounded-full ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
-                <div className="absolute inset-y-0 left-0 rounded-full bg-[#17A364] transition-all duration-150" style={{ width: `${sliderValue || 0}%` }} />
+                <div className="absolute inset-y-0 left-0 rounded-full bg-[#1A6140] transition-all duration-150" style={{ width: `${sliderValue || 0}%` }} />
                 <div
-                    className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 lg:w-5 lg:h-5 rounded-full ${isLight ? 'bg-white border-[3px] border-[#17A364]' : 'bg-[#17A364] border-2 border-black'} pointer-events-none transition-all duration-150 z-20`}
+                    className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 lg:w-5 lg:h-5 rounded-full ${isLight ? 'bg-white border-[3px] border-[#1A6140]' : 'bg-[#1A6140] border-2 border-black'} pointer-events-none transition-all duration-150 z-20`}
                     style={{ left: `calc(${sliderValue || 0}% - ${(sliderValue || 0) > 50 ? 8 : 6}px)` }}
                 />
                 <input type="range" min="0" max="100" step="1" value={sliderValue || 0} onChange={handleSliderChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30" />
@@ -193,7 +193,7 @@ function TradeTerminalComponent({
                 onClick={(e) => { e.stopPropagation(); handleAction("UP"); }}
                 disabled={isExecuting || maintenanceMode || tradingHalted || timerActive}
                 className={`flex-1 flex flex-row items-center justify-center gap-1 py-2 lg:py-2.5 rounded-full transition-all relative overflow-hidden group hover:scale-[1.02] active:scale-95 ${isExecuting || maintenanceMode || tradingHalted || timerActive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                style={{ background: '#17A364', color: 'white', boxShadow: '0 8px 20px -6px rgba(23,163,100,0.4)' }}
+                style={{ background: '#1A6140', color: 'white', boxShadow: '0 8px 20px -6px rgba(26, 97, 64,0.4)' }}
             >
                 {isExecuting && direction === "UP" ? (
                     <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />

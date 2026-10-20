@@ -178,7 +178,7 @@ class CircleService {
             let balanceVal = '0.00';
             try {
                 // Fetch real on-chain native USDC balance from Arc Testnet
-                const arcRpcUrl = (config.RPCS && config.RPCS[0]) || 'https://rpc.testnet.arc.network';
+                const arcRpcUrl = (config.RPCS && config.RPCS[0]) || 'https://rpc.testnet.arc.io';
                 const provider = new ethers.JsonRpcProvider(arcRpcUrl);
                 const balWei = await provider.getBalance(address);
                 balanceVal = ethers.formatEther(balWei);
@@ -207,7 +207,7 @@ class CircleService {
             const address = walletId.includes('-') ? walletId.split('-')[1] : walletId;
             let balanceVal = '0.00';
             try {
-                const arcRpcUrl = (config.RPCS && config.RPCS[0]) || 'https://rpc.testnet.arc.network';
+                const arcRpcUrl = (config.RPCS && config.RPCS[0]) || 'https://rpc.testnet.arc.io';
                 const provider = new ethers.JsonRpcProvider(arcRpcUrl);
                 const balWei = await provider.getBalance(address);
                 balanceVal = ethers.formatEther(balWei);

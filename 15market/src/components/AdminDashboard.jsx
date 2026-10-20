@@ -301,8 +301,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         }
     };
 
-    const AdminCard = ({ title, icon: Icon, children, accent = "#249C6C" }) => (
-        <div className={`p-6 border rounded-[32px] ${isLight ? 'bg-white/70 border-[#249C6C]/20 shadow-sm' : 'bg-[#0D0D0D]/80 border-white/5 shadow-2xl'} backdrop-blur-xl relative overflow-hidden group`}>
+    const AdminCard = ({ title, icon: Icon, children, accent = "#1A6140" }) => (
+        <div className={`p-6 border rounded-[32px] ${isLight ? 'bg-white/70 border-[#1A6140]/20 shadow-sm' : 'bg-[#0D0D0D]/80 border-white/5 shadow-2xl'} backdrop-blur-xl relative overflow-hidden group`}>
             <div className="absolute top-0 left-0 w-1 h-full opacity-40 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: accent }} />
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -317,20 +317,20 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     );
 
     return (
-        <div className={`h-screen w-full flex flex-col overflow-hidden ${isLight ? 'bg-[#b4d9c7]' : 'bg-[#050505]'} relative`}>
+        <div className={`h-screen w-full flex flex-col overflow-hidden ${isLight ? 'bg-[#8CB09D]' : 'bg-[#050505]'} relative`}>
             {/* Background Flair */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#249C6C]/5 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#249C6C]/3 rounded-full blur-[120px]" />
+                <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#1A6140]/5 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#1A6140]/3 rounded-full blur-[120px]" />
             </div>
 
             {/* Header */}
-            <header className={`flex-none ${isLight ? 'bg-white/50 border-[#249C6C]/20' : 'bg-[#0D0D0D]/50 border-white/5'} border-b backdrop-blur-3xl z-50`}>
+            <header className={`flex-none ${isLight ? 'bg-white/50 border-[#1A6140]/20' : 'bg-[#0D0D0D]/50 border-white/5'} border-b backdrop-blur-3xl z-50`}>
                 <div className="max-w-[1600px] mx-auto px-8 py-5 flex items-center justify-between">
                     <div className="flex items-center gap-6">
                         <button 
                             onClick={onBack}
-                            className={`p-3 rounded-full border transition-all ${isLight ? 'bg-white border-[#249C6C]/20 hover:bg-[#249C6C]/10 text-black' : 'bg-white/5 border-white/5 hover:bg-white/10 text-white'} active:scale-95`}
+                            className={`p-3 rounded-full border transition-all ${isLight ? 'bg-white border-[#1A6140]/20 hover:bg-[#1A6140]/10 text-black' : 'bg-white/5 border-white/5 hover:bg-white/10 text-white'} active:scale-95`}
                         >
                             <ArrowLeft size={18} />
                         </button>
@@ -343,9 +343,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className={`flex items-center gap-3 px-4 py-2 rounded-2xl border ${isLight ? 'bg-[#249C6C]/5 border-[#249C6C]/10' : 'bg-white/5 border-white/5'}`}>
-                            {isConnected ? <Wifi size={14} className="text-[#249C6C]" /> : <WifiOff size={14} className="text-red-500" />}
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${isConnected ? 'text-[#249C6C]' : 'text-red-500'}`}>
+                        <div className={`flex items-center gap-3 px-4 py-2 rounded-2xl border ${isLight ? 'bg-[#1A6140]/5 border-[#1A6140]/10' : 'bg-white/5 border-white/5'}`}>
+                            {isConnected ? <Wifi size={14} className="text-[#1A6140]" /> : <WifiOff size={14} className="text-red-500" />}
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${isConnected ? 'text-[#1A6140]' : 'text-red-500'}`}>
                                 Latency: 42ms
                             </span>
                         </div>
@@ -359,13 +359,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     
                     {/* Security & Maintenance Controls (COL 1-7) */}
                     <div className="lg:col-span-7 flex flex-col gap-8">
-                        <AdminCard title="Security Protocols" icon={Shield} accent="#249C6C">
+                        <AdminCard title="Security Protocols" icon={Shield} accent="#1A6140">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Maintenance Toggle */}
-                                <div className={`p-6 rounded-[24px] border ${platformSettings.maintenanceMode ? 'bg-[#249C6C]/10 border-[#249C6C]/40' : 'bg-white/5 border-white/5'} transition-all`}>
+                                <div className={`p-6 rounded-[24px] border ${platformSettings.maintenanceMode ? 'bg-[#1A6140]/10 border-[#1A6140]/40' : 'bg-white/5 border-white/5'} transition-all`}>
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-4">
-                                            <div className={`p-3 rounded-2xl ${platformSettings.maintenanceMode ? 'bg-[#249C6C] text-white' : 'bg-white/5 text-white/40'}`}>
+                                            <div className={`p-3 rounded-2xl ${platformSettings.maintenanceMode ? 'bg-[#1A6140] text-white' : 'bg-white/5 text-white/40'}`}>
                                                 <Settings size={20} className={platformSettings.maintenanceMode ? 'animate-spin-slow' : ''} />
                                             </div>
                                             <div>
@@ -375,7 +375,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         </div>
                                         <button 
                                             onClick={() => updateSettings({ maintenanceMode: !platformSettings.maintenanceMode })}
-                                            className={`w-14 h-8 rounded-full relative p-1 transition-all ${platformSettings.maintenanceMode ? 'bg-[#249C6C]' : 'bg-white/10'}`}
+                                            className={`w-14 h-8 rounded-full relative p-1 transition-all ${platformSettings.maintenanceMode ? 'bg-[#1A6140]' : 'bg-white/10'}`}
                                         >
                                             <motion.div 
                                                 animate={{ x: platformSettings.maintenanceMode ? 24 : 0 }}
@@ -425,10 +425,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         </AdminCard>
 
-                        <AdminCard title="Platform Metrics" icon={Activity} accent="#249C6C">
+                        <AdminCard title="Platform Metrics" icon={Activity} accent="#1A6140">
                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
-                                    { label: 'Total Volume', value: `$${parseFloat(stats.totalVolume).toLocaleString()}`, icon: DollarSign, color: '#249C6C' },
+                                    { label: 'Total Volume', value: `$${parseFloat(stats.totalVolume).toLocaleString()}`, icon: DollarSign, color: '#1A6140' },
                                     { label: 'Active Users', value: stats.activeUsers, icon: Users, color: '#3b82f6' },
                                     { label: 'Total Trades', value: stats.totalTrades, icon: TrendingUp, color: '#f59e0b' },
                                     { label: 'Treasury', value: `${parseFloat(stats.treasuryBalance).toFixed(2)} ARC`, icon: Zap, color: '#ef4444' }
@@ -445,7 +445,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </AdminCard>
 
                         <AdminCard title="Global User Presence" icon={Globe} accent="#3b82f6">
-                            <div className={`relative w-full aspect-[2/1] rounded-3xl overflow-hidden border ${isLight ? 'bg-[#249C6C]/5 border-[#249C6C]/10' : 'bg-black/40 border-white/5'}`}>
+                            <div className={`relative w-full aspect-[2/1] rounded-3xl overflow-hidden border ${isLight ? 'bg-[#1A6140]/5 border-[#1A6140]/10' : 'bg-black/40 border-white/5'}`}>
                                 {/* Simplified SVG World Map */}
                                 <svg className="w-full h-full opacity-20" viewBox="0 0 800 400" fill="currentColor">
                                     <path d="M150,100 Q200,80 250,100 T350,120 T450,100 T550,80 T650,100 T750,120 L750,300 Q650,320 550,300 T450,280 T350,300 T250,320 T150,300 Z" opacity="0.5" />
@@ -480,7 +480,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                     {/* Broadcast Center (COL 8-12) */}
                     <div className="lg:col-span-5">
-                        <AdminCard title="Broadcast Center" icon={Radio} accent="#2EC47C">
+                        <AdminCard title="Broadcast Center" icon={Radio} accent="#1A6140">
                             <div className="flex flex-col gap-6">
                                 <div>
                                     <label className="text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1">Live Message</label>
@@ -488,7 +488,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         value={broadcastText}
                                         onChange={(e) => setBroadcastText(e.target.value)}
                                         placeholder="Enter system broadcast message..."
-                                        className={`w-full min-h-[140px] p-6 rounded-3xl border text-sm font-bold resize-none transition-all outline-none ${isLight ? 'bg-white border-[#249C6C]/10 focus:border-[#249C6C]/40' : 'bg-black/40 border-white/10 focus:border-[#249C6C]/30'}`}
+                                        className={`w-full min-h-[140px] p-6 rounded-3xl border text-sm font-bold resize-none transition-all outline-none ${isLight ? 'bg-white border-[#1A6140]/10 focus:border-[#1A6140]/40' : 'bg-black/40 border-white/10 focus:border-[#1A6140]/30'}`}
                                     />
                                 </div>
 
@@ -500,7 +500,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 <button 
                                                     key={m}
                                                     onClick={() => setBroadcastDuration(m * 60)}
-                                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#249C6C] text-white border-[#249C6C]' : 'bg-white/5 border-white/5 opacity-50 hover:opacity-100'}`}
+                                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#1A6140] text-white border-[#1A6140]' : 'bg-white/5 border-white/5 opacity-50 hover:opacity-100'}`}
                                                 >
                                                     {m}m
                                                 </button>
@@ -514,8 +514,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 <button 
                                                     key={level}
                                                     onClick={() => updateSettings({ bannerLevel: level })}
-                                                    className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${platformSettings.bannerLevel === level ? 'ring-2 ring-[#249C6C] border-transparent' : 'border-white/10 opacity-30 shadow-sm'}`}
-                                                    style={{ backgroundColor: level === 'info' ? '#3b82f6' : level === 'success' ? '#249C6C' : level === 'warning' ? '#f59e0b' : '#ef4444' }}
+                                                    className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${platformSettings.bannerLevel === level ? 'ring-2 ring-[#1A6140] border-transparent' : 'border-white/10 opacity-30 shadow-sm'}`}
+                                                    style={{ backgroundColor: level === 'info' ? '#3b82f6' : level === 'success' ? '#1A6140' : level === 'warning' ? '#f59e0b' : '#ef4444' }}
                                                 >
                                                     <div className="w-1.5 h-1.5 rounded-full bg-white" />
                                                 </button>
@@ -527,7 +527,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <button 
                                     onClick={handleUpdateBroadcast}
                                     disabled={isSaving || !broadcastText}
-                                    className="w-full py-5 bg-[#249C6C] text-white rounded-3xl font-black uppercase tracking-[0.3em] text-[10px] shadow-[0_20px_40px_-10px_rgba(36, 156, 108,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                                    className="w-full py-5 bg-[#1A6140] text-white rounded-3xl font-black uppercase tracking-[0.3em] text-[10px] shadow-[0_20px_40px_-10px_rgba(26, 97, 64,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
                                 >
                                     <div className="flex items-center justify-center gap-3">
                                         <Radio size={16} />
@@ -535,9 +535,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     </div>
                                 </button>
 
-                                <div className={`p-5 rounded-2xl border ${isLight ? 'bg-white/50 border-[#249C6C]/10' : 'bg-white/[0.03] border-white/5'}`}>
+                                <div className={`p-5 rounded-2xl border ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-white/[0.03] border-white/5'}`}>
                                     <div className="flex items-center gap-3 mb-2">
-                                        <Activity size={14} className="text-[#249C6C]" />
+                                        <Activity size={14} className="text-[#1A6140]" />
                                         <h4 className="text-[10px] font-black uppercase">Current Transmission</h4>
                                     </div>
                                     <p className="text-[11px] font-bold opacity-60 leading-relaxed italic">
@@ -556,7 +556,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         value={campaignTitle}
                                         onChange={(e) => setCampaignTitle(e.target.value)}
                                         placeholder="e.g. Genesis Trading Pool"
-                                        className={`w-full p-4 rounded-2xl border text-sm font-bold outline-none transition-all ${isLight ? 'bg-white border-[#249C6C]/10 focus:border-[#a855f7]/40' : 'bg-black/40 border-white/10 focus:border-[#a855f7]/40'}`}
+                                        className={`w-full p-4 rounded-2xl border text-sm font-bold outline-none transition-all ${isLight ? 'bg-white border-[#1A6140]/10 focus:border-[#a855f7]/40' : 'bg-black/40 border-white/10 focus:border-[#a855f7]/40'}`}
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -567,12 +567,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             value={campaignPrize}
                                             onChange={(e) => setCampaignPrize(e.target.value)}
                                             placeholder="$1,000 USDC"
-                                            className={`w-full p-4 rounded-2xl border text-sm font-bold outline-none transition-all ${isLight ? 'bg-white border-[#249C6C]/10 focus:border-[#a855f7]/40' : 'bg-black/40 border-white/10 focus:border-[#a855f7]/40'}`}
+                                            className={`w-full p-4 rounded-2xl border text-sm font-bold outline-none transition-all ${isLight ? 'bg-white border-[#1A6140]/10 focus:border-[#a855f7]/40' : 'bg-black/40 border-white/10 focus:border-[#a855f7]/40'}`}
                                         />
                                     </div>
                                     <div>
                                         <label className="text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-2 ml-1">Launch Timing</label>
-                                        <div className={`flex items-center gap-2 p-2 rounded-2xl border ${isLight ? 'bg-white border-[#249C6C]/10' : 'bg-black/40 border-white/10'}`}>
+                                        <div className={`flex items-center gap-2 p-2 rounded-2xl border ${isLight ? 'bg-white border-[#1A6140]/10' : 'bg-black/40 border-white/10'}`}>
                                             <button 
                                                 onClick={() => setCampaignDelayMinutes(0)}
                                                 className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${campaignDelayMinutes === 0 ? 'bg-[#a855f7] text-white' : 'hover:bg-white/5 opacity-50'}`}
@@ -628,7 +628,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 </button>
                                                 <button 
                                                     onClick={() => handleCopyApprove(app.address, true)}
-                                                    className="w-8 h-8 rounded-full border border-[#249C6C]/20 text-[#249C6C] flex items-center justify-center hover:bg-[#249C6C]/10 transition-all"
+                                                    className="w-8 h-8 rounded-full border border-[#1A6140]/20 text-[#1A6140] flex items-center justify-center hover:bg-[#1A6140]/10 transition-all"
                                                 >
                                                     <Check size={14} />
                                                 </button>
@@ -660,7 +660,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             className={`p-3 rounded-2xl border flex items-center justify-between ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center ${act.direction === 'UP' ? 'bg-[#249C6C]/10 text-[#249C6C]' : 'bg-red-500/10 text-red-500'}`}>
+                                                <div className={`w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
                                                     {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.avatar ? (
                                                         <img 
                                                             src={userProfiles[(act.userAddr || act.owner || "").toLowerCase()].avatar} 
@@ -680,7 +680,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className={`text-[10px] font-black ${act.won ? 'text-[#249C6C]' : (act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
+                                                <div className={`text-[10px] font-black ${act.won ? 'text-[#1A6140]' : (act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
                                                     {act.type === 'TRADE_PLACED' ? 'PENDING' : (act.won ? `+$${act.payout}` : 'LOST')}
                                                 </div>
                                                 <div className="text-[8px] opacity-20 font-mono capitalize">{new Date(act.timestamp).toLocaleTimeString()}</div>
@@ -695,15 +695,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             </main>
 
             {/* Persistence Layer Status */}
-            <footer className={`flex-none p-5 border-t backdrop-blur-3xl px-10 flex items-center justify-between ${isLight ? 'bg-white/50 border-[#249C6C]/10' : 'bg-[#050505]/50 border-white/5'}`}>
+            <footer className={`flex-none p-5 border-t backdrop-blur-3xl px-10 flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#050505]/50 border-white/5'}`}>
                 <div className="flex items-center gap-8">
                     <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[#249C6C]' : 'bg-red-500'} animate-pulse`} />
+                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[#1A6140]' : 'bg-red-500'} animate-pulse`} />
                         <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Persistence Layer Stable</span>
                     </div>
                     <div className="h-4 w-px bg-white/5" />
                     <div className="flex items-center gap-3">
-                        <Shield size={14} className="text-[#249C6C] opacity-50" />
+                        <Shield size={14} className="text-[#1A6140] opacity-50" />
                         <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Admin Token Authorized</span>
                     </div>
                 </div>

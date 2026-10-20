@@ -109,7 +109,7 @@ export function UnifiedFundingModal({
             <div className={`relative ${size} flex items-center justify-center`}>
                 <img 
                     src={iconSrc} 
-                    className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(36, 156, 108,0.3)]" 
+                    className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(26, 97, 64,0.3)]" 
                     style={{ filter: isLight && mode === 'native' ? 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)' : 'none' }}
                     alt={token.symbol} 
                 />
@@ -409,12 +409,12 @@ export function UnifiedFundingModal({
                 {/* Header Section */}
                 <div className={`p-6 border-b flex items-center justify-between shrink-0 ${isLight ? 'bg-white/40 border-black/5' : 'bg-white/[0.02] border-white/5'}`}>
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#249C6C]/10 flex items-center justify-center">
-                            <Zap className="text-[#249C6C]" size={20} />
+                        <div className="w-10 h-10 rounded-full bg-[#1A6140]/10 flex items-center justify-center">
+                            <Zap className="text-[#1A6140]" size={20} />
                         </div>
                         <div>
                             <h3 className={`text-lg font-black uppercase tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Quick Fund</h3>
-                            <p className="text-[10px] font-bold text-[#249C6C] uppercase tracking-widest">Main → Trading Vault</p>
+                            <p className="text-[10px] font-bold text-[#1A6140] uppercase tracking-widest">Main → Trading Vault</p>
                         </div>
                     </div>
                     <button onClick={onClose} className={`p-2 rounded-full transition-colors ${isLight ? 'hover:bg-black/5 text-black/40' : 'hover:bg-white/5 text-white/40'}`}>
@@ -425,7 +425,7 @@ export function UnifiedFundingModal({
                 <div className="p-6 flex flex-col gap-6 max-h-[85dvh] overflow-y-auto custom-scrollbar">
                                         {/* Guided Funding Selection */}
                     <div className={`p-8 rounded-[40px] border relative overflow-hidden flex flex-col items-center justify-center min-h-[320px] ${isLight ? 'bg-[#C2D1C9] border-black/5 shadow-xl' : 'bg-[#111] border-white/5 shadow-2xl'}`}>
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#249C6C]/5 blur-[60px] rounded-full" />
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#1A6140]/5 blur-[60px] rounded-full" />
                         
                         <AnimatePresence mode="wait">
                             {!fundingMode ? (
@@ -438,10 +438,10 @@ export function UnifiedFundingModal({
                                 >
                                     <button 
                                         onClick={() => setFundingMode('native')}
-                                        className={`flex-1 group relative p-6 h-full flex flex-col items-center justify-center gap-4 transition-all hover:bg-[#249C6C]/5 active:scale-[0.98]`}
+                                        className={`flex-1 group relative p-6 h-full flex flex-col items-center justify-center gap-4 transition-all hover:bg-[#1A6140]/5 active:scale-[0.98]`}
                                     >
-                                        <div className="w-12 h-12 rounded-full bg-[#249C6C]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <Zap size={24} className="text-[#249C6C]" />
+                                        <div className="w-12 h-12 rounded-full bg-[#1A6140]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <Zap size={24} className="text-[#1A6140]" />
                                         </div>
                                         <div className="text-center">
                                             <p className={`text-[11px] font-black uppercase tracking-[0.2em] ${isLight ? 'text-black' : 'text-white'}`}>Native</p>
@@ -449,14 +449,14 @@ export function UnifiedFundingModal({
                                     </button>
 
                                     {/* Vertical Divider */}
-                                    <div className="w-px h-16 bg-[#249C6C]/20" />
+                                    <div className="w-px h-16 bg-[#1A6140]/20" />
 
                                     <button 
                                         onClick={() => setFundingMode('stables')}
-                                        className={`flex-1 group relative p-6 h-full flex flex-col items-center justify-center gap-4 transition-all hover:bg-[#249C6C]/5 active:scale-[0.98]`}
+                                        className={`flex-1 group relative p-6 h-full flex flex-col items-center justify-center gap-4 transition-all hover:bg-[#1A6140]/5 active:scale-[0.98]`}
                                     >
-                                        <div className="w-12 h-12 rounded-full bg-[#249C6C]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <Globe size={24} className="text-[#249C6C]" />
+                                        <div className="w-12 h-12 rounded-full bg-[#1A6140]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <Globe size={24} className="text-[#1A6140]" />
                                         </div>
                                         <div className="text-center">
                                             <p className={`text-[11px] font-black uppercase tracking-[0.2em] ${isLight ? 'text-black' : 'text-white'}`}>Stables</p>
@@ -481,7 +481,7 @@ export function UnifiedFundingModal({
                                         </button>
                                         <div className="flex gap-1">
                                             {SUPPORTED_TOKENS.map(t => (
-                                                <div key={t.id} className={`w-1 h-1 rounded-full transition-all ${selectedToken.id === t.id ? 'w-3 bg-[#249C6C]' : 'bg-white/10'}`} />
+                                                <div key={t.id} className={`w-1 h-1 rounded-full transition-all ${selectedToken.id === t.id ? 'w-3 bg-[#1A6140]' : 'bg-white/10'}`} />
                                             ))}
                                         </div>
                                     </div>
@@ -490,13 +490,13 @@ export function UnifiedFundingModal({
                                         {/* Token Navigation Buttons */}
                                         <button 
                                             onClick={() => handleSwipeToken('right')}
-                                            className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 text-[#249C6C] hover:scale-110 active:scale-90 transition-all`}
+                                            className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 text-[#1A6140] hover:scale-110 active:scale-90 transition-all`}
                                         >
                                             <ChevronLeft size={32} strokeWidth={3} />
                                         </button>
                                         <button 
                                             onClick={() => handleSwipeToken('left')}
-                                            className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 text-[#249C6C] hover:scale-110 active:scale-90 transition-all`}
+                                            className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 text-[#1A6140] hover:scale-110 active:scale-90 transition-all`}
                                         >
                                             <ChevronRight size={32} strokeWidth={3} />
                                         </button>
@@ -519,17 +519,17 @@ export function UnifiedFundingModal({
                                                     <TokenLogoInfused token={selectedToken} isLight={isLight} mode={fundingMode} />
                                                     <span className={`mt-2 text-[10px] font-black ${isLight ? 'text-black' : 'text-white'}`}>{selectedToken.symbol}</span>
                                                 </div>
-                                                <ArrowRightLeft size={20} className="text-[#249C6C] mx-4" />
+                                                <ArrowRightLeft size={20} className="text-[#1A6140] mx-4" />
                                                 <div className="flex flex-col items-center">
-                                                    <div className="w-12 h-12 rounded-full bg-[#249C6C]/20 flex items-center justify-center">
-                                                        <span className="text-[10px] font-black text-[#249C6C]">USDC</span>
+                                                    <div className="w-12 h-12 rounded-full bg-[#1A6140]/20 flex items-center justify-center">
+                                                        <span className="text-[10px] font-black text-[#1A6140]">USDC</span>
                                                     </div>
                                                     <span className={`mt-2 text-[10px] font-black ${isLight ? 'text-black' : 'text-white'}`}>Vault</span>
                                                 </div>
                                             </motion.div>
                                         </AnimatePresence>
                                     </div>
-                                    <p className="text-[10px] text-center font-bold text-[#249C6C] uppercase tracking-[0.2em]">
+                                    <p className="text-[10px] text-center font-bold text-[#1A6140] uppercase tracking-[0.2em]">
                                         {balances[`${selectedToken.id}_${fundingMode}`]?.toFixed(2) || '0.00'} Available
                                     </p>
                                 </motion.div>
@@ -542,7 +542,7 @@ export function UnifiedFundingModal({
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between px-2">
                             <label className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>Funding Amount</label>
-                             <button onClick={() => setAmount(balances[`${selectedToken.id}_${fundingMode}`]?.toString())} className="text-[10px] font-black text-[#249C6C] uppercase hover:underline">Use Max</button>
+                             <button onClick={() => setAmount(balances[`${selectedToken.id}_${fundingMode}`]?.toString())} className="text-[10px] font-black text-[#1A6140] uppercase hover:underline">Use Max</button>
                         </div>
                         <div className="relative group">
                             <input 
@@ -550,10 +550,10 @@ export function UnifiedFundingModal({
                                 placeholder="0.00"
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
-                                className={`w-full py-6 px-8 rounded-[32px] text-4xl font-black transition-all outline-none border-2 border-transparent focus:border-[#249C6C]/30 ${isLight ? 'bg-[#CFDCD5] text-[#2d3d34] shadow-lg' : 'bg-white/5 text-white shadow-2xl'}`}
+                                className={`w-full py-6 px-8 rounded-[32px] text-4xl font-black transition-all outline-none border-2 border-transparent focus:border-[#1A6140]/30 ${isLight ? 'bg-[#CFDCD5] text-[#2d3d34] shadow-lg' : 'bg-white/5 text-white shadow-2xl'}`}
                             />
                             <div className="absolute right-8 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                <span className="text-xl font-black text-[#249C6C]">{selectedToken.symbol}</span>
+                                <span className="text-xl font-black text-[#1A6140]">{selectedToken.symbol}</span>
                             </div>
                         </div>
                     </div>
@@ -565,7 +565,7 @@ export function UnifiedFundingModal({
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1">Estimated Deposit</p>
-                                        <p className="text-2xl font-black text-[#249C6C]">{quote.estimatedUsdc} USDC</p>
+                                        <p className="text-2xl font-black text-[#1A6140]">{quote.estimatedUsdc} USDC</p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1">Net Fees</p>
@@ -574,13 +574,13 @@ export function UnifiedFundingModal({
                                 </div>
                                 <div className="h-[1px] bg-white/5 w-full" />
                                 <div className="flex items-center gap-2">
-                                    <ShieldCheck size={14} className="text-[#249C6C]" />
+                                    <ShieldCheck size={14} className="text-[#1A6140]" />
                                     <p className="text-[9px] font-bold uppercase tracking-wide opacity-40">Automated settlement on Arc Mainnet Node.</p>
                                 </div>
                             </motion.div>
                         ) : (
                             <div className={`p-6 rounded-[32px] border border-dashed flex items-center gap-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}>
-                                <Info size={18} className="text-[#249C6C] shrink-0" />
+                                <Info size={18} className="text-[#1A6140] shrink-0" />
                                 <p className="text-[9px] font-bold uppercase leading-relaxed opacity-40">
                                     Funding your Trading Wallet converts any asset to USDC instantly for high-speed trade execution.
                                 </p>
@@ -592,7 +592,7 @@ export function UnifiedFundingModal({
                     <button 
                         onClick={handleFunding}
                         disabled={true}
-                        className={`w-full py-6 rounded-[28px] font-black uppercase tracking-[0.2em] text-sm transition-all shadow-xl bg-[#249C6C] text-black hover:scale-[1.02] active:scale-[0.98] shadow-[#249C6C]/20`}
+                        className={`w-full py-6 rounded-[28px] font-black uppercase tracking-[0.2em] text-sm transition-all shadow-xl bg-[#1A6140] text-black hover:scale-[1.02] active:scale-[0.98] shadow-[#1A6140]/20`}
                     >
                         Confirm
                     </button>

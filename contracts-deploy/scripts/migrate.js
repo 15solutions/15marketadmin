@@ -17,7 +17,7 @@ if (fs.existsSync(envPath)) {
 
 const OLD_TREASURY = process.env.TREASURY_ADDRESS;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
-const ARC_RPC = process.env.ARC_RPC_1 || "https://rpc.testnet.arc.network";
+const ARC_RPC = process.env.ARC_RPC_1 || "https://rpc.testnet.arc.io";
 const ENV_PATH = path.resolve("../nexus-core/.env");
 
 // Minimal ABI to drain old contract

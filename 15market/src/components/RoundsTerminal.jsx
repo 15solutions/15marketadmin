@@ -196,8 +196,8 @@ function RoundsTerminalComponent({
             {/* COMPACT HEADER */}
             <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-full bg-[#17A364]/10 border border-[#17A364]/20">
-                        <Layers size={12} className="text-[#17A364]" />
+                    <div className="p-1.5 rounded-full bg-[#1A6140]/10 border border-[#1A6140]/20">
+                        <Layers size={12} className="text-[#1A6140]" />
                     </div>
                     <div>
                         <h2 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>ROUNDS</h2>
@@ -210,11 +210,11 @@ function RoundsTerminalComponent({
 
                 <div className="flex items-center gap-2">
                     <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${isLight ? 'bg-black/5' : 'bg-white/5'}`}>
-                        <Timer size={8} className="text-[#17A364]" />
+                        <Timer size={8} className="text-[#1A6140]" />
                         <span className={`text-[9px] font-black font-mono ${isLight ? 'text-[#0a261a]' : 'text-white/60'}`}>{secondsToNextLock}s</span>
                     </div>
 
-                    <div className={`px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${isLockedPhase ? 'border-[#FF7F50]/30 text-[#FF7F50] bg-[#FF7F50]/5' : 'border-[#17A364]/30 text-[#17A364] bg-[#17A364]/5'}`}>
+                    <div className={`px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${isLockedPhase ? 'border-[#FF7F50]/30 text-[#FF7F50] bg-[#FF7F50]/5' : 'border-[#1A6140]/30 text-[#1A6140] bg-[#1A6140]/5'}`}>
                         {isLockedPhase ? 'LIVE' : (isResultPhase ? 'END' : 'OPEN')}
                     </div>
                 </div>
@@ -229,10 +229,10 @@ function RoundsTerminalComponent({
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className={`p-3 rounded-[24px] border mb-1 transition-colors px-3 flex items-center justify-center gap-2 ${liveData.result === 'WON' ? 'bg-[#17A364]/15 border-[#17A364]/30' : (liveData.result === 'LOST' ? 'bg-[#FF7F50]/15 border-[#FF7F50]/40' : (liveData.result === 'HOUSE' ? 'bg-white/10 border-white/20' : (isLight ? 'bg-[#b4d9c7] border-[#17A364]/35 shadow-sm' : 'bg-white/5 border-white/10')))}`}>
+                            className={`p-3 rounded-[24px] border mb-1 transition-colors px-3 flex items-center justify-center gap-2 ${liveData.result === 'WON' ? 'bg-[#1A6140]/15 border-[#1A6140]/30' : (liveData.result === 'LOST' ? 'bg-[#FF7F50]/15 border-[#FF7F50]/40' : (liveData.result === 'HOUSE' ? 'bg-white/10 border-white/20' : (isLight ? 'bg-[#8CB09D] border-[#1A6140]/35 shadow-sm' : 'bg-white/5 border-white/10')))}`}>
                             <div className="flex items-center gap-2 uppercase font-black tracking-tighter shrink-0">
                                 <span className="text-[7px] opacity-40">#{liveData.id}</span>
-                                <div className={`px-1.5 py-0.5 rounded-full border text-[6px] font-black ${parseFloat(price) >= (liveData.lockPrice || 0) ? 'bg-[#17A364]/10 border-[#17A364]/30 text-[#17A364]' : 'bg-[#FF7F50]/10 border-[#FF7F50]/30 text-[#FF7F50]'}`}>
+                                <div className={`px-1.5 py-0.5 rounded-full border text-[6px] font-black ${parseFloat(price) >= (liveData.lockPrice || 0) ? 'bg-[#1A6140]/10 border-[#1A6140]/30 text-[#1A6140]' : 'bg-[#FF7F50]/10 border-[#FF7F50]/30 text-[#FF7F50]'}`}>
                                     {parseFloat(price) >= (liveData.lockPrice || 0) ? 'BULL' : 'BEAR'}
                                 </div>
                             </div>
@@ -244,12 +244,12 @@ function RoundsTerminalComponent({
                                 </div>
                                 <div className="flex items-center gap-2 justify-center">
                                     {isResultPhase ? (
-                                        <span className={`text-[11px] font-black italic tracking-widest ${liveData.result === 'WON' ? 'text-[#17A364]' : 'text-[#FF7F50]'}`}>
+                                        <span className={`text-[11px] font-black italic tracking-widest ${liveData.result === 'WON' ? 'text-[#1A6140]' : 'text-[#FF7F50]'}`}>
                                             {liveData.result === 'WON' ? 'WIN' : 'LOSS'}
                                         </span>
                                     ) : (
                                         <div className="flex items-center gap-1.5">
-                                            <Timer size={10} className="text-[#17A364] animate-pulse" />
+                                            <Timer size={10} className="text-[#1A6140] animate-pulse" />
                                             <span className="text-[11px] font-black font-mono tabular-nums text-white/90">{15 - cyclePos}s</span>
                                         </div>
                                     )}
@@ -266,14 +266,14 @@ function RoundsTerminalComponent({
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center justify-between px-1">
                             <span className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black/60' : 'text-white opacity-30'}`}>Stake</span>
-                            <span className={`text-[8px] font-bold ${isLight ? 'text-[#17A364]' : 'text-emerald-400'}`}>
+                            <span className={`text-[8px] font-bold ${isLight ? 'text-[#1A6140]' : 'text-[#1A6140]'}`}>
                                 ${(activeBal || 0).toFixed(2)}
                             </span>
                         </div>
 
-                        <div className={`flex flex-col gap-1.5 py-2 px-3 rounded-xl transition-all duration-300 ${isFocused ? (isLight ? 'bg-transparent border-2 border-[#17A364]/60 shadow-sm' : 'bg-white/10 border-2 border-[#17A364]/30 shadow-[0_0_15px_rgba(23, 163, 100,0.1)]') : (isLight ? 'bg-transparent border border-[#17A364]/40' : 'bg-white/5 border border-white/5')}`}>
+                        <div className={`flex flex-col gap-1.5 py-2 px-3 rounded-xl transition-all duration-300 ${isFocused ? (isLight ? 'bg-transparent border-2 border-[#1A6140]/60 shadow-sm' : 'bg-white/10 border-2 border-[#1A6140]/30 shadow-[0_0_15px_rgba(26, 97, 64,0.1)]') : (isLight ? 'bg-transparent border border-[#1A6140]/40' : 'bg-white/5 border border-white/5')}`}>
                             <div className="flex items-center gap-1.5 transition-all">
-                                <span className={`text-[12px] font-black transition-opacity duration-300 ${isFocused ? 'opacity-40 text-[#17A364]' : 'opacity-20'}`}>$</span>
+                                <span className={`text-[12px] font-black transition-opacity duration-300 ${isFocused ? 'opacity-40 text-[#1A6140]' : 'opacity-20'}`}>$</span>
                                 <input
                                     type="number"
                                     value={localAmount}
@@ -289,16 +289,16 @@ function RoundsTerminalComponent({
 
                         <div className="relative pt-1.5 pb-1 px-2">
                             <input type="range" min="0" max="100" value={localSlider} onChange={e => handleLocalSliderChange(e.target.value)}
-                                className="w-full accent-[#17A364] h-1 rounded-full cursor-pointer" />
+                                className="w-full accent-[#1A6140] h-1 rounded-full cursor-pointer" />
                         </div>
                     </div>
 
                 {/* Direction Buttons - Sliding Tab Effect */}
-                <div className={`relative flex items-center p-0.5 rounded-full border backdrop-blur-3xl overflow-hidden mb-1 ${isLight ? 'bg-[#b4d9c7] border-[#17A364]/40 shadow-sm' : 'bg-white/5 border-white/5'}`}>
+                <div className={`relative flex items-center p-0.5 rounded-full border backdrop-blur-3xl overflow-hidden mb-1 ${isLight ? 'bg-[#8CB09D] border-[#1A6140]/40 shadow-sm' : 'bg-white/5 border-white/5'}`}>
                     <button onClick={() => setSelectedDirection('UP')}
                         disabled={hasEnteredThisRound}
-                        className={`flex-1 relative z-10 py-1.5 flex flex-col items-center gap-0.5 transition-all duration-300 rounded-full ${selectedDirection === 'UP' ? 'bg-[#17A364] text-white' : (isLight ? 'text-[#0a261a]/60 hover:text-[#0a261a]/80' : 'text-white/50 hover:text-white/70')}`}>
-                        <TrendingUp size={16} className={selectedDirection === 'UP' ? 'text-white' : 'text-[#17A364]/60'} />
+                        className={`flex-1 relative z-10 py-1.5 flex flex-col items-center gap-0.5 transition-all duration-300 rounded-full ${selectedDirection === 'UP' ? 'bg-[#1A6140] text-white' : (isLight ? 'text-[#0a261a]/60 hover:text-[#0a261a]/80' : 'text-white/50 hover:text-white/70')}`}>
+                        <TrendingUp size={16} className={selectedDirection === 'UP' ? 'text-white' : 'text-[#1A6140]/60'} />
                         <div className="flex flex-col items-center leading-none">
                             <span className="text-[7px] font-black uppercase opacity-60">LONG</span>
                             <span className="text-[11px] font-black">{odds.long}x</span>
@@ -322,13 +322,13 @@ function RoundsTerminalComponent({
                         <motion.div 
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className={`p-3 rounded-full border-2 !border-[#17A364] flex items-center justify-center gap-3 px-3 ${selectedDirection === 'UP' ? 'bg-[#17A364]/10' : 'bg-[#FF7F50]/10 !border-[#FF7F50]'}`}>
+                            className={`p-3 rounded-full border-2 !border-[#1A6140] flex items-center justify-center gap-3 px-3 ${selectedDirection === 'UP' ? 'bg-[#1A6140]/10' : 'bg-[#FF7F50]/10 !border-[#FF7F50]'}`}>
                             <div className="flex items-center gap-2 shrink-0">
-                                <div className={`p-1 rounded-full ${selectedDirection === 'UP' ? 'bg-[#17A364]/20 !text-[#17A364]' : 'bg-[#FF7F50]/20 !text-[#FF7F50]'}`}>
+                                <div className={`p-1 rounded-full ${selectedDirection === 'UP' ? 'bg-[#1A6140]/20 !text-[#1A6140]' : 'bg-[#FF7F50]/20 !text-[#FF7F50]'}`}>
                                     {selectedDirection === 'UP' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                                 </div>
                                 <div className="flex flex-col leading-tight">
-                                    <span className={`text-[9px] font-black uppercase tracking-widest ${selectedDirection === 'UP' ? '!text-[#17A364]' : '!text-[#FF7F50]'}`}>
+                                    <span className={`text-[9px] font-black uppercase tracking-widest ${selectedDirection === 'UP' ? '!text-[#1A6140]' : '!text-[#FF7F50]'}`}>
                                         {selectedDirection}
                                     </span>
                                     <span className={`text-[6px] font-bold uppercase opacity-30`}>Pred.</span>
@@ -339,7 +339,7 @@ function RoundsTerminalComponent({
 
                             <div className="flex flex-col items-center leading-tight min-w-0 flex-1 overflow-hidden">
                                 <span className={`text-[10px] font-black ${isLight ? 'text-[#0a261a]' : 'text-white'} truncate w-full text-center`}>{localAmount} USDC</span>
-                                <span className={`text-[8px] font-bold ${selectedDirection === 'UP' ? '!text-[#17A364]' : '!text-[#FF7F50]'} uppercase truncate w-full text-center`}>
+                                <span className={`text-[8px] font-bold ${selectedDirection === 'UP' ? '!text-[#1A6140]' : '!text-[#FF7F50]'} uppercase truncate w-full text-center`}>
                                     +{(parseFloat(localAmount || 0) * (selectedDirection === 'UP' ? parseFloat(odds.long) : parseFloat(odds.short))).toFixed(0)} PAY
                                 </span>
                             </div>
@@ -350,13 +350,13 @@ function RoundsTerminalComponent({
                             disabled={!selectedDirection || isExecuting || !localAmount || parseFloat(localAmount) <= 0}
                             className={`w-full py-2.5 rounded-full font-black text-[11px] uppercase tracking-[0.2em] transition-all relative overflow-hidden group hover:brightness-125 active:brightness-95 border-2 ${(!selectedDirection || !localAmount || parseFloat(localAmount) <= 0 || maintenanceMode || tradingHalted)
                                 ? 'bg-white/5 text-white/10 cursor-not-allowed border-white/5'
-                                : (isLight ? 'bg-[#17A364]/20 !text-[#17A364] border-[#17A364]' : 'bg-[#17A364] text-white border-none')
+                                : (isLight ? 'bg-[#1A6140]/20 !text-[#1A6140] border-[#1A6140]' : 'bg-[#1A6140] text-white border-none')
                                 }`}
                             style={{
-                                boxShadow: (!selectedDirection || !localAmount || parseFloat(localAmount) <= 0 || maintenanceMode || tradingHalted) ? 'none' : (isLight ? '0 0 20px rgba(23, 163, 100, 0.15)' : '0 4px 15px rgba(23, 163, 100, 0.2)')
+                                boxShadow: (!selectedDirection || !localAmount || parseFloat(localAmount) <= 0 || maintenanceMode || tradingHalted) ? 'none' : (isLight ? '0 0 20px rgba(26, 97, 64, 0.15)' : '0 4px 15px rgba(26, 97, 64, 0.2)')
                             }}
                         >
-                            <span className={`relative z-10 flex items-center justify-center gap-2 rounds-confirm-text ${!(!selectedDirection || !localAmount || parseFloat(localAmount) <= 0 || maintenanceMode || tradingHalted) && isLight ? '!text-[#17A364]' : ''}`}>
+                            <span className={`relative z-10 flex items-center justify-center gap-2 rounds-confirm-text ${!(!selectedDirection || !localAmount || parseFloat(localAmount) <= 0 || maintenanceMode || tradingHalted) && isLight ? '!text-[#1A6140]' : ''}`}>
                                 {isExecuting && <RotateCw className="animate-spin" size={12} />}
                                 {maintenanceMode || tradingHalted ? (tradingHalted ? 'HALTED' : 'PAUSED') : (isExecuting ? 'SIGNING TXN...' : 'CONFIRM')}
                             </span>

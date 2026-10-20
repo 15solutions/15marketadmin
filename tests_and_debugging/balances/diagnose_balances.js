@@ -4,7 +4,7 @@ require('dotenv').config({ path: '../backend/.env' });
 const RPC_ENDPOINTS = [
     "https://rpc-test-1.arc.market",
     "https://5042002.rpc.thirdweb.com",
-    "https://rpc.testnet.arc.network",
+    "https://rpc.testnet.arc.io",
 ];
 
 async function main() {

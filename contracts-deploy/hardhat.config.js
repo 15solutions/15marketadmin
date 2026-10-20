@@ -22,7 +22,7 @@ export default {
   networks: {
     arc: {
       type: "http",
-      url: process.env.ARC_RPC_1 || "https://rpc.testnet.arc.network",
+      url: process.env.ARC_RPC_1 || "https://rpc.testnet.arc.io",
       accounts: [PRIVATE_KEY]
     }
   }

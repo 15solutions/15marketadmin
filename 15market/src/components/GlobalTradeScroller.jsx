@@ -18,7 +18,7 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
     const lastFetchRef = useRef(0);
 
     const isLight = theme === 'light';
-    const WIN_COLOR = "#17A364"; // Green
+    const WIN_COLOR = "#1A6140"; // Green
     const LOSS_COLOR = "#FF7F50"; // Coral/Red
 
     const truncate = (str) => str ? `${str.slice(0, 4)}...${str.slice(-4)}` : "";
@@ -199,7 +199,7 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
         : 'text-white';
 
     return (
-        <div className={`w-full ${isV1 ? 'h-5 md:h-6 lg:h-10 ' + v1Bg : 'h-7 md:h-7 lg:h-10 bg-[#17A364] text-white zigzag-ticker'} relative z-[45] overflow-hidden`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+        <div className={`w-full ${isV1 ? 'h-5 md:h-6 lg:h-10 ' + v1Bg : 'h-7 md:h-7 lg:h-10 bg-[#1A6140] text-white zigzag-ticker'} relative z-[45] overflow-hidden`} style={{ fontFamily: '"Comfortaa", cursive' }}>
             {/* Smooth Transition Layer for Broadcasts */}
             <AnimatePresence mode="wait">
                 {(activeBroadcast || (isCampaignWindow && campaignBroadcast)) ? (

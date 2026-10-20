@@ -37,16 +37,16 @@ export default function AssistedTradingPage({ onBack, theme, onSelect, isSmallSc
                     className="flex-1 w-full max-w-sm flex flex-col items-center justify-center gap-3 md:gap-5 cursor-pointer group mt-4 md:mt-0"
                 >
                     <div className="flex items-center justify-center transition-transform group-hover:-translate-y-2">
-                        <Users className={`w-8 h-8 md:w-10 md:h-10 text-[#249C6C] ${isLight ? 'drop-shadow-[0_2px_6px_rgba(36,156,108,0.2)]' : 'drop-shadow-[0_0_15px_rgba(36,156,108,0.5)]'}`} />
+                        <Users className={`w-8 h-8 md:w-10 md:h-10 text-[#1A6140] ${isLight ? 'drop-shadow-[0_2px_6px_rgba(26, 97, 64,0.2)]' : 'drop-shadow-[0_0_15px_rgba(26, 97, 64,0.5)]'}`} />
                     </div>
                     <div className="text-center">
-                        <h2 className={`text-[15px] md:text-xl font-black uppercase tracking-widest mb-1 md:mb-2 group-hover:text-[#249C6C] transition-colors ${isLight ? 'text-[#0f2618]' : 'text-white'}`}>Copytrading</h2>
+                        <h2 className={`text-[15px] md:text-xl font-black uppercase tracking-widest mb-1 md:mb-2 group-hover:text-[#1A6140] transition-colors ${isLight ? 'text-[#0f2618]' : 'text-white'}`}>Copytrading</h2>
                         <p className={`text-[10px] md:text-xs font-bold leading-relaxed max-w-[240px] md:max-w-[260px] mx-auto ${isLight ? 'text-black/50' : 'text-white/50'}`}>Follow top performing traders and automatically mirror their positions in real-time.</p>
                     </div>
                 </motion.div>
 
                 {/* Divider Line (Horizontal on Mobile, Vertical on Desktop) */}
-                <div className="w-full h-px md:w-px md:h-48 bg-gradient-to-r md:bg-gradient-to-b from-transparent via-[#249C6C] to-transparent" />
+                <div className="w-full h-px md:w-px md:h-48 bg-gradient-to-r md:bg-gradient-to-b from-transparent via-[#1A6140] to-transparent" />
 
                 {/* Agentic Trading Block */}
                 <motion.div 
@@ -56,10 +56,10 @@ export default function AssistedTradingPage({ onBack, theme, onSelect, isSmallSc
                     className="flex-1 w-full max-w-sm flex flex-col items-center justify-center gap-3 md:gap-5 cursor-pointer group mb-4 md:mb-0"
                 >
                     <div className="flex items-center justify-center transition-transform group-hover:-translate-y-2">
-                        <Bot className={`w-8 h-8 md:w-10 md:h-10 text-[#249C6C] ${isLight ? 'drop-shadow-[0_2px_6px_rgba(36,156,108,0.2)]' : 'drop-shadow-[0_0_15px_rgba(36,156,108,0.5)]'}`} />
+                        <Bot className={`w-8 h-8 md:w-10 md:h-10 text-[#1A6140] ${isLight ? 'drop-shadow-[0_2px_6px_rgba(26, 97, 64,0.2)]' : 'drop-shadow-[0_0_15px_rgba(26, 97, 64,0.5)]'}`} />
                     </div>
                     <div className="text-center">
-                        <h2 className={`text-[15px] md:text-xl font-black uppercase tracking-widest mb-1 md:mb-2 group-hover:text-[#249C6C] transition-colors ${isLight ? 'text-[#0f2618]' : 'text-white'}`}>Agentic Trading</h2>
+                        <h2 className={`text-[15px] md:text-xl font-black uppercase tracking-widest mb-1 md:mb-2 group-hover:text-[#1A6140] transition-colors ${isLight ? 'text-[#0f2618]' : 'text-white'}`}>Agentic Trading</h2>
                         <p className={`text-[10px] md:text-xs font-bold leading-relaxed max-w-[240px] md:max-w-[260px] mx-auto ${isLight ? 'text-black/50' : 'text-white/50'}`}>Deploy autonomous AI agents to execute advanced strategies 24/7 on your behalf.</p>
                     </div>
                 </motion.div>
@@ -68,8 +68,8 @@ export default function AssistedTradingPage({ onBack, theme, onSelect, isSmallSc
             
             {/* Background Decor */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-                <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-[#249C6C]/10 rounded-full blur-[120px] mix-blend-screen opacity-30" />
-                <div className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-[#249C6C]/5 rounded-full blur-[100px] mix-blend-screen opacity-30" />
+                <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-[#1A6140]/10 rounded-full blur-[120px] mix-blend-screen opacity-30" />
+                <div className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-[#1A6140]/5 rounded-full blur-[100px] mix-blend-screen opacity-30" />
             </div>
         </div>
     );

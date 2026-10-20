@@ -32,12 +32,12 @@ const LandingBackground = ({ theme }) => {
                 style={{
                     left: mousePos.x - 225,
                     top: mousePos.y - 225,
-                    background: `radial-gradient(circle, #249C6C 0%, transparent 70%)`,
+                    background: `radial-gradient(circle, #1A6140 0%, transparent 70%)`,
                 }}
             />
             {/* Cinematic Background Glows */}
-            <div className="absolute top-[20%] right-[10%] w-[350px] h-[350px] rounded-full bg-[#249C6C]/10 blur-[100px] pointer-events-none" />
-            <div className="absolute bottom-[10%] left-[5%] w-[300px] h-[300px] rounded-full bg-[#249C6C]/5 blur-[90px] pointer-events-none" />
+            <div className="absolute top-[20%] right-[10%] w-[350px] h-[350px] rounded-full bg-[#1A6140]/10 blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-[10%] left-[5%] w-[300px] h-[300px] rounded-full bg-[#1A6140]/5 blur-[90px] pointer-events-none" />
         </div>
     );
 };
@@ -49,7 +49,7 @@ const RisingBalance = () => {
         return () => clearInterval(i);
     }, []);
     return (
-        <span className="ml-3 sm:ml-4 text-white bg-[#249C6C] px-3 py-0.5 text-sm sm:text-base rounded-full shadow-[0_0_15px_rgba(36,156,108,0.4)] inline-block align-middle font-bold">
+        <span className="ml-3 sm:ml-4 text-white bg-[#1A6140] px-3 py-0.5 text-sm sm:text-base rounded-full shadow-[0_0_15px_rgba(26, 97, 64,0.4)] inline-block align-middle font-bold">
             ${val.toFixed(2)}
         </span>
     );
@@ -98,7 +98,7 @@ export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
         : "bg-white/[0.03] border-white/[0.05] backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.3)]";
 
     return (
-        <div className={`min-h-screen w-screen ${isLight ? 'text-[#0a261a]' : 'text-white'} overflow-y-auto no-scrollbar font-sans relative flex flex-col items-center selection:bg-[#249C6C]/30 pb-16`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+        <div className={`min-h-screen w-screen ${isLight ? 'text-[#0a261a]' : 'text-white'} overflow-y-auto no-scrollbar font-sans relative flex flex-col items-center selection:bg-[#1A6140]/30 pb-16`} style={{ fontFamily: '"Comfortaa", cursive' }}>
             <LandingBackground theme={theme} />
 
             {/* TOP NAVIGATION BAR */}
@@ -108,7 +108,7 @@ export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
                     <img
                         src={isLight ? "/goblogo.png" : "/gowlogo.png"}
                         alt="15market"
-                        className="h-14 w-auto drop-shadow-[0_0_20px_rgba(36,156,108,0.3)]"
+                        className="h-14 w-auto drop-shadow-[0_0_20px_rgba(26, 97, 64,0.3)]"
                     />
                 </div>
 
@@ -122,7 +122,7 @@ export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
                                 : 'bg-white/5 border-white/5 hover:bg-white/10 text-white'
                         }`}
                     >
-                        <BookOpen size={13} className="text-[#249C6C]" />
+                        <BookOpen size={13} className="text-[#1A6140]" />
                         <span>Docs</span>
                     </button>
                     <a 
@@ -169,7 +169,7 @@ export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
                                         isLight ? 'hover:bg-black/5' : 'hover:bg-white/5'
                                     }`}
                                 >
-                                    <BookOpen size={12} className="text-[#249C6C]" />
+                                    <BookOpen size={12} className="text-[#1A6140]" />
                                     <span>Docs</span>
                                 </button>
                                 <a 
@@ -194,10 +194,10 @@ export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
             <header className="w-full max-w-5xl mx-auto text-center px-6 pt-8 pb-6 relative z-10 flex flex-col items-center gap-4">
                 <div className="h-[70px] sm:h-[90px] flex items-center justify-center">
                     <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-tight uppercase leading-snug">
-                        <span className="text-transparent bg-clip-text bg-gradient-to-b from-[#249C6C] to-[#1D7A52] inline-block filter drop-shadow-[0_0_15px_rgba(36,156,108,0.25)]">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-b from-[#1A6140] to-[#123F28] inline-block filter drop-shadow-[0_0_15px_rgba(26, 97, 64,0.25)]">
                             {displayText}
                         </span>
-                        <span className="inline-block w-[1.5px] h-[0.75em] bg-[#249C6C] ml-1.5 animate-pulse" />
+                        <span className="inline-block w-[1.5px] h-[0.75em] bg-[#1A6140] ml-1.5 animate-pulse" />
                     </h1>
                 </div>
                 <p className={`text-[10px] sm:text-xs uppercase tracking-widest max-w-lg mx-auto opacity-75 font-semibold leading-relaxed ${isLight ? 'text-black/60' : 'text-white/50'}`}>
@@ -220,7 +220,7 @@ export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
                         src="/mascot.png" 
                         alt="Mascot" 
                         className="absolute right-[-231px] top-[-76px] h-[432px] z-30 pointer-events-none select-none"
-                        style={{ filter: 'drop-shadow(0 28px 24px rgba(0,0,0,0.75)) drop-shadow(0 8px 40px rgba(36,156,108,0.22)) drop-shadow(-4px 0 20px rgba(0,0,0,0.5))' }}
+                        style={{ filter: 'drop-shadow(0 28px 24px rgba(0,0,0,0.75)) drop-shadow(0 8px 40px rgba(26, 97, 64,0.22)) drop-shadow(-4px 0 20px rgba(0,0,0,0.5))' }}
                     />
                     {/* Screen Outer Bezel */}
                     <div className="w-full aspect-[16/9] bg-[#121212] rounded-t-[20px] p-2 border-[2px] border-[#333] shadow-[0_25px_60px_rgba(0,0,0,0.55)] flex flex-col relative overflow-hidden">
@@ -232,7 +232,7 @@ export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
                                 {/* Camera lens */}
                                 <span className="w-1 h-1 rounded-full bg-[#111]" />
                                 {/* Green indicator light */}
-                                <span className="w-[1.5px] h-[1.5px] rounded-full bg-green-500/80 animate-pulse" />
+                                <span className="w-[1.5px] h-[1.5px] rounded-full bg-[#1A6140]/80 animate-pulse" />
                             </div>
                             <img 
                                 src="/deskto.png" 

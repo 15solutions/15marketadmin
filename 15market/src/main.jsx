@@ -27,9 +27,9 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div className="p-6 text-white min-h-screen flex flex-col items-center justify-center text-sm font-bold">
-          <p className="text-[#249C6C] text-lg mb-2">Load Error</p>
+          <p className="text-[#1A6140] text-lg mb-2">Load Error</p>
           <p className="text-white/60 text-center max-w-md">{this.state.error?.message || 'Unable to load the application.'}</p>
-          <button className="mt-6 rounded-lg bg-[#249C6C] px-4 py-2" onClick={() => window.location.reload()}>
+          <button className="mt-6 rounded-lg bg-[#1A6140] px-4 py-2" onClick={() => window.location.reload()}>
             Reload
           </button>
         </div>
@@ -54,7 +54,7 @@ function Root() {
           smartWallets: { enabled: true },
           appearance: {
             theme: 'dark',
-            accentColor: '#249C6C',
+            accentColor: '#1A6140',
             logo: 'https://www.15market.online/gowlogo.png',
             walletList: ['metamask', 'rabby', 'okx_wallet', 'detected_ethereum_wallets', 'wallet_connect'],
           },

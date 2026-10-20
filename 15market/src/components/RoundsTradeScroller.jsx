@@ -8,7 +8,7 @@ function RoundsTradeScrollerComponent({ theme, isV1 = false }) {
     const [activeBroadcast, setActiveBroadcast] = useState(null);
 
     const isLight = theme === 'light';
-    const WIN_COLOR = "#249C6C"; 
+    const WIN_COLOR = "#1A6140"; 
     const LOSS_COLOR = "#FF7F50"; 
 
     const fetchRoundsData = useCallback(async () => {
@@ -98,7 +98,7 @@ function RoundsTradeScrollerComponent({ theme, isV1 = false }) {
     return (
         <div className={`w-full ${isV1 ? 'h-5 md:h-6 lg:h-10 border-y-2 ' + v1Bg : 'h-5 md:h-6 lg:h-10 ' + v2Bg} relative z-[45] overflow-hidden`}>
             {activeBroadcast ? (
-                <div className={`absolute inset-0 flex items-center ${isV1 ? 'bg-amber-500/10' : (isLight ? 'bg-[#249C6C]' : 'bg-[#0a0a0a]')}`} style={{ animation: 'fadeIn 0.3s ease' }}>
+                <div className={`absolute inset-0 flex items-center ${isV1 ? 'bg-amber-500/10' : (isLight ? 'bg-[#1A6140]' : 'bg-[#0a0a0a]')}`} style={{ animation: 'fadeIn 0.3s ease' }}>
                     <div
                         className="flex items-center gap-10 whitespace-nowrap px-10"
                         style={{ animation: 'ticker-move 30s linear infinite', willChange: 'transform' }}

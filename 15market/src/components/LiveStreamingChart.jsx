@@ -1,12 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { priceSocketService } from '../utils/priceSocket';
+import { KEEPER_URL_ARC } from '../constants';
 
 /**
  * LiveStreamingChart — A specialized Canvas-based line chart for 1s timeframe.
  * HIGH PERFORMANCE: Optimized drawing routines to avoid lags and redundant allocations.
  * Now includes trade entry markers with LIVE countdown badges rendered on canvas.
  */
-function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], currentPrice, windowMs = 20000 }) {
+function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], currentPrice, windowMs = 20000, priceHistory = [] }) {
     const canvasRef = useRef(null);
     const priceHistoryRef = useRef([]);
     const rafRef = useRef(null);
@@ -14,6 +15,10 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
     const interpolatedPriceRef = useRef(null);
     const startTimeRef = useRef(null);
     const gradRef = useRef(null);
+
+    // Guards async history seeding against a symbol switch mid-flight.
+    const symbolRef = useRef(symbol);
+    symbolRef.current = symbol;
 
     const lastFrameRef = useRef(0);
     const FRAME_INTERVAL = 1000 / 30;
@@ -35,24 +40,31 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
     useEffect(() => { activeTradesRef.current = activeTrades; }, [activeTrades]);
 
     const isLight = theme === 'light';
-    const GREEN = '#17A364';
+    const GREEN = '#1A6140';
 
     useEffect(() => {
         const handlePrice = (data) => {
-            if (data.key === symbol.replace('USDT', '').toLowerCase()) {
-                const price = parseFloat(data.price);
-                if (!isNaN(price) && price > 0) {
-                    const prev = interpolatedPriceRef.current;
-                    // Snap immediately if this is the first tick or a large jump (>0.5%)
-                    const isLargeJump = prev !== null && Math.abs(price - prev) / prev > 0.005;
-                    if (prev === null || isLargeJump) {
-                        interpolatedPriceRef.current = price;
-                    }
-                    targetPriceRef.current = price;
-                    if (startTimeRef.current === null) {
-                        startTimeRef.current = Date.now();
-                    }
-                }
+            // AUTHORITATIVE SOURCE ONLY. priceSocketService fans out FOUR feeds:
+            // 'binance_ws' (direct client feed), 'backend' (engine relay), and
+            // 'relay_rest' / 'cache' (fallbacks / stale replay). Their values are
+            // the same trade price but arrive at different latencies, so mixing
+            // them makes the target flip between a fresh tick and the delayed copy
+            // of an older one — the line then "goes up and down" before drawing
+            // the next real price. We use ONLY the backend engine relay, which is
+            // what settlement uses (same rule as the mobile chart).
+            if (data.source !== 'backend') return;
+            if (data.key !== symbol.replace('USDT', '').toLowerCase()) return;
+            const price = parseFloat(data.price);
+            if (isNaN(price) || price <= 0) return;
+            const prev = interpolatedPriceRef.current;
+            // Snap immediately if this is the first tick or a large jump (>0.5%)
+            const isLargeJump = prev !== null && Math.abs(price - prev) / prev > 0.005;
+            if (prev === null || isLargeJump) {
+                interpolatedPriceRef.current = price;
+            }
+            targetPriceRef.current = price;
+            if (startTimeRef.current === null) {
+                startTimeRef.current = Date.now();
             }
         };
 
@@ -60,24 +72,85 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         return () => unbind();
     }, [symbol]);
 
-    // Reset chart state on symbol change, then immediately seed from currentPrice
-    // so the chart draws straight away without waiting for the next socket tick.
+    // Reset chart state on symbol change, then seed immediately so the chart
+    // opens already complete instead of growing in from an empty buffer:
+    //   1. the parent's live buffer (real points), if it has any, and
+    //   2. the backend's recent price history (async — the authoritative feed).
     useEffect(() => {
-        priceHistoryRef.current = [];
-        targetPriceRef.current = null;
-        interpolatedPriceRef.current = null;
-        startTimeRef.current = null;
         yMinRef.current = null;
         yMaxRef.current = null;
+        startTimeRef.current = null;
+        targetPriceRef.current = null;
+        interpolatedPriceRef.current = null;
+        priceHistoryRef.current = [];
 
-        // Seed immediately from the prop so startTimeRef is set and the draw
-        // loop doesn't stall until the next socket message arrives.
+        // The parent may already hold real points (it streams them itself) —
+        // use them straight away, no round trip needed.
+        if (Array.isArray(priceHistory) && priceHistory.length) {
+            const seedPts = [];
+            for (const p of priceHistory) {
+                if (!p) continue;
+                const t = Number(p.t);
+                const v = Number(p.p);
+                if (isFinite(t) && isFinite(v) && v > 0) seedPts.push({ t, p: v });
+            }
+            if (seedPts.length) priceHistoryRef.current = seedPts.slice(-1200);
+        }
+
+        // Seed from the prop so the draw loop doesn't stall before the first socket tick.
         const seed = parseFloat(currentPrice);
         if (!isNaN(seed) && seed > 0) {
             targetPriceRef.current = seed;
             interpolatedPriceRef.current = seed;
             startTimeRef.current = Date.now();
         }
+
+        // Pull the backend's recent price history so the chart renders a full,
+        // correctly-scaled window on frame one (no "wait for the form").
+        const key = (symbol || '').replace('USDT', '').toLowerCase();
+        const seedMs = windowMs + 4000;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`${KEEPER_URL_ARC}/prices/history?key=${encodeURIComponent(key)}&ms=${seedMs}&limit=${Math.ceil(seedMs / 50)}`);
+                if (!res.ok) return;
+                const data = await res.json().catch(() => null);
+                if (cancelled || symbolRef.current !== symbol) return;
+                const pts = Array.isArray(data?.points) ? data.points : [];
+                const seeded = [];
+                for (const p of pts) {
+                    if (!p) continue;
+                    const t = Number(p.t);
+                    const v = Number(p.p);
+                    if (isFinite(t) && isFinite(v) && v > 0) seeded.push({ t, p: v });
+                }
+                if (!seeded.length) return;
+                seeded.sort((a, b) => a.t - b.t);
+                // Reproduce the live line's easing (0.45 per 50ms tick) over the
+                // seeded series so the opening window has the SAME smooth finish
+                // as the streaming tail — no rough "seam" where they meet.
+                const smoothed = [{ t: seeded[0].t, p: seeded[0].p }];
+                let cur = seeded[0].p;
+                for (let i = 1; i < seeded.length; i++) {
+                    cur += (seeded[i].p - cur) * 0.45;
+                    smoothed.push({ t: seeded[i].t, p: cur });
+                }
+                // Keep any live points collected while the fetch was in flight.
+                const lastSeedT = smoothed[smoothed.length - 1].t;
+                const merged = smoothed.concat(priceHistoryRef.current.filter(e => e.t > lastSeedT));
+                priceHistoryRef.current = merged.length > 1600 ? merged.slice(-1600) : merged;
+                const newest = priceHistoryRef.current[priceHistoryRef.current.length - 1];
+                if (newest && isFinite(newest.p) && newest.p > 0) {
+                    if (targetPriceRef.current === null) targetPriceRef.current = newest.p;
+                    if (interpolatedPriceRef.current === null) interpolatedPriceRef.current = newest.p;
+                    if (startTimeRef.current === null) startTimeRef.current = Date.now();
+                }
+            } catch {
+                // Network blip: the live stream still fills the chart normally.
+            }
+        })();
+
+        return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [symbol]);
 
@@ -203,19 +276,28 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             let minVisiblePrice = pMin;
             let maxVisiblePrice = pMax;
             let priceDiff = maxVisiblePrice - minVisiblePrice;
-            if (priceDiff === 0) {
-                priceDiff = latestPriceVal * 0.0001;
+            // Never let the range collapse to a hairline. A near-zero range makes
+            // the opening frames hyper-zoom onto a single tick and then "pull
+            // back" as data arrives. Keep at least ~0.08% of price so the view
+            // starts already sane and focused on the action.
+            const minRange = latestPriceVal * 0.0008;
+            if (!(priceDiff > minRange)) {
+                priceDiff = minRange;
             }
 
             const targetMin = minVisiblePrice - priceDiff * 0.12;
             const targetMax = maxVisiblePrice + priceDiff * 0.12;
 
             if (yMinRef.current === null) {
+                // First frame after (re)mount/seed: SNAP, don't animate, so the
+                // chart is already correctly scaled instead of easing in.
                 yMinRef.current = targetMin;
                 yMaxRef.current = targetMax;
             } else {
-                yMinRef.current += (targetMin - yMinRef.current) * 0.1;
-                yMaxRef.current += (targetMax - yMaxRef.current) * 0.1;
+                // Snappier follow (0.2 ≈ settles in ~0.3s) so the scale tracks
+                // price action closely without a slow, visible zoom.
+                yMinRef.current += (targetMin - yMinRef.current) * 0.2;
+                yMaxRef.current += (targetMax - yMaxRef.current) * 0.2;
             }
 
             const lo = yMinRef.current;
@@ -244,9 +326,9 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.clip();
 
             const fillGrad = ctx.createLinearGradient(0, liveY, 0, H);
-            fillGrad.addColorStop(0.00, isLight ? 'rgba(23, 163, 100, 0.38)' : `${GREEN}60`);
-            fillGrad.addColorStop(0.35, isLight ? 'rgba(23, 163, 100, 0.18)' : `${GREEN}2A`);
-            fillGrad.addColorStop(0.70, isLight ? 'rgba(23, 163, 100, 0.06)' : `${GREEN}0F`);
+            fillGrad.addColorStop(0.00, isLight ? 'rgba(26, 97, 64, 0.38)' : `${GREEN}60`);
+            fillGrad.addColorStop(0.35, isLight ? 'rgba(26, 97, 64, 0.18)' : `${GREEN}2A`);
+            fillGrad.addColorStop(0.70, isLight ? 'rgba(26, 97, 64, 0.06)' : `${GREEN}0F`);
             fillGrad.addColorStop(1.00, isLight ? 'rgba(238, 247, 242, 0)' : 'rgba(13, 30, 21, 0)');
             ctx.fillStyle = fillGrad;
             ctx.fillRect(startX, 0, W + 180 - startX, H + 20);
@@ -256,9 +338,9 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
             ctx.lineWidth = 1.5;
-            ctx.strokeStyle = isLight ? '#1D7A52' : GREEN;
+            ctx.strokeStyle = isLight ? '#123F28' : GREEN;
             ctx.shadowBlur = 15;
-            ctx.shadowColor = isLight ? 'rgba(30,90,56,0.5)' : 'rgba(23, 163, 100,0.6)';
+            ctx.shadowColor = isLight ? 'rgba(30,90,56,0.5)' : 'rgba(26, 97, 64,0.6)';
             ctx.moveTo(startX, startY);
             for (let i = firstIdx + 1; i <= lastIdx; i++) {
                 ctx.lineTo(getX(history[i].t), toY(history[i].p));
@@ -315,21 +397,21 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
                     let badgeColor, badgeGlow, resultText, resultColor;
                     if (isSettled) {
-                        badgeColor = isWon ? 'rgba(23,163,100,0.95)' : 'rgba(240,76,76,0.95)';
-                        badgeGlow = isWon ? 'rgba(23,163,100,0.5)' : 'rgba(240,76,76,0.5)';
+                        badgeColor = isWon ? 'rgba(26, 97, 64,0.95)' : 'rgba(240,76,76,0.95)';
+                        badgeGlow = isWon ? 'rgba(26, 97, 64,0.5)' : 'rgba(240,76,76,0.5)';
                         resultText = isWon ? 'WON' : 'LOST';
-                        resultColor = isWon ? '#4ADE80' : '#FF7F50';
+                        resultColor = isWon ? '#1A6140' : '#FF7F50';
                     } else {
-                        badgeColor = isLight ? 'rgba(23,163,100,0.92)' : 'rgba(20,71,44,0.92)';
-                        badgeGlow = 'rgba(23,163,100,0.35)';
+                        badgeColor = isLight ? 'rgba(26, 97, 64,0.92)' : 'rgba(20,71,44,0.92)';
+                        badgeGlow = 'rgba(26, 97, 64,0.35)';
                     }
 
                     if (lineBottom > lineTop) {
                         const lineGlow = ctx.createLinearGradient(entryX - 10, 0, entryX + 10, 0);
                         lineGlow.addColorStop(0, 'transparent');
                         lineGlow.addColorStop(0.5, isSettled
-                            ? (isWon ? 'rgba(23,163,100,0.08)' : 'rgba(240,76,76,0.06)')
-                            : (isLight ? 'rgba(23,163,100,0.06)' : 'rgba(23,163,100,0.04)'));
+                            ? (isWon ? 'rgba(26, 97, 64,0.08)' : 'rgba(240,76,76,0.06)')
+                            : (isLight ? 'rgba(26, 97, 64,0.06)' : 'rgba(26, 97, 64,0.04)'));
                         lineGlow.addColorStop(1, 'transparent');
                         ctx.fillStyle = lineGlow;
                         ctx.fillRect(entryX - 10, lineTop, 20, lineBottom - lineTop);
@@ -339,8 +421,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                         ctx.save();
                         ctx.setLineDash([3, 4]);
                         ctx.strokeStyle = isSettled
-                            ? (isWon ? 'rgba(23,163,100,0.5)' : 'rgba(240,76,76,0.4)')
-                            : (isLight ? 'rgba(23,163,100,0.45)' : 'rgba(23,163,100,0.35)');
+                            ? (isWon ? 'rgba(26, 97, 64,0.5)' : 'rgba(240,76,76,0.4)')
+                            : (isLight ? 'rgba(26, 97, 64,0.45)' : 'rgba(26, 97, 64,0.35)');
                         ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.moveTo(entryX, lineTop);
@@ -362,8 +444,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                     ctx.fillStyle = isSettled ? (isWon ? GREEN : '#F04C4C') : GREEN;
                     ctx.shadowBlur = 8;
                     ctx.shadowColor = isSettled
-                        ? (isWon ? 'rgba(23,163,100,0.6)' : 'rgba(240,76,76,0.6)')
-                        : 'rgba(23,163,100,0.5)';
+                        ? (isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(240,76,76,0.6)')
+                        : 'rgba(26, 97, 64,0.5)';
                     ctx.beginPath();
                     ctx.arc(entryX, entryY, 3.2, 0, Math.PI * 2);
                     ctx.fill();
@@ -380,7 +462,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
                     if (!isSettled) {
                         const pulsePhase = Math.sin(nowPx / 600) * 0.5 + 0.5;
-                        ctx.strokeStyle = `rgba(23,163,100,${0.15 + pulsePhase * 0.15})`;
+                        ctx.strokeStyle = `rgba(26, 97, 64,${0.15 + pulsePhase * 0.15})`;
                         ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.roundRect(badgeX - 2, badgeY - 2, badgeW + 4, badgeH + 4, 10);
@@ -402,8 +484,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                     ctx.fill();
 
                     ctx.strokeStyle = isSettled
-                        ? (isWon ? 'rgba(23,163,100,0.6)' : 'rgba(240,76,76,0.5)')
-                        : 'rgba(23,163,100,0.5)';
+                        ? (isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(240,76,76,0.5)')
+                        : 'rgba(26, 97, 64,0.5)';
                     ctx.lineWidth = 0.5;
                     ctx.beginPath();
                     ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8);
@@ -421,7 +503,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                         ctx.globalAlpha = 1;
                         ctx.translate(entryX, badgeY + badgeH / 2);
                         ctx.shadowBlur = 14 * pulse;
-                        ctx.shadowColor = isWon ? 'rgba(74,222,128,0.6)' : 'rgba(255,127,80,0.5)';
+                        ctx.shadowColor = isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(255,127,80,0.5)';
                         ctx.fillStyle = resultColor;
                         ctx.font = `900 ${isMobile ? 11 : 13}px Inter, system-ui, sans-serif`;
                         ctx.textAlign = 'center';
@@ -454,7 +536,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
                         const progress = 1 - (remainingMs / (duration * 1000));
                         const handAngle = -Math.PI / 2 + (progress * Math.PI * 2);
-                        ctx.strokeStyle = '#4ADE80';
+                        ctx.strokeStyle = '#1A6140';
                         ctx.lineWidth = 1.4;
                         ctx.beginPath();
                         ctx.moveTo(iconCenterX, iconCenterY);
@@ -471,7 +553,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                         ctx.restore();
 
                         const textStartX = iconCenterX + iconR + (isMobile ? 3 : 4);
-                        ctx.fillStyle = '#4ADE80';
+                        ctx.fillStyle = '#1A6140';
                         ctx.font = `900 ${isMobile ? 7 : 8}px Inter, system-ui, sans-serif`;
                         ctx.textBaseline = 'top';
                         ctx.fillText('LIVE', textStartX, badgeY + (isMobile ? 5 : 6));
@@ -568,7 +650,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
             ctx.save();
             ctx.setLineDash([2, 4]);
-            ctx.strokeStyle = isLight ? 'rgba(23, 163, 100, 0.25)' : 'rgba(23, 163, 100, 0.35)';
+            ctx.strokeStyle = isLight ? 'rgba(26, 97, 64, 0.25)' : 'rgba(26, 97, 64, 0.35)';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, liveY);
@@ -581,7 +663,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.restore();
 
             const labelH = 20;
-            ctx.fillStyle = isLight ? '#1D7A52' : GREEN;
+            ctx.fillStyle = isLight ? '#123F28' : GREEN;
             ctx.beginPath();
             ctx.roundRect(liveXBoundary + 6, liveY - labelH/2, priceScaleWidth - 12, labelH, 4);
             ctx.fill();
@@ -592,8 +674,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.fillText(latestPriceValStr, liveXBoundary + 12, liveY);
 
             const ambientGlow = ctx.createRadialGradient(liveX, liveY, 0, liveX, liveY, isMobile ? 30 : 40);
-            ambientGlow.addColorStop(0, isLight ? 'rgba(23, 163, 100, 0.20)' : 'rgba(23, 163, 100, 0.25)');
-            ambientGlow.addColorStop(0.6, isLight ? 'rgba(23, 163, 100, 0.06)' : 'rgba(23, 163, 100, 0.10)');
+            ambientGlow.addColorStop(0, isLight ? 'rgba(26, 97, 64, 0.20)' : 'rgba(26, 97, 64, 0.25)');
+            ambientGlow.addColorStop(0.6, isLight ? 'rgba(26, 97, 64, 0.06)' : 'rgba(26, 97, 64, 0.10)');
             ambientGlow.addColorStop(1, 'transparent');
             ctx.fillStyle = ambientGlow;
             ctx.globalCompositeOperation = 'screen';
@@ -604,8 +686,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             const glowSize = 10 + pulseSize;
 
             const signalGlow = ctx.createRadialGradient(liveX, liveY, 1, liveX, liveY, glowSize);
-            signalGlow.addColorStop(0, isLight ? 'rgba(45, 138, 87, 0.9)' : `${GREEN}bb`);
-            signalGlow.addColorStop(0.5, isLight ? 'rgba(45, 138, 87, 0.3)' : `${GREEN}30`);
+            signalGlow.addColorStop(0, isLight ? 'rgba(26, 97, 64, 0.9)' : `${GREEN}bb`);
+            signalGlow.addColorStop(0.5, isLight ? 'rgba(26, 97, 64, 0.3)' : `${GREEN}30`);
             signalGlow.addColorStop(1, 'transparent');
 
             ctx.beginPath();
@@ -620,7 +702,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
             ctx.beginPath();
             ctx.arc(liveX, liveY, 6.5 + (pulseSize * 0.3), 0, Math.PI * 2);
-            ctx.strokeStyle = isLight ? 'rgba(45, 138, 87, 0.25)' : `${GREEN}35`;
+            ctx.strokeStyle = isLight ? 'rgba(26, 97, 64, 0.25)' : `${GREEN}35`;
             ctx.lineWidth = 1;
             ctx.stroke();
 

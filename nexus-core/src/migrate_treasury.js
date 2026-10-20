@@ -1,7 +1,7 @@
 const { ethers } = require('ethers');
 require('dotenv').config();
 
-const ARC_RPC = process.env.ARC_RPC_1 || "https://rpc.testnet.arc.network";
+const ARC_RPC = process.env.ARC_RPC_1 || "https://rpc.testnet.arc.io";
 const OLD_TREASURY = "0x345014899b42bF9034D9475760609e64B1433A6a";
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 

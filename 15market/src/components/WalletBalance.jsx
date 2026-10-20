@@ -32,7 +32,7 @@ export function WalletBalance({ theme, balanceOverride, label }) {
 
     if (!isConnected) return null;
 
-    const networkColor = '#17A364'; // Arc Green
+    const networkColor = '#1A6140'; // Arc Green
 
     return (
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border backdrop-blur-xl transition-all duration-300 group hover:scale-105"
@@ -42,7 +42,7 @@ export function WalletBalance({ theme, balanceOverride, label }) {
             }}>
 
             <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} 
-                style={{ backgroundColor: theme === 'light' ? '#17A364' : '#facc15', boxShadow: `0 0 8px ${theme === 'light' ? '#17A364' : '#facc15'}60` }} 
+                style={{ backgroundColor: theme === 'light' ? '#1A6140' : '#facc15', boxShadow: `0 0 8px ${theme === 'light' ? '#1A6140' : '#facc15'}60` }} 
             />
 
             <span className={`text-[10px] font-bold font-mono tracking-wide ${theme === 'light' ? 'text-black' : 'text-white'}`}>

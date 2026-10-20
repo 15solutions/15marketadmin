@@ -64,7 +64,7 @@ services:
       - key: VITE_ARC_ROUNDS_CONTRACT_ADDRESS
         value: "0x02AE9D2a7CEca436E7B3A482772EfB74C4fE4721"
       - key: VITE_ARC_RPC_1
-        value: "https://rpc.testnet.arc.network"
+        value: "https://rpc.testnet.arc.io"
       - key: VITE_PRICE_FEED_URL
         value: "https://prices.15market.com"
       - key: VITE_PRIVY_APP_ID

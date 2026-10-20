@@ -13,17 +13,17 @@ export function RenderIntro({ isLight, body }) {
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className={`p-4 rounded-2xl border ${isLight ? "bg-white/40 border-black/5 shadow-sm" : "bg-white/5 border-white/5"}`}>
-                    <span className="text-[10px] font-black uppercase text-[#249C6C] tracking-wide block mb-1">Simple profit loop</span>
+                    <span className="text-[10px] font-black uppercase text-[#1A6140] tracking-wide block mb-1">Simple profit loop</span>
                     <p className="text-[11px] leading-relaxed opacity-80">
                         Choose Up or Down, enter stake, and watch live resolution. Correct prediction wins back stake + profit instantly.
                     </p>
                 </div>
                 <div className={`p-4 rounded-2xl border ${isLight ? "bg-white/40 border-black/5 shadow-sm" : "bg-white/5 border-white/5"}`}>
-                    <span className="text-[10px] font-black uppercase text-[#249C6C] tracking-wide block mb-1">Dynamic payouts</span>
+                    <span className="text-[10px] font-black uppercase text-[#1A6140] tracking-wide block mb-1">Dynamic payouts</span>
                     <div className="grid grid-cols-3 gap-1.5 mt-1.5">
                         {[["5s","2.90x"],["10s","2.40x"],["15s","1.90x"]].map(([d,m]) => (
                             <div key={d} className={`text-center py-1.5 rounded-lg border ${isLight ? "bg-black/5 border-black/5" : "bg-white/5 border-white/5"}`}>
-                                <div className="text-[8px] font-black text-[#249C6C]">{d}</div>
+                                <div className="text-[8px] font-black text-[#1A6140]">{d}</div>
                                 <div className="text-xs font-black">{m}</div>
                             </div>
                         ))}
@@ -47,7 +47,7 @@ export function RenderTrading({
             {/* Visual Chart Widget & Prediction UI */}
             <div className={`rounded-2xl border p-4 flex flex-col md:flex-row gap-4 ${isLight ? "bg-white/70 border-black/5" : "bg-[#0c0c0c]/80 border-white/5"}`}>
                 <div className="flex-1 flex flex-col gap-3">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-[#249C6C] flex items-center gap-1.5">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-[#1A6140] flex items-center gap-1.5">
                         <Terminal size={12}/> Live Predictor Mockup
                     </span>
                     
@@ -55,7 +55,7 @@ export function RenderTrading({
                     <div className="flex gap-2">
                         {[5, 10, 15].map(d => (
                             <button key={d} onClick={() => !simRunning && setSimDur(d)} disabled={simRunning}
-                                className={`flex-1 py-1.5 text-[9px] font-black rounded-lg border transition-all ${simDur === d ? "bg-[#249C6C] text-white border-[#249C6C]" : isLight ? "bg-black/5 border-transparent" : "bg-white/5 border-transparent"}`}>
+                                className={`flex-1 py-1.5 text-[9px] font-black rounded-lg border transition-all ${simDur === d ? "bg-[#1A6140] text-white border-[#1A6140]" : isLight ? "bg-black/5 border-transparent" : "bg-white/5 border-transparent"}`}>
                                 {d}s ({d === 5 ? "2.9x" : d === 10 ? "2.4x" : "1.9x"})
                             </button>
                         ))}
@@ -71,7 +71,7 @@ export function RenderTrading({
                     {/* Prediction Buttons */}
                     <div className="flex gap-2">
                         <button onClick={() => !simRunning && setSimDir("up")} disabled={simRunning}
-                            className={`flex-1 py-2 rounded-lg border flex items-center justify-center gap-1 text-[9px] font-black uppercase transition-all ${simDir === "up" ? "bg-[#249C6C]/20 border-[#249C6C] text-[#249C6C]" : isLight ? "bg-black/5 border-transparent" : "bg-white/5 border-transparent"}`}>
+                            className={`flex-1 py-2 rounded-lg border flex items-center justify-center gap-1 text-[9px] font-black uppercase transition-all ${simDir === "up" ? "bg-[#1A6140]/20 border-[#1A6140] text-[#1A6140]" : isLight ? "bg-black/5 border-transparent" : "bg-white/5 border-transparent"}`}>
                             <TrendingUp size={11}/> Up
                         </button>
                         <button onClick={() => !simRunning && setSimDir("down")} disabled={simRunning}
@@ -81,7 +81,7 @@ export function RenderTrading({
                     </div>
 
                     <button onClick={startSim} disabled={simRunning}
-                        className="w-full py-2 rounded-lg bg-[#249C6C] text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 shadow hover:bg-[#1a7c57] transition-colors disabled:opacity-50">
+                        className="w-full py-2 rounded-lg bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 shadow hover:bg-[#1A6140] transition-colors disabled:opacity-50">
                         {simRunning ? <RefreshCw size={11} className="animate-spin" /> : <Play size={11} />}
                         {simRunning ? `Countdown ${simCountdown}s` : "Execute Simulation"}
                     </button>
@@ -90,7 +90,7 @@ export function RenderTrading({
                 {/* Mock Chart Widget explanation */}
                 <div className={`flex-1 rounded-xl border p-3 flex flex-col justify-between ${isLight ? "bg-black/5 border-black/5" : "bg-white/5 border-white/5"}`}>
                     <div className="flex flex-col gap-1">
-                        <span className="text-[8px] font-black uppercase tracking-wider text-[#249C6C] block">Interactive Chart Feed</span>
+                        <span className="text-[8px] font-black uppercase tracking-wider text-[#1A6140] block">Interactive Chart Feed</span>
                         <p className="text-[10px] opacity-75 leading-relaxed">
                             The live line/candlestick widget shows the price history tick-by-tick. The entry point is locked on chart as a dotted reference line.
                         </p>
@@ -100,7 +100,7 @@ export function RenderTrading({
                         {simTicks.length > 0 ? (
                             <div className="text-center">
                                 <span className={`text-[9px] font-bold ${muted}`}>BTC Mock Index</span>
-                                <div className={`text-xl font-black ${simTicks[simTicks.length-1].price >= simTicks[0].price ? "text-[#249C6C]" : "text-red-400"}`}>
+                                <div className={`text-xl font-black ${simTicks[simTicks.length-1].price >= simTicks[0].price ? "text-[#1A6140]" : "text-red-400"}`}>
                                     ${simTicks[simTicks.length-1].price.toLocaleString()}
                                 </div>
                                 <span className={`text-[8px] ${muted}`}>Locked Entry: ${simTicks[0].price}</span>
@@ -111,7 +111,7 @@ export function RenderTrading({
                     </div>
 
                     {simResult && (
-                        <div className={`p-2 rounded-lg text-center border text-[9px] font-black ${simResult.won ? "bg-[#249C6C]/10 border-[#249C6C]/20 text-[#249C6C]" : "bg-red-500/10 border-red-500/20 text-red-400"}`}>
+                        <div className={`p-2 rounded-lg text-center border text-[9px] font-black ${simResult.won ? "bg-[#1A6140]/10 border-[#1A6140]/20 text-[#1A6140]" : "bg-red-500/10 border-red-500/20 text-red-400"}`}>
                             {simResult.won ? "🎉 WIN: Price settled above entry" : "❌ LOSS: Price settled against prediction"}
                             <div className="text-[8px] opacity-80 mt-0.5">Net Profit: {simResult.profit} USDC</div>
                         </div>
@@ -141,7 +141,7 @@ export function RenderNavbar({ isLight, body }) {
                     const Icon = item.icon;
                     return (
                         <div key={idx} className={`p-3 rounded-xl border flex gap-3 items-center ${isLight ? "bg-white/40 border-black/5" : "bg-white/5 border-white/5"}`}>
-                            <div className="p-2 rounded-lg bg-[#249C6C]/10 border border-[#249C6C]/20 text-[#249C6C] flex-none">
+                            <div className="p-2 rounded-lg bg-[#1A6140]/10 border border-[#1A6140]/20 text-[#1A6140] flex-none">
                                 <Icon size={16} />
                             </div>
                             <div>
@@ -170,7 +170,7 @@ export function RenderWallets({ isLight, body }) {
                     </p>
                 </div>
                 <div className={`p-4 rounded-xl border flex flex-col gap-2 ${isLight ? "bg-white/40 border-black/5" : "bg-white/5 border-white/5"}`}>
-                    <span className="text-[10px] font-black uppercase tracking-wide text-[#249C6C]">2. Trading Wallet (EVM Session Signer)</span>
+                    <span className="text-[10px] font-black uppercase tracking-wide text-[#1A6140]">2. Trading Wallet (EVM Session Signer)</span>
                     <p className="text-[10px] opacity-80 leading-relaxed">
                         Client-side generated signer stored securely in memory. Automatically signs active trades inside contract in &lt;45ms.
                     </p>
@@ -179,20 +179,20 @@ export function RenderWallets({ isLight, body }) {
 
             {/* Transfer Hub Mockup */}
             <div className={`p-4 rounded-2xl border flex flex-col gap-2.5 ${isLight ? "bg-white/70 border-black/5" : "bg-white/5 border-white/5"}`}>
-                <span className="text-[10px] font-black uppercase tracking-wider text-[#249C6C] flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#1A6140] flex items-center gap-1.5">
                     <Send size={11}/> Transfer Hub Portal
                 </span>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[10px]">
                     <div className={`p-2.5 rounded-lg border ${isLight ? "bg-black/5 border-black/5" : "bg-white/5 border-white/5"}`}>
-                        <span className="font-bold text-[#249C6C]">Circle Smart Deposits</span>
+                        <span className="font-bold text-[#1A6140]">Circle Smart Deposits</span>
                         <p className="opacity-75 mt-1 leading-relaxed">Dedicated leaf-branded QR code addresses that sync deposits instantly with Circle API.</p>
                     </div>
                     <div className={`p-2.5 rounded-lg border ${isLight ? "bg-black/5 border-black/5" : "bg-white/5 border-white/5"}`}>
-                        <span className="font-bold text-[#249C6C]">Solana Engine</span>
+                        <span className="font-bold text-[#1A6140]">Solana Engine</span>
                         <p className="opacity-75 mt-1 leading-relaxed">Send SOL or USDC directly from Phantom/Solana addresses; converts to EVM USDC in 2 seconds.</p>
                     </div>
                     <div className={`p-2.5 rounded-lg border ${isLight ? "bg-black/5 border-black/5" : "bg-white/5 border-white/5"}`}>
-                        <span className="font-bold text-[#249C6C]">Fuji CCTP Bridge</span>
+                        <span className="font-bold text-[#1A6140]">Fuji CCTP Bridge</span>
                         <p className="opacity-75 mt-1 leading-relaxed">Cross-chain bridging from Avalanche testnet. Fully automated relayer processes target minting.</p>
                     </div>
                 </div>
@@ -231,7 +231,7 @@ export function RenderHistory({ isLight, body }) {
                     const Icon = l.icon;
                     return (
                         <div key={idx} className={`p-3.5 rounded-xl border flex flex-col gap-2 ${isLight ? "bg-white/40 border-black/5" : "bg-white/5 border-white/5"}`}>
-                            <div className="flex items-center gap-2 text-[#249C6C]">
+                            <div className="flex items-center gap-2 text-[#1A6140]">
                                 <Icon size={14} />
                                 <span className="text-[10px] font-black uppercase tracking-wider">{l.title}</span>
                             </div>
@@ -243,7 +243,7 @@ export function RenderHistory({ isLight, body }) {
 
             {/* Visual audit preview */}
             <div className={`p-4 rounded-xl border text-[10px] flex flex-col gap-1.5 ${isLight ? "bg-white/70 border-black/5" : "bg-white/3 border-white/5"}`}>
-                <span className="text-[8px] font-black uppercase text-[#249C6C] tracking-widest block">Audit Dashboard Mockup</span>
+                <span className="text-[8px] font-black uppercase text-[#1A6140] tracking-widest block">Audit Dashboard Mockup</span>
                 <div className="flex justify-between border-b border-white/10 pb-1 font-bold">
                     <span>Target Event</span>
                     <span>Ledger Source</span>
@@ -251,7 +251,7 @@ export function RenderHistory({ isLight, body }) {
                 </div>
                 <div className="flex justify-between opacity-80">
                     <span>Correct 5s BTC Prediction</span>
-                    <span className="text-emerald-500">Trade History</span>
+                    <span className="text-[#1A6140]">Trade History</span>
                     <span>Wins payout audit</span>
                 </div>
                 <div className="flex justify-between opacity-80">
@@ -281,7 +281,7 @@ export function RenderFAQ({ isLight, body }) {
             <div className="flex flex-col gap-3">
                 {faqs.map((f, i) => (
                     <div key={i} className={`p-4 rounded-xl border flex flex-col gap-2 ${isLight ? "bg-white/40 border-black/5" : "bg-white/5 border-white/5"}`}>
-                        <div className="flex items-center gap-2 text-[#249C6C]">
+                        <div className="flex items-center gap-2 text-[#1A6140]">
                             <HelpCircle size={13} />
                             <span className="text-xs font-black uppercase">{f.q}</span>
                         </div>

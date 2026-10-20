@@ -64,8 +64,8 @@ export default function CampaignsHub({ campaigns, enrollments, address, theme, o
         ) : (
           /* State 3: No active campaigns */
           <div className="flex-1 flex flex-col items-center justify-center text-center py-20">
-            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 ${isLight ? "bg-[#249C6C]/5 border-[#249C6C]/10" : "bg-white/5 border-white/10"} border`}>
-              <Calendar size={36} className="text-[#249C6C]/40" />
+            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 ${isLight ? "bg-[#1A6140]/5 border-[#1A6140]/10" : "bg-white/5 border-white/10"} border`}>
+              <Calendar size={36} className="text-[#1A6140]/40" />
             </div>
             <h2 className={`text-2xl font-black uppercase tracking-tight mb-3 ${isLight ? "text-[#0a261a]" : "text-white"}`}>No Active Campaigns</h2>
             <p className={`text-sm font-medium max-w-md ${isLight ? "text-[#0a261a]/40" : "text-white/30"}`}>
@@ -86,9 +86,9 @@ function CampaignCardDetailed({ campaign, theme, enrollments }) {
   const timeLeft = campaign.endTime - now;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`${isLight ? "bg-white border-[#249C6C]/10 shadow-xl" : "bg-[#0d0d0d] border-white/5"} border rounded-[32px] p-8 md:p-12 overflow-hidden relative`}>
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`${isLight ? "bg-white border-[#1A6140]/10 shadow-xl" : "bg-[#0d0d0d] border-white/5"} border rounded-[32px] p-8 md:p-12 overflow-hidden relative`}>
       <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none">
-        <Trophy size={200} className={isLight ? "text-[#249C6C]" : "text-white"} />
+        <Trophy size={200} className={isLight ? "text-[#1A6140]" : "text-white"} />
       </div>
       <div className="relative z-10">
         <div className="flex items-center gap-4 mb-6">
@@ -97,9 +97,9 @@ function CampaignCardDetailed({ campaign, theme, enrollments }) {
           </div>
           <div>
             <h1 className={`text-3xl md:text-4xl font-black uppercase tracking-tight ${isLight ? "text-[#0a261a]" : "text-white"}`}>{campaign.title}</h1>
-            <div className="inline-flex items-center gap-2 mt-2 px-3 py-1 rounded-full bg-[#249C6C]/20 border border-[#249C6C]/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#249C6C] animate-pulse" />
-              <span className="text-[9px] font-black text-[#249C6C] uppercase tracking-widest">Live • Enrolled</span>
+            <div className="inline-flex items-center gap-2 mt-2 px-3 py-1 rounded-full bg-[#1A6140]/20 border border-[#1A6140]/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1A6140] animate-pulse" />
+              <span className="text-[9px] font-black text-[#1A6140] uppercase tracking-widest">Live • Enrolled</span>
             </div>
           </div>
         </div>
@@ -107,11 +107,11 @@ function CampaignCardDetailed({ campaign, theme, enrollments }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatBox icon={<Gift />} label="Prize Pool" value={campaign.prize || "TBA"} color="text-yellow-500" theme={theme} />
           <StatBox icon={<Clock />} label="Time Left" value={formatTimeLeft(timeLeft)} color="text-blue-400" theme={theme} />
-          <StatBox icon={<Users />} label="Status" value="Active" color="text-[#249C6C]" theme={theme} />
+          <StatBox icon={<Users />} label="Status" value="Active" color="text-[#1A6140]" theme={theme} />
           <StatBox icon={<Zap />} label="Network" value={campaign.network === "general" ? "ALL" : campaign.network} color="text-purple-400" theme={theme} />
         </div>
-        <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full ${isLight ? "bg-[#249C6C]/5 border-[#249C6C]/20 text-[#0a261a]/60" : "bg-white/5 border-white/10 text-white/50"} border text-xs font-black uppercase tracking-widest`}>
-          <Activity size={14} className="text-[#249C6C]" />
+        <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full ${isLight ? "bg-[#1A6140]/5 border-[#1A6140]/20 text-[#0a261a]/60" : "bg-white/5 border-white/10 text-white/50"} border text-xs font-black uppercase tracking-widest`}>
+          <Activity size={14} className="text-[#1A6140]" />
           You are enrolled — trades count toward your ranking
         </div>
       </div>
@@ -125,7 +125,7 @@ function CampaignCard({ campaign, enrolled, enrolling, onEnroll, theme }) {
   const timeLeft = campaign.endTime - now;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${isLight ? "bg-white border-[#249C6C]/10 hover:border-[#249C6C]/20" : "bg-white/5 border-white/5 hover:border-white/20"} border rounded-2xl p-6 transition-all group`}>
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`${isLight ? "bg-white border-[#1A6140]/10 hover:border-[#1A6140]/20" : "bg-white/5 border-white/5 hover:border-white/20"} border rounded-2xl p-6 transition-all group`}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500/20 to-transparent border border-yellow-500/30 flex items-center justify-center shrink-0">
@@ -143,7 +143,7 @@ function CampaignCard({ campaign, enrolled, enrolling, onEnroll, theme }) {
         <button
           onClick={onEnroll}
           disabled={enrolled || enrolling}
-          className={`shrink-0 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${enrolled ? (isLight ? "bg-[#249C6C]/10 text-[#249C6C] border border-[#249C6C]/20" : "bg-[#249C6C]/20 text-[#249C6C] border border-[#249C6C]/30") : (isLight ? "bg-[#249C6C] text-white hover:bg-[#249C6C]/90" : "bg-white text-black hover:bg-white/90")}`}
+          className={`shrink-0 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${enrolled ? (isLight ? "bg-[#1A6140]/10 text-[#1A6140] border border-[#1A6140]/20" : "bg-[#1A6140]/20 text-[#1A6140] border border-[#1A6140]/30") : (isLight ? "bg-[#1A6140] text-white hover:bg-[#1A6140]/90" : "bg-white text-black hover:bg-white/90")}`}
         >
           {enrolled ? "Enrolled" : enrolling ? "Enrolling..." : "Join"}
         </button>
@@ -154,7 +154,7 @@ function CampaignCard({ campaign, enrolled, enrolling, onEnroll, theme }) {
 
 function StatBox({ icon, label, value, color, theme }) {
   return (
-    <div className={`${theme === "light" ? "bg-[#f0f9f4] border-[#249C6C]/10" : "bg-white/5 border-white/5"} border p-5 rounded-2xl`}>
+    <div className={`${theme === "light" ? "bg-[#f0f9f4] border-[#1A6140]/10" : "bg-white/5 border-white/5"} border p-5 rounded-2xl`}>
       <p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${theme === "light" ? "text-[#0a261a]/20" : "text-white/20"}`}>{label}</p>
       <p className={`text-lg font-black ${color}`}>{value}</p>
     </div>

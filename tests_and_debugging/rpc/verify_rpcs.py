@@ -2,7 +2,7 @@ import requests
 
 rpcs = [
     "https://arc-testnet.g.alchemy.com/v2/gmklUsP-qeITLeu6a8Pw1",
-    "https://rpc.testnet.arc.network"
+    "https://rpc.testnet.arc.io"
 ]
 
 for rpc in rpcs:

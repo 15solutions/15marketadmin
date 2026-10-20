@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ArrowUp, ArrowDown, Trophy, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const GREEN_COLOR = "#17A364"; // WON is Green
+const GREEN_COLOR = "#1A6140"; // WON is Green
 const RED_COLOR = "#FF7F50";   // LOST is Coral
 
 // 1. FLIP CLOCK DIGIT
@@ -47,8 +47,8 @@ function FlipClockSmall({ seconds }) {
 // (green winning, NO-button orange losing). Un-filled track has slanted ash/grey stripes.
 function SidebarProgressBeam({ progress, isWinning }) {
     const clamped = Math.max(0, Math.min(100, progress));
-    const color = isWinning ? '#17A364' : '#FF914D';
-    const head = isWinning ? '#3DDC97' : '#FFB085';
+    const color = isWinning ? '#1A6140' : '#FF914D';
+    const head = isWinning ? '#1A6140' : '#FFB085';
     const glow = color;
 
     return (
@@ -155,14 +155,14 @@ function TradeRow({ trade, price, isDark, setSelectedPnLTrade, setIsPnLOpen }) {
                 }
             }}
             className={`relative p-3 rounded-2xl border transition-all hover:scale-[1.02] active:scale-[0.98] group/item
-                ${isDark ? 'bg-white/5 border-white/5 hover:border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.3)]' : 'bg-[#f0f9f4] border-[#17A364]/10 shadow-[0_2px_10px_rgba(0,0,0,0.02)]'}
+                ${isDark ? 'bg-white/5 border-white/5 hover:border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.3)]' : 'bg-[#f0f9f4] border-[#1A6140]/10 shadow-[0_2px_10px_rgba(0,0,0,0.02)]'}
             `}
         >
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg ${isLong ? 'bg-[#17A364]/10' : 'bg-[#FF7F50]/10'}`}>
+                    <div className={`p-1.5 rounded-lg ${isLong ? 'bg-[#1A6140]/10' : 'bg-[#FF7F50]/10'}`}>
                         {isLong
-                            ? <ArrowUp size={12} color="#17A364" strokeWidth={3} />
+                            ? <ArrowUp size={12} color="#1A6140" strokeWidth={3} />
                             : <ArrowDown size={12} color="#FF7F50" strokeWidth={3} />
                         }
                     </div>
@@ -212,14 +212,14 @@ function TradeRow({ trade, price, isDark, setSelectedPnLTrade, setIsPnLOpen }) {
             </div>
 
             {(trade.status === 'RESOLVING' || trade.status === 'WON' || trade.status === 'LOST' || trade.status === 'PAID') && (
-                <div className={`absolute inset-0 z-10 backdrop-blur-md ${isDark ? 'bg-black/60 border-white/10' : 'bg-white/60 border-[#17A364]/10'} flex flex-col items-center justify-center rounded-xl border`}>
+                <div className={`absolute inset-0 z-10 backdrop-blur-md ${isDark ? 'bg-black/60 border-white/10' : 'bg-white/60 border-[#1A6140]/10'} flex flex-col items-center justify-center rounded-xl border`}>
                     {(trade.status === 'WON' || trade.status === 'PAID') && (
-                        <div className="flex flex-col items-center text-[#17A364] scale-90">
+                        <div className="flex flex-col items-center text-[#1A6140] scale-90">
                             <Trophy size={20} />
                             <span className="text-[9px] font-black uppercase tracking-[0.2em] mt-1">Won</span>
                             {trade.status === 'WON' && (
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                    <div className="w-2 h-2 rounded-full border border-[#17A364] border-t-transparent animate-spin" />
+                                    <div className="w-2 h-2 rounded-full border border-[#1A6140] border-t-transparent animate-spin" />
                                     <span className="text-[7px] font-bold uppercase opacity-60 animate-pulse">Payout Pending</span>
                                 </div>
                             )}
@@ -248,16 +248,16 @@ export function ActiveTradesSidebar({ activeTrades, price, theme = 'dark', curre
     return (
         <div className={`w-full h-full flex flex-col overflow-hidden ${isDark ? 'bg-transparent' : 'coral-green-gradient-light'}`} style={{ fontFamily: '"Comfortaa", cursive' }}
         >
-            <div className={`px-4 py-2.5 flex items-center justify-between border-b ${isDark ? 'border-white/5 bg-white/[0.02]' : 'border-[#17A364]/10 bg-white/20'}`}>
+            <div className={`px-4 py-2.5 flex items-center justify-between border-b ${isDark ? 'border-white/5 bg-white/[0.02]' : 'border-[#1A6140]/10 bg-white/20'}`}>
                 <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#17A364] shadow-[0_0_10px_#17A364]" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#1A6140] shadow-[0_0_10px_#1A6140]" />
                     <span className={`text-[9px] uppercase font-black tracking-[0.3em] ${isDark ? 'text-white/40' : 'text-[#0f2618]/40'}`}>
                         Engines
                     </span>
                 </div>
                 {activeTrades.length > 0 && (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#17A364]/10 border border-[#17A364]/20">
-                        <span className="text-[8px] font-black text-[#17A364]">{activeTrades.length} ACTIVE</span>
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#1A6140]/10 border border-[#1A6140]/20">
+                        <span className="text-[8px] font-black text-[#1A6140]">{activeTrades.length} ACTIVE</span>
                     </div>
                 )}
             </div>
@@ -317,14 +317,14 @@ export function ActiveTradesSidebar({ activeTrades, price, theme = 'dark', curre
                                         }
                                     }}
                                     className={`relative p-3 rounded-2xl border transition-all hover:scale-[1.02] active:scale-[0.98] group/item
-                                        ${isDark ? 'bg-white/5 border-white/5 hover:border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.3)]' : 'bg-[#f0f9f4] border-[#17A364]/10 shadow-[0_2px_10px_rgba(0,0,0,0.02)]'}
+                                        ${isDark ? 'bg-white/5 border-white/5 hover:border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.3)]' : 'bg-[#f0f9f4] border-[#1A6140]/10 shadow-[0_2px_10px_rgba(0,0,0,0.02)]'}
                                     `}
                                 >
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
-                                            <div className={`p-1.5 rounded-lg ${isLong ? 'bg-[#17A364]/10' : 'bg-[#FF7F50]/10'}`}>
+                                            <div className={`p-1.5 rounded-lg ${isLong ? 'bg-[#1A6140]/10' : 'bg-[#FF7F50]/10'}`}>
                                                 {isLong
-                                                    ? <ArrowUp size={12} color="#17A364" strokeWidth={3} />
+                                                    ? <ArrowUp size={12} color="#1A6140" strokeWidth={3} />
                                                     : <ArrowDown size={12} color="#FF7F50" strokeWidth={3} />
                                                 }
                                             </div>
@@ -374,14 +374,14 @@ export function ActiveTradesSidebar({ activeTrades, price, theme = 'dark', curre
                                     </div>
 
                                     {(trade.status === 'RESOLVING' || trade.status === 'WON' || trade.status === 'LOST' || trade.status === 'PAID') && (
-                                        <div className={`absolute inset-0 z-10 backdrop-blur-md ${isDark ? 'bg-black/60 border-white/10' : 'bg-white/60 border-[#17A364]/10'} flex flex-col items-center justify-center rounded-xl border`}>
+                                        <div className={`absolute inset-0 z-10 backdrop-blur-md ${isDark ? 'bg-black/60 border-white/10' : 'bg-white/60 border-[#1A6140]/10'} flex flex-col items-center justify-center rounded-xl border`}>
                                             {(trade.status === 'WON' || trade.status === 'PAID') && (
-                                                <div className="flex flex-col items-center text-[#17A364] scale-90">
+                                                <div className="flex flex-col items-center text-[#1A6140] scale-90">
                                                     <Trophy size={20} />
                                                     <span className="text-[9px] font-black uppercase tracking-[0.2em] mt-1">Won</span>
                                                     {trade.status === 'WON' && (
                                                         <div className="flex items-center gap-1.5 mt-0.5">
-                                                            <div className="w-2 h-2 rounded-full border border-[#17A364] border-t-transparent animate-spin" />
+                                                            <div className="w-2 h-2 rounded-full border border-[#1A6140] border-t-transparent animate-spin" />
                                                             <span className="text-[7px] font-bold uppercase opacity-60 animate-pulse">Payout Pending</span>
                                                         </div>
                                                     )}
@@ -393,8 +393,8 @@ export function ActiveTradesSidebar({ activeTrades, price, theme = 'dark', curre
                                             {trade.status === 'LOST' && <div className="flex flex-col items-center text-[#FF7F50] opacity-80 scale-90"><AlertCircle size={20} /><span className="text-[9px] font-black uppercase tracking-[0.2em] mt-1">Lost</span></div>}
                                             {trade.status === 'RESOLVING' && (
                                                 <div className="flex flex-col items-center gap-2">
-                                                    <div className="w-4 h-4 rounded-full border-2 border-[#17A364] border-t-transparent animate-spin" />
-                                                    <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#17A364] animate-pulse">Syncing</span>
+                                                    <div className="w-4 h-4 rounded-full border-2 border-[#1A6140] border-t-transparent animate-spin" />
+                                                    <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#1A6140] animate-pulse">Syncing</span>
                                                 </div>
                                             )}
                                         </div>

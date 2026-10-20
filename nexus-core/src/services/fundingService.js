@@ -76,7 +76,7 @@ const CCTP_CHAINS = {
     '5042002': {
         name: 'Arc Testnet',
         domain: 26,
-        rpc: 'https://rpc.testnet.arc.network',
+        rpc: 'https://rpc.testnet.arc.io',
         tokenMessenger: '0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa',
         messageTransmitter: '0xe737e5cebeeba77efe34d4aa090756590b1ce275',
         usdc: '0x3600000000000000000000000000000000000000'

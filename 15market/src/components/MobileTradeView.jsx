@@ -8,12 +8,17 @@ import { FlipClock, ProgressBeam, ResolvingOutcome, TradeOutcome } from './Tradi
 import { isTradeSettled, isTradeInFlight, isTradeOverdue, isWinningTrade } from '../utils/tradeStatus';
 
 const LOGO_MAP = {
-  eth: '/ethusdc.png',
-  btc: '/btc.png',
-  sol: '/sol.png',
-  mon: '/monad.png',
-  avax: '/avax.png',
+  eth: '/logos/eth.png',
+  btc: '/logos/btc.png',
+  sol: '/logos/sol.png',
+  mon: '/logos/mon.png',
+  avax: '/logos/avax.png',
 };
+
+// Assets shown in the picker that are not tradable yet. They stay visible so
+// users can see what's coming, but they are faded and cannot be selected.
+const UNAVAILABLE_ASSETS = new Set(['mon', 'avax']);
+const isAssetUnavailable = (id) => UNAVAILABLE_ASSETS.has(String(id || '').toLowerCase());
 
 const ASSET_META = {
   BTC: { glyph: '₿', color: '#f7931a' },
@@ -59,10 +64,15 @@ function getLogoFilter(isLight) {
  * derived from a motion value, so the row scales and fades continuously with
  * the drag instead of snapping between discrete states.
  */
-function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol, isLight }) {
+function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol, isLight, isUnavailable = false }) {
   const distance = useTransform(wheelPos, (v) => Math.abs(v - index));
   const scale = useTransform(distance, [0, 1, 2, 3], [1.6, 1.08, 0.72, 0.28]);
-  const opacity = useTransform(distance, [0, 1, 2, 3], [1, 0.82, 0.45, 0.12]);
+  // Unlisted assets render faded so they read as "not available yet".
+  const opacity = useTransform(
+    distance,
+    [0, 1, 2, 3],
+    isUnavailable ? [0.4, 0.33, 0.2, 0.08] : [1, 0.82, 0.45, 0.12]
+  );
   const y = useTransform(wheelPos, (v) => (boxH / 2 - 22) - (index - v) * WHEEL_ROW_H);
 
   const assetMeta = getAssetMeta(token);
@@ -136,6 +146,23 @@ function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol, isLi
       >
         {token.symbol}
       </motion.span>
+
+      {isUnavailable && (
+        <motion.span
+          style={{
+            fontSize: 9,
+            fontWeight: 800,
+            letterSpacing: '0.08em',
+            color: isLight ? '#0a261a' : '#ffffff',
+            border: `1px solid ${isLight ? 'rgba(10,38,26,0.35)' : 'rgba(255,255,255,0.35)'}`,
+            borderRadius: 999,
+            padding: '2px 6px',
+            lineHeight: 1,
+          }}
+        >
+          SOON
+        </motion.span>
+      )}
     </motion.button>
   );
 }
@@ -161,24 +188,71 @@ function MobileSteppedChart({
   const yMinRef = useRef(null);
   const yMaxRef = useRef(null);
   const activeTradesRef = useRef(activeTrades);
+  // Guards async history seeding against a symbol switch mid-flight.
+  const symbolRef = useRef(symbol);
+  symbolRef.current = symbol;
   const isLight = theme === 'light';
-  const GREEN = '#17A364';
+  const GREEN = '#1A6140';
 
   useEffect(() => { activeTradesRef.current = activeTrades; }, [activeTrades]);
 
   const numericPrice = parseFloat(currentPrice) || 0;
 
-  // Live-only: no stored history anywhere. Every mount starts from an
-  // empty buffer that fills with real streamed ticks — never seeded,
-  // shifted or synthesised.
-
-  // Initialize: start empty on every mount/symbol. Live streamed ticks fill
-  // the buffer within a second — nothing stored, nothing seeded.
+  // Seed the buffer with the backend's REAL recent history on mount / symbol
+  // change so the chart opens already complete and correctly scaled, instead of
+  // growing in from an empty buffer. The seed is the same 250ms/trade snapshot
+  // feed the settlement engine uses, so the drawn line and the settled verdict
+  // can never disagree; live ticks then append on top.
   useEffect(() => {
+    yMinRef.current = null;
+    yMaxRef.current = null;
     priceHistoryRef.current = [];
     interpolatedPriceRef.current = null;
     targetPriceRef.current = null;
-  }, [symbol]);
+
+    const key = (symbol || 'ETHUSDT').replace('USDT', '').toLowerCase();
+    const seedMs = windowMs + 4000;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${KEEPER_URL_ARC}/prices/history?key=${encodeURIComponent(key)}&ms=${seedMs}&limit=${Math.ceil(seedMs / 50)}`);
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (cancelled || symbolRef.current !== symbol) return;
+        const pts = Array.isArray(data?.points) ? data.points : [];
+        const seeded = [];
+        for (const p of pts) {
+          if (!p) continue;
+          const t = Number(p.t);
+          const v = Number(p.p);
+          if (isFinite(t) && isFinite(v) && v > 0) seeded.push({ t, p: v });
+        }
+        if (!seeded.length) return;
+        seeded.sort((a, b) => a.t - b.t);
+        // Same easing as the live loop (0.45 / 50ms) so the seeded window has an
+        // identical smooth finish to the streaming tail.
+        const smoothed = [{ t: seeded[0].t, p: seeded[0].p }];
+        let cur = seeded[0].p;
+        for (let i = 1; i < seeded.length; i++) {
+          cur += (seeded[i].p - cur) * 0.45;
+          smoothed.push({ t: seeded[i].t, p: cur });
+        }
+        // Keep any live points collected while the fetch was in flight.
+        const lastSeedT = smoothed[smoothed.length - 1].t;
+        const merged = smoothed.concat(priceHistoryRef.current.filter(e => e.t > lastSeedT));
+        priceHistoryRef.current = merged.length > 1600 ? merged.slice(-1600) : merged;
+        const newest = priceHistoryRef.current[priceHistoryRef.current.length - 1];
+        if (newest && isFinite(newest.p) && newest.p > 0) {
+          if (interpolatedPriceRef.current === null) interpolatedPriceRef.current = newest.p;
+          if (targetPriceRef.current === null) targetPriceRef.current = newest.p;
+        }
+      } catch {
+        // Network blip: live ticks still fill the chart normally.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [symbol, windowMs]);
 
   // Listen to the BACKEND price relay only. The backend engine (cache.prices) is
   // the single source of truth for settlement, so the chart must NEVER stream a
@@ -322,18 +396,23 @@ function MobileSteppedChart({
       }
 
       let diff = pMax - pMin;
-      if (diff === 0) diff = latestPrice * 0.001;
+      // Floor the range so the opening frames can't hyper-zoom onto a single
+      // tick and then "pull back" as more data arrives.
+      const minRange = latestPrice * 0.0008;
+      if (!(diff > minRange)) diff = minRange;
 
       // 18% top and bottom padding for balanced breathing room
       const targetMin = pMin - diff * 0.18;
       const targetMax = pMax + diff * 0.18;
 
       if (yMinRef.current === null) {
+        // Snap on the first frame after (re)mount/seed — no easing-in.
         yMinRef.current = targetMin;
         yMaxRef.current = targetMax;
       } else {
-        yMinRef.current += (targetMin - yMinRef.current) * 0.12;
-        yMaxRef.current += (targetMax - yMaxRef.current) * 0.12;
+        // Snappier follow so the scale tracks price action without a slow zoom.
+        yMinRef.current += (targetMin - yMinRef.current) * 0.2;
+        yMaxRef.current += (targetMax - yMaxRef.current) * 0.2;
       }
 
       const lo = yMinRef.current;
@@ -395,9 +474,9 @@ function MobileSteppedChart({
       fillPath.closePath();
 
       const fillGrad = ctx.createLinearGradient(0, liveY, 0, H);
-      fillGrad.addColorStop(0, isLight ? 'rgba(23, 163, 100, 0.22)' : 'rgba(23, 163, 100, 0.28)');
-      fillGrad.addColorStop(0.55, isLight ? 'rgba(23, 163, 100, 0.08)' : 'rgba(23, 163, 100, 0.10)');
-      fillGrad.addColorStop(1, 'rgba(23, 163, 100, 0.0)');
+      fillGrad.addColorStop(0, isLight ? 'rgba(26, 97, 64, 0.22)' : 'rgba(26, 97, 64, 0.28)');
+      fillGrad.addColorStop(0.55, isLight ? 'rgba(26, 97, 64, 0.08)' : 'rgba(26, 97, 64, 0.10)');
+      fillGrad.addColorStop(1, 'rgba(26, 97, 64, 0.0)');
       ctx.fillStyle = fillGrad;
       ctx.fill(fillPath);
       ctx.restore();
@@ -599,13 +678,13 @@ function MobileSteppedChart({
 
           let badgeColor, badgeGlow, resultText, resultColor;
           if (isSettled) {
-            badgeColor = isWon ? 'rgba(23,163,100,0.95)' : 'rgba(240,76,76,0.95)';
-            badgeGlow = isWon ? 'rgba(23,163,100,0.5)' : 'rgba(240,76,76,0.5)';
+            badgeColor = isWon ? 'rgba(26, 97, 64,0.95)' : 'rgba(240,76,76,0.95)';
+            badgeGlow = isWon ? 'rgba(26, 97, 64,0.5)' : 'rgba(240,76,76,0.5)';
             resultText = isWon ? 'WON' : 'LOST';
-            resultColor = isWon ? '#4ADE80' : '#FF7F50';
+            resultColor = isWon ? '#1A6140' : '#FF7F50';
           } else {
-            badgeColor = isLight ? 'rgba(23,163,100,0.92)' : 'rgba(20,71,44,0.92)';
-            badgeGlow = 'rgba(23,163,100,0.35)';
+            badgeColor = isLight ? 'rgba(26, 97, 64,0.92)' : 'rgba(20,71,44,0.92)';
+            badgeGlow = 'rgba(26, 97, 64,0.35)';
           }
 
           // Soft glow behind vertical line
@@ -613,8 +692,8 @@ function MobileSteppedChart({
             const lineGlow = ctx.createLinearGradient(entryX - 10, 0, entryX + 10, 0);
             lineGlow.addColorStop(0, 'transparent');
             lineGlow.addColorStop(0.5, isSettled
-              ? (isWon ? 'rgba(23,163,100,0.08)' : 'rgba(240,76,76,0.06)')
-              : (isLight ? 'rgba(23,163,100,0.06)' : 'rgba(23,163,100,0.04)'));
+              ? (isWon ? 'rgba(26, 97, 64,0.08)' : 'rgba(240,76,76,0.06)')
+              : (isLight ? 'rgba(26, 97, 64,0.06)' : 'rgba(26, 97, 64,0.04)'));
             lineGlow.addColorStop(1, 'transparent');
             ctx.fillStyle = lineGlow;
             ctx.fillRect(entryX - 10, lineTop, 20, lineBottom - lineTop);
@@ -625,8 +704,8 @@ function MobileSteppedChart({
             ctx.save();
             ctx.setLineDash([3, 4]);
             ctx.strokeStyle = isSettled
-              ? (isWon ? 'rgba(23,163,100,0.5)' : 'rgba(240,76,76,0.4)')
-              : (isLight ? 'rgba(23,163,100,0.45)' : 'rgba(23,163,100,0.35)');
+              ? (isWon ? 'rgba(26, 97, 64,0.5)' : 'rgba(240,76,76,0.4)')
+              : (isLight ? 'rgba(26, 97, 64,0.45)' : 'rgba(26, 97, 64,0.35)');
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(entryX, lineTop);
@@ -649,8 +728,8 @@ function MobileSteppedChart({
           ctx.fillStyle = isSettled ? (isWon ? GREEN : '#F04C4C') : GREEN;
           ctx.shadowBlur = 8;
           ctx.shadowColor = isSettled
-            ? (isWon ? 'rgba(23,163,100,0.6)' : 'rgba(240,76,76,0.6)')
-            : 'rgba(23,163,100,0.5)';
+            ? (isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(240,76,76,0.6)')
+            : 'rgba(26, 97, 64,0.5)';
           ctx.beginPath();
           ctx.arc(entryX, entryY, 3.2, 0, Math.PI * 2);
           ctx.fill();
@@ -668,7 +747,7 @@ function MobileSteppedChart({
 
           if (!isSettled) {
             const pulsePhase = Math.sin(now / 600) * 0.5 + 0.5;
-            ctx.strokeStyle = `rgba(23,163,100,${0.15 + pulsePhase * 0.15})`;
+            ctx.strokeStyle = `rgba(26, 97, 64,${0.15 + pulsePhase * 0.15})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.roundRect(badgeX2 - 2, badgeY2 - 2, badgeW2 + 4, badgeH2 + 4, 10);
@@ -690,8 +769,8 @@ function MobileSteppedChart({
           ctx.fill();
 
           ctx.strokeStyle = isSettled
-            ? (isWon ? 'rgba(23,163,100,0.6)' : 'rgba(240,76,76,0.5)')
-            : 'rgba(23,163,100,0.5)';
+            ? (isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(240,76,76,0.5)')
+            : 'rgba(26, 97, 64,0.5)';
           ctx.lineWidth = 0.5;
           ctx.beginPath();
           ctx.roundRect(badgeX2, badgeY2, badgeW2, badgeH2, 8);
@@ -709,7 +788,7 @@ function MobileSteppedChart({
             ctx.globalAlpha = 1;
             ctx.translate(entryX, badgeY2 + badgeH2 / 2);
             ctx.shadowBlur = 14 * pulse;
-            ctx.shadowColor = isWon ? 'rgba(74,222,128,0.6)' : 'rgba(255,127,80,0.5)';
+            ctx.shadowColor = isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(255,127,80,0.5)';
             ctx.fillStyle = resultColor;
             ctx.font = '900 11px Inter, system-ui, sans-serif';
             ctx.textAlign = 'center';
@@ -743,7 +822,7 @@ function MobileSteppedChart({
 
             const progress = 1 - (remainingMs / (duration * 1000));
             const handAngle = -Math.PI / 2 + (progress * Math.PI * 2);
-            ctx.strokeStyle = '#4ADE80';
+            ctx.strokeStyle = '#1A6140';
             ctx.lineWidth = 1.4;
             ctx.beginPath();
             ctx.moveTo(iconCenterX, iconCenterY);
@@ -761,7 +840,7 @@ function MobileSteppedChart({
 
             // LIVE text
             const textStartX = iconCenterX + iconR + 3;
-            ctx.fillStyle = '#4ADE80';
+            ctx.fillStyle = '#1A6140';
             ctx.font = '900 7px Inter, system-ui, sans-serif';
             ctx.textBaseline = 'top';
             ctx.fillText('LIVE', textStartX, badgeY2 + 5);
@@ -831,6 +910,14 @@ export default function MobileTradeView({
 }) {
   const isLight = theme === 'light';
   const [assetOpen, setAssetOpen] = useState(false);
+  // Symbol of an unlisted asset the user just tried to select, used to show the
+  // "coming soon" disclaimer. Cleared whenever the sheet closes.
+  const [unavailableNotice, setUnavailableNotice] = useState(null);
+
+  // Drop the "coming soon" notice as soon as the picker closes.
+  useEffect(() => {
+    if (!assetOpen) setUnavailableNotice(null);
+  }, [assetOpen]);
   const [searchQuery, setSearchQuery] = useState('');
   const assetWheelRef = useRef(null);
   const [selectedDuration, setSelectedDuration] = useState(15);
@@ -1052,6 +1139,7 @@ export default function MobileTradeView({
   const wheelBoxH = (wheelSpan * 2 + 1) * WHEEL_ROW_H;
 
   const pickAsset = (t) => {
+    setUnavailableNotice(null);
     handleMarketChange?.(t);
     setAssetOpen(false);
   };
@@ -1189,6 +1277,13 @@ export default function MobileTradeView({
       return;
     }
 
+    // Unlisted assets (MON, AVAX) can be scrolled to but not selected: show a
+    // "coming soon" notice and keep the current asset.
+    if (isAssetUnavailable(rowToken.id)) {
+      setUnavailableNotice((rowToken.symbol || '').toUpperCase());
+      return;
+    }
+
     const nextSymbol = (rowToken.symbol || '').toUpperCase();
     setActiveAssetSymbol(nextSymbol);
     pickAsset(rowToken);
@@ -1277,6 +1372,19 @@ export default function MobileTradeView({
             }}
             onClick={onWheelBackdropClick}
           >
+            {unavailableNotice && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className={`mx-6 mb-4 px-4 py-3 rounded-2xl text-center text-[12px] font-bold leading-snug ${
+                  isLight ? 'bg-[#0a261a] text-white' : 'bg-[#1A6140] text-white'
+                }`}
+              >
+                <span className="block text-[13px] tracking-widest">{unavailableNotice} COMING SOON</span>
+                <span className="block mt-1 opacity-90">Please select another asset to trade.</span>
+              </motion.div>
+            )}
             <div
               ref={assetWheelRef}
               className="relative w-full flex flex-col items-center justify-center select-none"
@@ -1297,7 +1405,7 @@ export default function MobileTradeView({
             >
               <motion.div className="absolute inset-x-0 top-0">
                 {wheelRows.map(({ token, virtualIdx }, slot) => {
-                  const isUnavailable = token.id?.toLowerCase() === 'mon' || token.id?.toLowerCase() === 'avax';
+                  const isUnavailable = isAssetUnavailable(token.id);
                   return (
                     <WheelRow
                       key={`wheel-slot-${slot}`}
@@ -1308,6 +1416,7 @@ export default function MobileTradeView({
                       onTap={() => onWheelRowTap(virtualIdx)}
                       activeAssetSymbol={activeAssetSymbol}
                       isLight={isLight}
+                      isUnavailable={isUnavailable}
                     />
                   );
                 })}
@@ -1328,13 +1437,15 @@ export default function MobileTradeView({
           className="absolute top-3.5 left-5 z-30 flex items-center gap-2 bg-transparent border-none p-1 outline-none cursor-pointer active:scale-95 transition-transform"
         >
           {LOGO_MAP[(activeMarket?.id || 'eth').toLowerCase()] && (
-            <img
-              src={LOGO_MAP[(activeMarket?.id || 'eth').toLowerCase()]}
-              alt={currentSymbol}
-              className={`${(activeMarket?.id || 'eth').toLowerCase() === 'eth' ? 'w-14 h-14' : (activeMarket?.id || 'eth').toLowerCase() === 'sol' ? 'w-[36.4px] h-[36.4px]' : 'w-7 h-7'} object-contain shrink-0`}
-              style={{ filter: getLogoFilter(isLight) }}
-              crossOrigin="anonymous"
-            />
+            <span className="w-9 h-9 flex items-center justify-center shrink-0">
+              <img
+                src={LOGO_MAP[(activeMarket?.id || 'eth').toLowerCase()]}
+                alt={currentSymbol}
+                className="w-full h-full object-contain"
+                style={{ filter: getLogoFilter(isLight) }}
+                crossOrigin="anonymous"
+              />
+            </span>
           )}
           <span
             className={`text-[16px] font-bold tracking-wider leading-none ${
@@ -1375,8 +1486,8 @@ export default function MobileTradeView({
             className="shrink-0 relative flex flex-col items-center justify-center gap-2 px-4 py-3 min-h-[56px] w-full overflow-visible"
           >
             {isExecuting && !currentActiveTrade && !(showOutcome && settledTrade) ? (
-              <div className="flex items-center gap-2 text-[#17A364] animate-pulse text-[14px] font-black tracking-widest">
-                <div className="w-4 h-4 rounded-full border-2 border-[#17A364] border-t-transparent animate-spin" />
+              <div className="flex items-center gap-2 text-[#1A6140] animate-pulse text-[14px] font-black tracking-widest">
+                <div className="w-4 h-4 rounded-full border-2 border-[#1A6140] border-t-transparent animate-spin" />
                 PLACING TRADE...
               </div>
             ) : currentActiveTrade && currentActiveTrade.status === 'PENDING' && remainingSec > 0 ? (
@@ -1429,7 +1540,7 @@ export default function MobileTradeView({
                   onClick={() => setSelectedDuration(d)}
                   className={`py-1 px-5 rounded-full text-[14px] font-black transition-all active:scale-95 ${
                     selectedDuration === d
-                      ? 'bg-[#17A364] text-white shadow-sm'
+                      ? 'bg-[#1A6140] text-white shadow-sm'
                       : isLight
                       ? 'text-[#0a261a]/60 hover:text-[#0a261a]'
                       : 'text-white/60 hover:text-white'
@@ -1443,11 +1554,11 @@ export default function MobileTradeView({
             {/* ─── 4. STAKE INPUT PILL ─── */}
             <div className="shrink-0 px-4 py-1 select-none">
               <div
-                className={`w-full rounded-full border-2 border-[#17A364] px-4 py-1.5 flex items-center shadow-sm ${
+                className={`w-full rounded-full border-2 border-[#1A6140] px-4 py-1.5 flex items-center shadow-sm ${
                   isLight ? 'bg-white/80' : 'bg-black/30'
                 }`}
               >
-                <span className="text-[#17A364] font-black text-[15px] select-none pl-1 mr-2">
+                <span className="text-[#1A6140] font-black text-[15px] select-none pl-1 mr-2">
                   $
                 </span>
                 <input
@@ -1459,8 +1570,8 @@ export default function MobileTradeView({
                   step="0.01"
                   className={`w-full text-center font-black text-[14px] uppercase tracking-wider outline-none bg-transparent ${
                     isLight
-                      ? 'text-[#17A364] placeholder:text-[#17A364]'
-                      : 'text-[#17A364] placeholder:text-[#17A364]'
+                      ? 'text-[#1A6140] placeholder:text-[#1A6140]'
+                      : 'text-[#1A6140] placeholder:text-[#1A6140]'
                   }`}
                 />
                 <span className={`text-[11px] font-bold whitespace-nowrap ml-1 ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>
@@ -1487,7 +1598,7 @@ export default function MobileTradeView({
                     />
                   ))}
                   <div
-                    className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-[3px] border-[#17A364] transition-all -ml-2 pointer-events-none ${
+                    className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-[3px] border-[#1A6140] transition-all -ml-2 pointer-events-none ${
                       isLight ? 'bg-white' : 'bg-black'
                     }`}
                     style={{ left: `${sliderPct}%` }}
@@ -1510,7 +1621,7 @@ export default function MobileTradeView({
               <button
                 onClick={() => handleTrade('UP')}
                 disabled={currentStake <= 0 || isExecuting}
-                className={`flex-1 h-[52px] rounded-full bg-[#17A364] text-white flex items-center justify-center gap-3 font-black text-[18px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
+                className={`flex-1 h-[52px] rounded-full bg-[#1A6140] text-white flex items-center justify-center gap-3 font-black text-[18px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
                   currentStake <= 0 || isExecuting ? 'opacity-85' : 'hover:brightness-105'
                 }`}
               >
@@ -1549,7 +1660,7 @@ export default function MobileTradeView({
       <div className="shrink-0 mt-auto select-none">
         <button
           onClick={() => setShowFullHistory?.(!showFullHistory)}
-          className="w-full bg-[#17A364] text-white rounded-t-[28px] pt-2 pb-3.5 px-4 flex flex-col items-center justify-center shadow-lg active:brightness-95 transition-all"
+          className="w-full bg-[#1A6140] text-white rounded-t-[28px] pt-2 pb-3.5 px-4 flex flex-col items-center justify-center shadow-lg active:brightness-95 transition-all"
         >
           {/* Horizontal Grab Bar */}
           <div className="w-12 h-1 bg-white/40 rounded-full mb-2" />
@@ -1583,7 +1694,7 @@ export default function MobileTradeView({
             {/* Header bar of drawer — Only carry TRADE HISTORY label, no counter */}
             <div
               onClick={() => setShowFullHistory(false)}
-              className="w-full bg-[#17A364] text-white pt-2.5 pb-2 px-4 flex flex-col items-center justify-center cursor-pointer"
+              className="w-full bg-[#1A6140] text-white pt-2.5 pb-2 px-4 flex flex-col items-center justify-center cursor-pointer"
             >
               <div className="w-12 h-1 bg-white/40 rounded-full mb-1.5" />
               <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest">
@@ -1624,7 +1735,7 @@ export default function MobileTradeView({
                       <div className="flex items-center gap-2.5">
                         <div
                           className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-[11px] text-white ${
-                            isUp ? 'bg-[#17A364]' : 'bg-[#EF5350]'
+                            isUp ? 'bg-[#1A6140]' : 'bg-[#EF5350]'
                           }`}
                         >
                           {isUp ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
@@ -1656,7 +1767,7 @@ export default function MobileTradeView({
                           <>
                             <div
                               className={`text-[12px] font-black ${
-                                isWin ? 'text-[#17A364]' : 'text-[#EF5350]'
+                                isWin ? 'text-[#1A6140]' : 'text-[#EF5350]'
                               }`}
                             >
                               {isWin ? `+$${parseFloat(trade.payout || 0).toFixed(2)}` : 'LOST'}

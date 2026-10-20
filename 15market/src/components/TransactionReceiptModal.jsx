@@ -79,7 +79,7 @@ export function TransactionReceiptModal({ isOpen, onClose, transaction }) {
                                     L 0 16 
                                     C 0 7.163 7.163 0 16 0 Z`} 
                                 fill="#f4f5f5" 
-                                stroke="#249C6C" 
+                                stroke="#1A6140" 
                                 strokeWidth="2.5"
                                 strokeLinejoin="round"
                             />
@@ -105,7 +105,7 @@ export function TransactionReceiptModal({ isOpen, onClose, transaction }) {
                                 
                                 <div className="w-full border-t border-dashed border-black/20 my-0" />
                                 <div className="flex justify-between w-full mt-3 text-[10px] font-black tracking-widest text-black/80 uppercase">
-                                    <span className="opacity-50">NETWORK:</span> <span className="text-[#249C6C]">ARC TESTNET</span>
+                                    <span className="opacity-50">NETWORK:</span> <span className="text-[#1A6140]">ARC TESTNET</span>
                                 </div>
                                 <div className="w-full border-t border-dashed border-black/20 mt-3" />
                             </div>
@@ -154,7 +154,7 @@ export function TransactionReceiptModal({ isOpen, onClose, transaction }) {
                                             </div>
                                             <div className="flex justify-between w-full">
                                                 <span className="opacity-50 uppercase">TRADE PROFIT:</span>
-                                                <span className={isWon ? 'text-[#249C6C]' : 'opacity-60'}>${profit.toFixed(settleDecimals)}</span>
+                                                <span className={isWon ? 'text-[#1A6140]' : 'opacity-60'}>${profit.toFixed(settleDecimals)}</span>
                                             </div>
                                         </>
                                     );
@@ -179,7 +179,7 @@ export function TransactionReceiptModal({ isOpen, onClose, transaction }) {
                                 </div>
                                 <div className="flex flex-col items-end text-right">
                                     <span className="text-[9px] opacity-50 font-black tracking-widest uppercase mb-1">PNL</span>
-                                    <span className={`text-sm font-black tracking-widest ${isWon ? 'text-[#249C6C]' : isLost ? 'text-[#FF7F50]' : 'text-black/60'}`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+                                    <span className={`text-sm font-black tracking-widest ${isWon ? 'text-[#1A6140]' : isLost ? 'text-[#FF7F50]' : 'text-black/60'}`} style={{ fontFamily: '"Comfortaa", cursive' }}>
                                         {isWon ? '+' : isLost ? '▼ -' : ''}{Number(transaction.payout || transaction.amount || 0).toFixed(2)} <span className="text-[8px]">USDC</span>
                                     </span>
                                 </div>
@@ -196,14 +196,14 @@ export function TransactionReceiptModal({ isOpen, onClose, transaction }) {
                             <div className="w-full grid grid-cols-2 gap-3 mt-auto receipt-control">
                                 <button
                                     onClick={handleDownload}
-                                    className="py-3 bg-[#249C6C] text-white text-[9px] font-black uppercase tracking-widest rounded flex items-center justify-center gap-2 hover:bg-[#1f875c] transition-all shadow-md"
+                                    className="py-3 bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest rounded flex items-center justify-center gap-2 hover:bg-[#1A6140] transition-all shadow-md"
                                 >
                                     <Download size={14} />
                                     SAVE IMAGE
                                 </button>
                                 <button
                                     onClick={onClose}
-                                    className="py-3 bg-transparent text-[#249C6C] border border-[#249C6C] text-[9px] font-black uppercase tracking-widest rounded flex items-center justify-center gap-2 hover:bg-[#249C6C]/5 transition-all"
+                                    className="py-3 bg-transparent text-[#1A6140] border border-[#1A6140] text-[9px] font-black uppercase tracking-widest rounded flex items-center justify-center gap-2 hover:bg-[#1A6140]/5 transition-all"
                                 >
                                     <X size={14} />
                                     CLOSE VIEW

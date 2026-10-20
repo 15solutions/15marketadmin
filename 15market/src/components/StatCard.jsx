@@ -10,7 +10,7 @@ export default function StatCard({ title, value, percentage, icon: Icon, iconBgC
       <div className="ml-4">
         <p className="text-sm text-gray-400">{title}</p>
         <p className="text-xl font-bold">{value}</p>
-        <div className={`flex items-center text-sm ${isPositive ? 'text-[#249C6C]' : 'text-red-500'}`}>
+        <div className={`flex items-center text-sm ${isPositive ? 'text-[#1A6140]' : 'text-red-500'}`}>
           {isPositive ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
           <span>{Math.abs(percentage)}%</span>
         </div>

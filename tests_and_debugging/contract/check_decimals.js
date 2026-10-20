@@ -1,7 +1,7 @@
 const { ethers } = require("ethers");
 require("dotenv").config();
 
-const ARC_RPC = "https://rpc.testnet.arc.network";
+const ARC_RPC = "https://rpc.testnet.arc.io";
 const USDC_ADDRESS = "0x3600000000000000000000000000000000000000";
 
 async function main() {

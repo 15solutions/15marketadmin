@@ -3,7 +3,7 @@ import { toPng } from 'html-to-image';
 import * as ethers from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
-import { Check, Trophy, Activity, DollarSign, Award, Target, BarChart2, User, Settings, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, TrendingUp, TrendingDown, Zap, Shield, Globe, MessageSquare, AlertCircle, Copy, RotateCw, ChevronRight, Send, ArrowDownLeft, Wallet, Bell, Megaphone, Calendar, ChevronDown, ChevronUp, Smile, Coins, RefreshCcw, BookOpen, Share2, Mail, Download, X, Menu, Bot } from "lucide-react";
+import { Check, Trophy, Activity, DollarSign, Award, Target, BarChart2, User, Settings, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, TrendingUp, TrendingDown, Zap, Shield, Globe, MessageSquare, AlertCircle, Copy, RotateCw, ChevronRight, ChevronLeft, Nfc, Send, ArrowDownLeft, Wallet, Bell, Megaphone, Calendar, ChevronDown, ChevronUp, Smile, Coins, RefreshCcw, BookOpen, Share2, Mail, Download, X, Menu, Bot } from "lucide-react";
 import MessagingSystem from "./MessagingSystem";
 import CampaignLeaderboardPane from "./CampaignLeaderboardPane";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine } from 'recharts';
@@ -235,6 +235,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [isProfileCardOpen, setIsProfileCardOpen] = useState(false);
+    const [walletCardSide, setWalletCardSide] = useState('trading'); // which card of the deck is showing
+    const touchStartXRef = useRef(null); // swipe navigation for the card deck
     const [linkedEmail, setLinkedEmail] = useState(userProfile?.email || '');
     const [isSavingEmail, setIsSavingEmail] = useState(false);
 
@@ -606,14 +608,172 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
 
     const truncate = (str) => str ? `${str.slice(0, 6)}...${str.slice(-4)}` : "";
 
+    // ─── WALLET CARD — Brand-green credit card (Transfer-Hub dimensions) ───────
+    // Same card dimensions as the Transfer Hub swipeable wallet card
+    // (h-[220px]/md:h-[260px], rounded-[40px], metallic gold chip, topographic
+    // nature texture) but finished in the brand green fill from the reference
+    // mock. Content is a profile + balance card: cardholder (avatar + username),
+    // card number (main wallet address), main wallet balance and trading wallet
+    // balance.
+    // One credit card per wallet, rendered by `kind` ('trading' | 'main'). Dark
+    // brand-green face with a world-map background; the two cards sit on a
+    // horizontal slider so switching reads like flipping a card deck.
+    const renderWalletCard = (kind) => {
+        const isTrading = kind === 'trading';
+        const cardAddress = isTrading ? evmSessionWallet?.address : address;
+        const cardBalance = isTrading ? sessionBalance : evmBalance;
+        return (
+        <div
+            className="w-[448px] h-[260px] flex-none relative overflow-hidden group text-white"
+            style={{
+                fontFamily: '"Comfortaa", cursive',
+                background: 'linear-gradient(145deg, #1a6140 0%, #123f28 55%, #0b3220 100%)',
+                border: '1.5px solid rgba(99,194,141,0.45)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), inset 0 0 46px rgba(0,0,0,0.28)'
+            }}
+        >
+            {/* World-Map Background */}
+            <img src="/worldmap.svg" alt="" aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover brightness-0 invert opacity-[0.14] pointer-events-none" />
+            {/* Brand sheen (keeps the dark green from reading flat) */}
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 via-transparent to-black/15 pointer-events-none" />
+
+            {/* NFC icon, top right — level with the brand logo */}
+            <Nfc size={24} className="absolute top-4 right-6 text-white/65 pointer-events-none" />
+
+            {/* Aurora beam — one soft light segment sweeping the card outline */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 448 260" fill="none">
+                <defs>
+                    <linearGradient id="aurora-stroke" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="rgba(126,255,199,0)" />
+                        <stop offset="45%" stopColor="rgba(126,255,199,0.95)" />
+                        <stop offset="100%" stopColor="rgba(255,255,255,0.95)" />
+                    </linearGradient>
+                </defs>
+                <rect x="3" y="3" width="442" height="254" rx="37" pathLength="100"
+                    stroke="url(#aurora-stroke)" strokeWidth="7" strokeDasharray="18 82" className="aurora-dash"
+                    style={{ filter: 'blur(5px)', opacity: 0.7, strokeLinecap: 'round' }} />
+                <rect x="3" y="3" width="442" height="254" rx="37" pathLength="100"
+                    stroke="url(#aurora-stroke)" strokeWidth="2.5" strokeDasharray="18 82" className="aurora-dash"
+                    style={{ strokeLinecap: 'round' }} />
+            </svg>
+
+            {/* Card Face: all-white brand logo (top-left, level with the NFC icon) ·
+                wallet address on the left with its label beneath ·
+                username (bottom-left) + balance with bigger numbers (bottom-right) */}
+            <div className="h-full flex flex-col justify-between relative z-20 py-4 px-6 md:px-7">
+
+                {/* 15market logo — all white, top-left, shifted upward */}
+                <img src="/gowlogo.png" alt="15market" className="h-24 md:h-[120px] w-auto self-start -translate-y-[10%]"
+                    style={{ filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
+
+                {/* Wallet address — full address on the left with a copy icon; label beneath */}
+                <div className="px-1 min-w-0"
+                    onClick={() => { if (cardAddress) { navigator.clipboard.writeText(cardAddress); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } }}>
+                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                        <p className="text-left text-lg md:text-xl font-black tracking-[0.22em] truncate leading-none">
+                            {cardAddress
+                                ? truncate(cardAddress).toUpperCase()
+                                : (isTrading && isSignerInitializing ? 'SYNCING...' : 'XXXX...XXXX')}
+                        </p>
+                        <Copy size={13} className="flex-none text-white/70" />
+                    </div>
+                    <p className="text-left text-[9px] md:text-[10px] italic font-black lowercase tracking-[0.25em] text-white/55 mt-1.5">
+                        {isTrading ? 'Trading Wallet' : 'Main Wallet'}
+                    </p>
+                </div>
+
+                {/* Bottom row: username (left) · balance with bigger numbers, USDC small on its base (right) */}
+                <div className="flex items-end justify-between gap-4">
+                    <span className="text-2xl md:text-3xl font-black truncate" style={{ fontFamily: 'Sankyu, "sankyu", cursive' }}>{userProfile?.username || 'Trader'}</span>
+                    <div className="text-right leading-none shrink-0">
+                        <div className="text-[45px] md:text-[72px] font-black tracking-tighter tabular-nums leading-none"
+                            style={{ textShadow: '0 6px 24px rgba(0,0,0,0.40)' }}>
+                            ${parseFloat(cardBalance || 0).toFixed(2)}
+                            <span className="text-[11px] md:text-base ml-1.5 font-bold text-white/70">USDC</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        );
+    };
+
+    {/* Card deck: trading + main cards side by side on one horizontal slider.
+        Both chevrons sit OUTSIDE the card on each side, always visible; mobile
+        users can also just swipe left/right between the two cards. */}
+    const walletCard = (
+        <div className="relative w-[448px] h-[260px]">
+            {/* Carousel chevrons — outside the card */}
+            <button onClick={() => setWalletCardSide(walletCardSide === 'trading' ? 'main' : 'trading')} title="Main Wallet card"
+                className="absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full flex items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
+                style={{ left: '-46px', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
+                <ChevronLeft size={18} />
+            </button>
+            <button onClick={() => setWalletCardSide(walletCardSide === 'trading' ? 'main' : 'trading')} title="Trading Wallet card"
+                className="absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full flex items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
+                style={{ right: '-46px', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
+                <ChevronRight size={18} />
+            </button>
+
+            {/* Static clip window over the sliding cards — carries the outer glow */}
+            <div className="w-[448px] h-[260px] rounded-[40px] relative overflow-hidden"
+                style={{ boxShadow: '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20, 241, 149, 0.13)' }}
+                onTouchStart={(e) => { touchStartXRef.current = e.touches[0].clientX; }}
+                onTouchEnd={(e) => {
+                    const startX = touchStartXRef.current;
+                    touchStartXRef.current = null;
+                    if (startX === null) return;
+                    const dx = e.changedTouches[0].clientX - startX;
+                    if (dx < -60 && walletCardSide === 'trading') setWalletCardSide('main');
+                    else if (dx > 60 && walletCardSide === 'main') setWalletCardSide('trading');
+                }}>
+                <div
+                    className="flex h-full will-change-transform transition-transform duration-700"
+                    style={{
+                        transform: walletCardSide === 'trading' ? 'translateX(0px)' : 'translateX(-448px)',
+                        transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.35, 1)'
+                    }}>
+                    {renderWalletCard('trading')}
+                    {renderWalletCard('main')}
+                </div>
+            </div>
+        </div>
+    );
+
+    // Compact action row that sits directly under the wallet card, mirroring the
+    // Transfer Hub 'Primary Actions' row. Withdraw is hidden for accounts with
+    // no external wallet (trading wallet only).
+    const walletActions = (
+        <div className={`grid ${hasExternalWallet ? 'grid-cols-2' : 'grid-cols-1'} gap-3 md:gap-4 shrink-0`}>
+            <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Deposit to Trading Wallet", placeholder: "USDC Amount", onConfirm: (val) => onDeposit(parseFloat(val)) }); }}
+                className="flex items-center justify-center gap-2 bg-[#1A6140] text-white font-black py-3 md:py-5 rounded-[20px] text-[9px] md:text-[11px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all"
+                style={{ boxShadow: '0 10px 24px rgba(0,0,0,0.50), 0 12px 34px rgba(20, 241, 149, 0.14)' }}>
+                <ArrowUp size={13} /> Deposit
+            </button>
+            {hasExternalWallet && (
+                <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Withdraw to Main Wallet", placeholder: "Amount", onConfirm: (val) => onWithdraw(val) }); }}
+                    className="flex items-center justify-center gap-2 border border-[#1A6140]/40 bg-[#1A6140]/10 text-[#1A6140] font-black py-3 md:py-5 rounded-[20px] text-[9px] md:text-[11px] uppercase tracking-widest hover:bg-[#1A6140]/20 active:scale-[0.95] transition-all"
+                    style={{ boxShadow: '0 10px 24px rgba(0,0,0,0.50), 0 12px 34px rgba(20, 241, 149, 0.14)' }}>
+                    <ArrowDown size={13} /> Withdraw
+                </button>
+            )}
+        </div>
+    );
+
     return (
         <div className={`h-screen w-full flex flex-col overflow-hidden relative ${isLight ? 'text-black bg-white' : 'text-white bg-black'}`} style={{ fontFamily: '"Comfortaa", cursive' }}>
             <style>{`
+                @import url('https://fonts.cdnfonts.com/css/sankyu');
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                .db-card { background: ${isLight ? 'rgba(255,255,255,0.7)' : 'rgba(10,10,10,0.8)'}; border: 1px solid ${isLight ? 'rgba(36, 156, 108,0.15)' : 'rgba(255,255,255,0.06)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
-                .db-card-alt { background: ${isLight ? 'rgba(255,255,255,0.65)' : 'rgba(10,10,10,0.75)'}; border: 1px solid ${isLight ? 'rgba(36, 156, 108,0.12)' : 'rgba(255,255,255,0.05)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
-                @keyframes breathe { 0%,100%{box-shadow:0 0 20px rgba(36, 156, 108,0.3)} 50%{box-shadow:0 0 40px rgba(36, 156, 108,0.6)} }
+                .db-card { background: ${isLight ? 'rgba(255,255,255,0.7)' : 'rgba(10,10,10,0.8)'}; border: 1px solid ${isLight ? 'rgba(26, 97, 64,0.15)' : 'rgba(255,255,255,0.06)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
+                .db-card-alt { background: ${isLight ? 'rgba(255,255,255,0.65)' : 'rgba(10,10,10,0.75)'}; border: 1px solid ${isLight ? 'rgba(26, 97, 64,0.12)' : 'rgba(255,255,255,0.05)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
+                @keyframes breathe { 0%,100%{box-shadow:0 0 20px rgba(26, 97, 64,0.3)} 50%{box-shadow:0 0 40px rgba(26, 97, 64,0.6)} }
+                /* Aurora beam — one light segment travels along the card outline */
+                @keyframes aurora-slide { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+                .aurora-dash { animation: aurora-slide 5.5s linear infinite; }
             `}</style>
 
             <div className={`absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] ${isLight ? '' : 'hidden'}`} />
@@ -632,7 +792,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
                             <Menu size={16} className={isLight ? 'text-black/80' : 'text-white/80'} />
                             <motion.span
-                                className="absolute top-2 right-2 w-2 h-2 bg-[#249C6C] rounded-full"
+                                className="absolute top-2 right-2 w-2 h-2 bg-[#1A6140] rounded-full"
                                 animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
                                 transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                             />
@@ -642,13 +802,13 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 ) : (
                     <div className="flex items-center gap-3">
                         <button onClick={onDocs} title="Platform Documentation" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
-                            <AnimatedBook size={16} className="text-[#249C6C]"/>
+                            <AnimatedBook size={16} className="text-[#1A6140]"/>
                         </button>
                         <button onClick={onCampaign} title="Campaign" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
-                            <AnimatedTrophy size={16} className="text-[#249C6C]"/>
+                            <AnimatedTrophy size={16} className="text-[#1A6140]"/>
                         </button>
                         <button onClick={onAssistedTrading} title="Assisted Trading" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
-                            <AnimatedBot size={16} className="text-[#249C6C]"/>
+                            <AnimatedBot size={16} className="text-[#1A6140]"/>
                         </button>
                         <button onClick={onTransferHub || (() => onOpenCircleWallet?.(null))} title="Transfer Hub" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
                             <AnimatedSend size={15} className={isLight ? 'text-black/80' : 'text-white/80'}/>
@@ -656,7 +816,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <button onClick={() => setIsNotificationsOpen(true)} className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`} title="Notifications">
                             <AnimatedBell size={16} className={isLight ? 'text-black/80' : 'text-white/80'}/>
                             <motion.span
-                                className="absolute top-2 right-2 w-2 h-2 bg-[#249C6C] rounded-full"
+                                className="absolute top-2 right-2 w-2 h-2 bg-[#1A6140] rounded-full"
                                 animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
                                 transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                             />
@@ -675,75 +835,17 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 /* MOBILE PORTRAIT: vertical stacked layout */
                 <div className="flex flex-1 gap-3 px-4 py-2 min-h-0 relative z-10 flex-col overflow-y-auto no-scrollbar pb-6">
 
-                    {/* TRADING WALLET */}
-                    <div className="flex-none">
-                        <div className={`w-full rounded-[24px] p-4 flex flex-col gap-3 relative overflow-hidden backdrop-blur-xl ${isLight ? 'bg-white/50 border-white/60' : 'bg-[#0a0a0a] border-white/5'}`} style={{ boxShadow: isLight ? '0 4px 30px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8)' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))', border: isLight ? '1px solid rgba(255,255,255,0.6)' : '1px solid rgba(255,255,255,0.05)' }}>
-
-                            {/* Profile Row */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => fileInputRef.current?.click()} className={`w-8 h-8 rounded-full flex-none flex items-center justify-center overflow-hidden border-2 border-[#249C6C]/40 ${isLight ? 'bg-[#249C6C]/10' : 'bg-white/5'} hover:scale-105 transition-all`}>
-                                        {(userProfile?.avatar || userProfile?.xProfileImage) ? (
-                                            <img src={userProfile?.avatar || userProfile?.xProfileImage} alt="avatar" className="w-full h-full object-cover"/>
-                                        ) : (
-                                            <User size={14} className={isLight ? 'text-[#249C6C]/70' : 'text-white/50'}/>
-                                        )}
-                                    </button>
-                                    <div>
-                                        <div className={`text-xs font-black leading-tight ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>{userProfile?.username || 'Trader'}</div>
-                                        <div onClick={() => { if (address) { navigator.clipboard.writeText(address); setToast('Copied!'); setTimeout(() => setToast(null), 2000); }}}
-                                            className={`text-[7px] font-mono cursor-pointer hover:opacity-100 transition-opacity ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>
-                                            {address ? `${address.slice(0,6)}...${address.slice(-4)}` : '---'}
-                                        </div>
-                                    </div>
-                                </div>
-                                <button onClick={() => setIsProfileCardOpen(true)}
-                                    className={`p-2 rounded-xl border ${isLight ? 'bg-white/40 border-[#249C6C]/20 hover:bg-white/60' : 'bg-white/5 border-white/10 hover:bg-white/10'} transition-all`}>
-                                    <Share2 size={12} className={isLight ? 'text-[#0a261a]/50' : 'text-white/40'}/>
-                                </button>
-                            </div>
-
-                            <div className={`w-full h-px ${isLight ? 'bg-black/5' : 'bg-white/5'}`}/>
-
-                            {/* Trading Wallet Row */}
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-0.5 ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>Trading Wallet</div>
-                                    <div onClick={() => { if (evmSessionWallet?.address) { navigator.clipboard.writeText(evmSessionWallet.address); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } else if (!isSignerInitializing && address) { onRetryInit?.(); } }}
-                                        className={`text-[7px] font-mono cursor-pointer hover:opacity-100 transition-opacity flex items-center gap-1 mt-0.5 ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>
-                                        {evmSessionWallet?.address ? `${evmSessionWallet.address.slice(0,6)}...${evmSessionWallet.address.slice(-4)}` : (isSignerInitializing ? 'Syncing...' : (address ? 'Not Ready (Retry)' : 'Connect Wallet'))}
-                                        {evmSessionWallet?.address && <Copy size={7}/>}
-                                    </div>
-                                </div>
-                                <div className="text-base font-black text-[#249C6C] tabular-nums">${parseFloat(sessionBalance || 0).toFixed(2)}</div>
-                            </div>
-
-                            {/* Main Wallet Balance — external wallets only */}
-                            {hasExternalWallet && (
-                            <div className={`rounded-xl border px-3 py-2 flex items-center justify-between ${isLight ? 'bg-white/60 border-white/80' : 'bg-white/5 border-white/10'}`} style={{ boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)' : '0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)', backdropFilter: 'blur(10px)' }}>
-                                <div>
-                                    <div className={`text-[6px] font-black uppercase tracking-widest mb-0.5 ${isLight ? 'text-[#0a261a]/40' : 'text-white/30'}`}>Main Wallet Balance</div>
-                                    <div onClick={() => { if (address) { navigator.clipboard.writeText(address); setToast('Copied!'); setTimeout(() => setToast(null), 2000); }}}
-                                        className={`text-[8px] font-mono cursor-pointer hover:opacity-100 transition-all flex items-center gap-1 ${isLight ? 'text-[#0a261a]/60' : 'text-white/50'}`}>
-                                        {address ? `${address.slice(0,6)}...${address.slice(-4)}` : '---'}
-                                        {address && <Copy size={7}/>}
-                                    </div>
-                                </div>
-                                <div className={`text-xs font-black tabular-nums ${isLight ? 'text-[#0a261a]' : 'text-white/90'}`}>${parseFloat(evmBalance || 0).toFixed(2)}</div>
-                            </div>
-                            )}
-                            <div className="grid grid-cols-2 gap-2 mt-auto" style={{ filter: 'drop-shadow(0 4px 12px rgba(36, 156, 108,0.15))' }}>
-                                <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Deposit to Trading Wallet", placeholder: "USDC Amount", onConfirm: (val) => onDeposit(parseFloat(val)) }); }}
-                                    className={`py-2 ${isLight ? 'bg-[#249C6C] text-white' : 'bg-[#249C6C] text-white'} text-[8px] font-black uppercase tracking-[0.2em] rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-lg`}>Deposit</button>
-                                <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Withdraw to Main Wallet", placeholder: "Amount", onConfirm: (val) => onWithdraw(val) }); }}
-                                    className={`py-2 text-[8px] font-black uppercase tracking-[0.2em] rounded-xl active:scale-95 transition-all border ${isLight ? 'bg-white/40 border-[#249C6C]/20 text-[#0a261a] hover:bg-white/60' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>Withdraw</button>
-                            </div>
+                    {/* WALLET CARD — fixed credit-card size (327 × 220), not screen-responsive */}
+                    <div className="flex-none flex flex-col gap-3">
+                        <div className="flex justify-center">
+                            {walletCard}
                         </div>
+                        {walletCardSide === 'trading' && walletActions}
                     </div>
 
                     {/* LINE UNDER WALLET */}
                     <div className="flex-none relative">
-                        <div className="w-full h-px bg-gradient-to-r from-transparent via-[#249C6C]/40 to-transparent"/>
+                        <div className="w-full h-px bg-gradient-to-r from-transparent via-[#1A6140]/40 to-transparent"/>
                     </div>
 
                     {/* USER METRICS (Rearranged 2x2 Grid) */}
@@ -752,31 +854,31 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             {/* 24H Volume */}
                             <div className="db-card p-3.5 flex flex-col justify-between min-h-[72px] relative overflow-hidden">
                                 <div className="flex items-center gap-1.5">
-                                    <BarChart2 size={12} className="text-[#249C6C] flex-none"/>
+                                    <BarChart2 size={12} className="text-[#1A6140] flex-none"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest truncate`}>Volume</span>
                                 </div>
                                 <div className="flex items-baseline justify-between mt-1">
                                     <div className={`text-sm font-black ${isLight ? 'text-black' : 'text-white'} tracking-tight truncate`}>{animVolume.toFixed(2)}</div>
-                                    <div className="text-[8px] font-bold text-[#249C6C] truncate">+12.4%</div>
+                                    <div className="text-[8px] font-bold text-[#1A6140] truncate">+12.4%</div>
                                 </div>
                             </div>
 
                             {/* Sentiment */}
                             <div className="db-card p-3.5 flex flex-col justify-between min-h-[72px] relative overflow-hidden">
                                 <div className="flex items-center gap-1.5">
-                                    <Smile size={12} className="text-[#249C6C] flex-none"/>
+                                    <Smile size={12} className="text-[#1A6140] flex-none"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest truncate`}>Sent.</span>
                                 </div>
                                 <div className="flex items-baseline justify-between mt-1">
                                     <div className={`text-sm font-black ${isLight ? 'text-black' : 'text-white'} tracking-tight truncate`}>{animSentiment.toFixed(0)}%</div>
-                                    <div className="text-[8px] font-bold text-[#249C6C] truncate uppercase">{derivedStats.sentimentText}</div>
+                                    <div className="text-[8px] font-bold text-[#1A6140] truncate uppercase">{derivedStats.sentimentText}</div>
                                 </div>
                             </div>
 
                             {/* Win Rate */}
                             <div className="db-card p-3.5 flex flex-col justify-between min-h-[72px] relative overflow-hidden">
                                 <div className="flex items-center gap-1.5">
-                                    <AnimatedZap size={12} className="text-[#249C6C] flex-none"/>
+                                    <AnimatedZap size={12} className="text-[#1A6140] flex-none"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest truncate`}>Win Rate</span>
                                 </div>
                                 <div className="flex items-baseline justify-between mt-1">
@@ -788,12 +890,12 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             {/* Avg Stake */}
                             <div className="db-card p-3.5 flex flex-col justify-between min-h-[72px] relative overflow-hidden">
                                 <div className="flex items-center gap-1.5">
-                                    <AnimatedCoins size={12} className="text-[#249C6C] flex-none"/>
+                                    <AnimatedCoins size={12} className="text-[#1A6140] flex-none"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest truncate`}>Avg Stake</span>
                                 </div>
                                 <div className="flex items-baseline justify-between mt-1">
                                     <div className={`text-sm font-black ${isLight ? 'text-black' : 'text-white'} tracking-tight truncate`}>{animAvgStake.toFixed(2)}</div>
-                                    <div className="text-[8px] font-bold text-[#249C6C] truncate">+8.1%</div>
+                                    <div className="text-[8px] font-bold text-[#1A6140] truncate">+8.1%</div>
                                 </div>
                             </div>
                         </div>
@@ -804,10 +906,10 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <div className="db-card p-4 flex flex-col h-[160px] relative overflow-hidden">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
-                                    <AnimatedTrendingUp size={12} className="text-[#249C6C]"/>
+                                    <AnimatedTrendingUp size={12} className="text-[#1A6140]"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>P&amp;L</span>
                                 </div>
-                                <span className={`text-xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#249C6C]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
+                                <span className={`text-xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#1A6140]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
                                     {pnlStats.netPnl >= 0 ? '+' : ''}{animNetPnl.toFixed(2)}
                                     <span className="text-[10px] font-bold ml-1 opacity-60">USDC</span>
                                 </span>
@@ -817,8 +919,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     <AreaChart data={pnlStats.chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                                         <defs>
                                             <linearGradient id="pnlLineStrokeMobile" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#249C6C" />
-                                                <stop offset={strokeOffsetPercent} stopColor="#249C6C" />
+                                                <stop offset="0%" stopColor="#1A6140" />
+                                                <stop offset={strokeOffsetPercent} stopColor="#1A6140" />
                                                 <stop offset={strokeOffsetPercent} stopColor="#FF6B6B" />
                                                 <stop offset="100%" stopColor="#FF6B6B" />
                                             </linearGradient>
@@ -831,7 +933,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             labelFormatter={() => ''}
                                         />
                                         <ReferenceLine y={0} stroke={isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)'} strokeWidth={1} strokeDasharray="3 3"/>
-                                        <Area type="monotone" dataKey="pnl" stroke="url(#pnlLineStrokeMobile)" strokeWidth={1.25} fill="none" dot={false} activeDot={{ r: 2.5, strokeWidth: 0, fill: pnlStats.netPnl >= 0 ? '#249C6C' : '#FF6B6B' }} baseValue={0}/>
+                                        <Area type="monotone" dataKey="pnl" stroke="url(#pnlLineStrokeMobile)" strokeWidth={1.25} fill="none" dot={false} activeDot={{ r: 2.5, strokeWidth: 0, fill: pnlStats.netPnl >= 0 ? '#1A6140' : '#FF6B6B' }} baseValue={0}/>
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
@@ -844,7 +946,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <div className="db-card-alt p-4 flex flex-col flex-1 min-h-0">
                             <div className="flex items-center justify-between mb-3 flex-none">
                                 <div className="flex items-center gap-2">
-                                    <AnimatedRefresh size={12} className="text-[#249C6C]"/>
+                                    <AnimatedRefresh size={12} className="text-[#1A6140]"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Transactions</span>
                                 </div>
                                 <button className={`text-[8px] font-bold ${isLight ? 'text-black/50 hover:text-black' : 'text-white/40 hover:text-white'} flex items-center gap-1 uppercase tracking-widest transition-colors`}>View all<ChevronRight size={10}/></button>
@@ -858,7 +960,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 ) : transactionHistory.slice(0, 10).map((tx,i) => (
                                     <div key={tx.id||i} className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${tx.type==="DEPOSIT"?"bg-[#249C6C]/15 text-[#249C6C]":"bg-[#FF7F50]/15 text-[#FF7F50]"}`}>
+                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${tx.type==="DEPOSIT"?"bg-[#1A6140]/15 text-[#1A6140]":"bg-[#FF7F50]/15 text-[#FF7F50]"}`}>
                                                 {tx.type==="DEPOSIT"?<ArrowUp size={10}/>:<ArrowDown size={10}/>}
                                             </div>
                                             <div>
@@ -867,8 +969,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             </div>
                                         </div>
                                         <div className="flex flex-col items-end gap-0.5">
-                                            <div className="px-1.5 py-0.5 bg-[#249C6C]/10 text-[#249C6C] text-[6px] font-black tracking-widest rounded-md uppercase">COMPLETED</div>
-                                            <div className={`text-[10px] font-bold tabular-nums ${tx.type==="DEPOSIT"?"text-[#249C6C]":"text-[#FF7F50]"}`}>{tx.type==="DEPOSIT"?"+":"-"}{parseFloat(tx.amount).toFixed(2)}</div>
+                                            <div className="px-1.5 py-0.5 bg-[#1A6140]/10 text-[#1A6140] text-[6px] font-black tracking-widest rounded-md uppercase">COMPLETED</div>
+                                            <div className={`text-[10px] font-bold tabular-nums ${tx.type==="DEPOSIT"?"text-[#1A6140]":"text-[#FF7F50]"}`}>{tx.type==="DEPOSIT"?"+":"-"}{parseFloat(tx.amount).toFixed(2)}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -881,80 +983,19 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 <div className="flex flex-1 gap-10 px-10 py-5 min-h-0 relative z-10 max-w-[1600px] mx-auto w-full">
 
                     {/* LEFT: Wallet Card Column */}
-                    <div className="w-[380px] flex-none flex flex-col justify-center min-h-0 gap-6">
+                    <div className="w-[448px] flex-none flex flex-col justify-center min-h-0 gap-6">
 
-                        {/* WALLET CARD */}
-                        <div className={`w-full rounded-[40px] p-8 flex flex-col gap-5 relative overflow-hidden backdrop-blur-xl ${isLight ? 'bg-white/50 border-white/60' : 'bg-[#0a0a0a] border-white/5'}`} style={{ minHeight: '280px', margin: '0 2px', boxShadow: isLight ? '0 4px 30px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8)' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))', border: isLight ? '1px solid rgba(255,255,255,0.6)' : '1px solid rgba(255,255,255,0.05)' }}>
-
-                            {/* Profile Row */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => fileInputRef.current?.click()} className={`w-9 h-9 rounded-full flex-none flex items-center justify-center overflow-hidden border-2 border-[#249C6C]/40 ${isLight ? 'bg-[#249C6C]/10' : 'bg-white/5'} hover:scale-105 transition-all`}>
-                                        {(userProfile?.avatar || userProfile?.xProfileImage) ? (
-                                            <img src={userProfile?.avatar || userProfile?.xProfileImage} alt="avatar" className="w-full h-full object-cover"/>
-                                        ) : (
-                                            <User size={16} className={isLight ? 'text-[#249C6C]/70' : 'text-white/50'}/>
-                                        )}
-                                    </button>
-                                    <div>
-                                        <div className={`text-sm font-black leading-tight ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>{userProfile?.username || 'Trader'}</div>
-                                        <div onClick={() => { if (address) { navigator.clipboard.writeText(address); setToast('Copied!'); setTimeout(() => setToast(null), 2000); }}}
-                                            className={`text-[8px] font-mono cursor-pointer hover:opacity-100 transition-opacity ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>
-                                            {address ? `${address.slice(0,6)}...${address.slice(-4)}` : '---'}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-
-                                    <button onClick={() => setIsProfileCardOpen(true)}
-                                        className={`p-2 rounded-xl border ${isLight ? 'bg-white/40 border-[#249C6C]/20 hover:bg-white/60' : 'bg-white/5 border-white/10 hover:bg-white/10'} transition-all`}>
-                                        <Share2 size={13} className={isLight ? 'text-[#0a261a]/50' : 'text-white/40'}/>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className={`w-full h-px ${isLight ? 'bg-black/5' : 'bg-white/5'}`}/>
-
-                            {/* Trading Wallet Row */}
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <div className={`text-[8px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>Trading Wallet</div>
-                                    <div onClick={() => { if (evmSessionWallet?.address) { navigator.clipboard.writeText(evmSessionWallet.address); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } else if (!isSignerInitializing && address) { onRetryInit?.(); } }}
-                                        className={`text-[8px] font-mono cursor-pointer hover:opacity-100 transition-opacity flex items-center gap-1 mt-0.5 ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>
-                                        {evmSessionWallet?.address ? `${evmSessionWallet.address.slice(0,6)}...${evmSessionWallet.address.slice(-4)}` : (isSignerInitializing ? 'Syncing...' : (address ? 'Not Ready (Retry)' : 'Connect Wallet'))}
-                                        {evmSessionWallet?.address && <Copy size={8}/>}
-                                    </div>
-                                </div>
-                                <div className="text-xl font-black text-[#249C6C] tabular-nums">${parseFloat(sessionBalance || 0).toFixed(2)}</div>
-                            </div>
-
-                            {/* Main Wallet Balance Panel — external wallets only */}
-                            {hasExternalWallet && (
-                            <div className={`rounded-2xl border px-4 py-3 flex items-center justify-between ${isLight ? 'bg-white/60 border-white/80' : 'bg-white/5 border-white/10'}`} style={{ boxShadow: isLight ? '0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)' : '0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)', backdropFilter: 'blur(10px)' }}>
-                                <div>
-                                    <div className={`text-[7px] font-black uppercase tracking-widest mb-1 ${isLight ? 'text-[#0a261a]/40' : 'text-white/30'}`}>Main Wallet Balance</div>
-                                    <div onClick={() => { if (address) { navigator.clipboard.writeText(address); setToast('Copied!'); setTimeout(() => setToast(null), 2000); }}}
-                                        className={`text-[9px] font-mono cursor-pointer hover:opacity-100 transition-all flex items-center gap-1 ${isLight ? 'text-[#0a261a]/60' : 'text-white/50'}`}>
-                                        {address ? `${address.slice(0,6)}...${address.slice(-4)}` : '---'}
-                                        {address && <Copy size={8}/>}
-                                    </div>
-                                </div>
-                                <div className={`text-sm font-black tabular-nums ${isLight ? 'text-[#0a261a]' : 'text-white/90'}`}>${parseFloat(evmBalance || 0).toFixed(2)}</div>
-                            </div>
-                            )}
-                            <div className="grid grid-cols-2 gap-3 mt-auto" style={{ filter: 'drop-shadow(0 4px 12px rgba(36, 156, 108,0.15))' }}>
-                                <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Deposit to Trading Wallet", placeholder: "USDC Amount", onConfirm: (val) => onDeposit(parseFloat(val)) }); }}
-                                    className={`py-3 ${isLight ? 'bg-[#249C6C] text-white' : 'bg-[#249C6C] text-white'} text-[9px] font-black uppercase tracking-[0.2em] rounded-2xl hover:brightness-110 active:scale-95 transition-all shadow-lg`}>Deposit</button>
-                                <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Withdraw to Main Wallet", placeholder: "Amount", onConfirm: (val) => onWithdraw(val) }); }}
-                                    className={`py-3 text-[9px] font-black uppercase tracking-[0.2em] rounded-2xl active:scale-95 transition-all border ${isLight ? 'bg-white/40 border-[#249C6C]/20 text-[#0a261a] hover:bg-white/60' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>Withdraw</button>
-                            </div>
+                        {/* WALLET CARD — Transfer-Hub credit-card format (desktop) */}
+                        <div className="flex flex-col gap-4">
+                            {walletCard}
+                            {walletCardSide === 'trading' && walletActions}
                         </div>
                     </div>
 
                     {/* DIVIDER */}
                     <div className="w-px mx-4 flex-none self-stretch relative">
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#249C6C]/20 to-transparent"/>
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[2px] h-12 bg-[#249C6C] rounded-full" style={{animation:'breathe 2s ease-in-out infinite'}}/>
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1A6140]/20 to-transparent"/>
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[2px] h-12 bg-[#1A6140] rounded-full" style={{animation:'breathe 2s ease-in-out infinite'}}/>
                     </div>
 
                     {/* RIGHT: Stats & Panels */}
@@ -964,28 +1005,28 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             {/* 24H Volume */}
                             <div className="db-card p-5 relative overflow-hidden group flex flex-col justify-between">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <AnimatedBarChart size={14} className="text-[#249C6C] flex-none"/>
+                                    <AnimatedBarChart size={14} className="text-[#1A6140] flex-none"/>
                                     <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>24H Volume</span>
                                 </div>
                                 <div className={`text-3xl font-bold ${isLight ? 'text-black' : 'text-white'} mb-1.5 tracking-tight tabular-nums`}>{animVolume.toFixed(2)}</div>
-                                <div className="flex items-center gap-1.5 text-[9px] font-bold"><span className="text-[#249C6C] flex items-center gap-0.5"><ChevronUp size={10}/>+12.4%</span><span className={isLight ? 'text-black/30' : 'text-white/20'}>vs yesterday</span></div>
+                                <div className="flex items-center gap-1.5 text-[9px] font-bold"><span className="text-[#1A6140] flex items-center gap-0.5"><ChevronUp size={10}/>+12.4%</span><span className={isLight ? 'text-black/30' : 'text-white/20'}>vs yesterday</span></div>
                                 <div className="absolute right-0 bottom-3 w-[110px] h-[45px] opacity-20">
-                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L15,38 L30,42 L45,22 L60,28 L75,8 L90,12 L100,0 L100,50 Z" fill="#249C6C" opacity="0.3"/><path d="M0,50 L15,38 L30,42 L45,22 L60,28 L75,8 L90,12 L100,0" fill="none" stroke="#249C6C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L15,38 L30,42 L45,22 L60,28 L75,8 L90,12 L100,0 L100,50 Z" fill="#1A6140" opacity="0.3"/><path d="M0,50 L15,38 L30,42 L45,22 L60,28 L75,8 L90,12 L100,0" fill="none" stroke="#1A6140" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                 </div>
                             </div>
 
                             {/* Sentiment */}
                             <div className="db-card p-5 relative overflow-hidden flex flex-col justify-between">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <AnimatedSmile size={14} className="text-[#249C6C] flex-none"/>
+                                    <AnimatedSmile size={14} className="text-[#1A6140] flex-none"/>
                                     <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Sentiment</span>
                                 </div>
                                 <div className={`text-3xl font-bold ${isLight ? 'text-black' : 'text-white'} mb-1.5 tracking-tight tabular-nums`}>{animSentiment.toFixed(0)}%</div>
-                                <div className="text-[9px] font-bold text-[#249C6C] uppercase tracking-widest">{derivedStats.sentimentText}</div>
+                                <div className="text-[9px] font-bold text-[#1A6140] uppercase tracking-widest">{derivedStats.sentimentText}</div>
                                 <div className="absolute right-6 top-1/2 -translate-y-1/2 w-[60px] h-[60px]">
                                     <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
                                         <circle cx="32" cy="32" r="26" fill="none" stroke={isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'} strokeWidth="6"/>
-                                        <circle cx="32" cy="32" r="26" fill="none" stroke="#249C6C" strokeWidth="6" strokeLinecap="round" strokeDasharray="163.4" strokeDashoffset={163.4-(163.4*Math.min(animSentiment,100)/100)}/>
+                                        <circle cx="32" cy="32" r="26" fill="none" stroke="#1A6140" strokeWidth="6" strokeLinecap="round" strokeDasharray="163.4" strokeDashoffset={163.4-(163.4*Math.min(animSentiment,100)/100)}/>
                                     </svg>
                                     <div className={`absolute inset-0 flex items-center justify-center text-[11px] font-bold ${isLight ? 'text-black' : 'text-white'}`} style={{transform:'rotate(0deg)'}}>{animSentiment.toFixed(0)}%</div>
                                 </div>
@@ -994,26 +1035,26 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             {/* Win Rate */}
                             <div className="db-card p-5 relative overflow-hidden group flex flex-col justify-between">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <AnimatedZap size={14} className="text-[#249C6C] flex-none"/>
+                                    <AnimatedZap size={14} className="text-[#1A6140] flex-none"/>
                                     <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Win Rate</span>
                                 </div>
                                 <div className={`text-3xl font-bold ${isLight ? 'text-black' : 'text-white'} mb-1.5 tracking-tight tabular-nums`}>{animWinRate.toFixed(1)}%</div>
                                 <div className="flex items-center gap-1.5 text-[9px] font-bold"><div className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-black/20' : 'bg-white/30'}`}/><span className={isLight ? 'text-black/40' : 'text-white/40'}>Neutral</span></div>
                                 <div className="absolute right-0 bottom-3 w-[110px] h-[45px] opacity-20">
-                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L20,38 L40,44 L60,22 L80,28 L100,10 L100,50 Z" fill="#249C6C" opacity="0.3"/><path d="M0,50 L20,38 L40,44 L60,22 L80,28 L100,10" fill="none" stroke="#249C6C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L20,38 L40,44 L60,22 L80,28 L100,10 L100,50 Z" fill="#1A6140" opacity="0.3"/><path d="M0,50 L20,38 L40,44 L60,22 L80,28 L100,10" fill="none" stroke="#1A6140" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                 </div>
                             </div>
 
                             {/* Avg Stake */}
                             <div className="db-card p-5 relative overflow-hidden group flex flex-col justify-between">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <AnimatedCoins size={14} className="text-[#249C6C] flex-none"/>
+                                    <AnimatedCoins size={14} className="text-[#1A6140] flex-none"/>
                                     <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Avg Stake</span>
                                 </div>
                                 <div className={`text-3xl font-bold ${isLight ? 'text-black' : 'text-white'} mb-1.5 tracking-tight tabular-nums`}>{animAvgStake.toFixed(2)}</div>
-                                <div className="flex items-center gap-1.5 text-[9px] font-bold"><span className="text-[#249C6C] flex items-center gap-0.5"><ChevronUp size={10}/>+8.1%</span><span className={isLight ? 'text-black/30' : 'text-white/20'}>vs yesterday</span></div>
+                                <div className="flex items-center gap-1.5 text-[9px] font-bold"><span className="text-[#1A6140] flex items-center gap-0.5"><ChevronUp size={10}/>+8.1%</span><span className={isLight ? 'text-black/30' : 'text-white/20'}>vs yesterday</span></div>
                                 <div className="absolute right-0 bottom-3 w-[110px] h-[45px] opacity-20">
-                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L15,44 L30,32 L45,28 L60,38 L75,14 L90,18 L100,0 L100,50 Z" fill="#249C6C" opacity="0.3"/><path d="M0,50 L15,44 L30,32 L45,28 L60,38 L75,14 L90,18 L100,0" fill="none" stroke="#249C6C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L15,44 L30,32 L45,28 L60,38 L75,14 L90,18 L100,0 L100,50 Z" fill="#1A6140" opacity="0.3"/><path d="M0,50 L15,44 L30,32 L45,28 L60,38 L75,14 L90,18 L100,0" fill="none" stroke="#1A6140" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                 </div>
                             </div>
                         </div>
@@ -1024,7 +1065,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             <div className="db-card p-5 flex flex-col min-h-0">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
-                                        <AnimatedTrendingUp size={14} className="text-[#249C6C]"/>
+                                        <AnimatedTrendingUp size={14} className="text-[#1A6140]"/>
                                         <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>P&amp;L</span>
                                     </div>
                                 </div>
@@ -1035,8 +1076,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <AreaChart data={pnlStats.chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="pnlLineStroke" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#249C6C" />
-                                                    <stop offset={strokeOffsetPercent} stopColor="#249C6C" />
+                                                    <stop offset="0%" stopColor="#1A6140" />
+                                                    <stop offset={strokeOffsetPercent} stopColor="#1A6140" />
                                                     <stop offset={strokeOffsetPercent} stopColor="#FF6B6B" />
                                                     <stop offset="100%" stopColor="#FF6B6B" />
                                                 </linearGradient>
@@ -1050,14 +1091,14 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             />
                                             <ReferenceLine y={0} stroke={isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)'} strokeWidth={1.5} strokeDasharray="3 3"/>
                                             {/* Stroke line only, colored by gradient based on top/bottom half */}
-                                            <Area type="monotone" dataKey="pnl" stroke="url(#pnlLineStroke)" strokeWidth={1.25} fill="none" dot={false} activeDot={{ r: 3, strokeWidth: 0, fill: pnlStats.netPnl >= 0 ? '#249C6C' : '#FF6B6B' }} baseValue={0}/>
+                                            <Area type="monotone" dataKey="pnl" stroke="url(#pnlLineStroke)" strokeWidth={1.25} fill="none" dot={false} activeDot={{ r: 3, strokeWidth: 0, fill: pnlStats.netPnl >= 0 ? '#1A6140' : '#FF6B6B' }} baseValue={0}/>
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
                                 {/* Big bold P&L value positioned in the lower right */}
                                 <div className="flex items-center justify-between mt-1">
                                     <div />
-                                    <span className={`text-3xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#249C6C]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
+                                    <span className={`text-3xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#1A6140]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
                                         {pnlStats.netPnl >= 0 ? '+' : ''}{animNetPnl.toFixed(2)}
                                         <span className="text-xs font-bold ml-1 opacity-60">USDC</span>
                                     </span>
@@ -1068,7 +1109,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             <div className="db-card-alt p-5 flex flex-col min-h-0">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2">
-                                        <AnimatedRefresh size={14} className="text-[#249C6C]"/>
+                                        <AnimatedRefresh size={14} className="text-[#1A6140]"/>
                                         <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Transactions</span>
                                     </div>
                                     <button className={`text-[9px] font-bold ${isLight ? 'text-black/50 hover:text-black' : 'text-white/40 hover:text-white'} flex items-center gap-1 uppercase tracking-widest transition-colors`}>View all<ChevronRight size={12}/></button>
@@ -1082,7 +1123,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     ) : transactionHistory.slice(0,5).map((tx,i) => (
                                         <div key={tx.id||i} className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${tx.type==="DEPOSIT"?"bg-[#249C6C]/15 text-[#249C6C]":"bg-[#FF7F50]/15 text-[#FF7F50]"}`}>
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${tx.type==="DEPOSIT"?"bg-[#1A6140]/15 text-[#1A6140]":"bg-[#FF7F50]/15 text-[#FF7F50]"}`}>
                                                     {tx.type==="DEPOSIT"?<ArrowUp size={12}/>:<ArrowDown size={12}/>}
                                                 </div>
                                                 <div>
@@ -1091,8 +1132,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-1">
-                                                <div className="px-2 py-0.5 bg-[#249C6C]/10 text-[#249C6C] text-[7px] font-black tracking-widest rounded-md uppercase">COMPLETED</div>
-                                                <div className={`text-[11px] font-bold tabular-nums ${tx.type==="DEPOSIT"?"text-[#249C6C]":"text-[#FF7F50]"}`}>{tx.type==="DEPOSIT"?"+":"-"}{parseFloat(tx.amount).toFixed(2)}</div>
+                                                <div className="px-2 py-0.5 bg-[#1A6140]/10 text-[#1A6140] text-[7px] font-black tracking-widest rounded-md uppercase">COMPLETED</div>
+                                                <div className={`text-[11px] font-bold tabular-nums ${tx.type==="DEPOSIT"?"text-[#1A6140]":"text-[#FF7F50]"}`}>{tx.type==="DEPOSIT"?"+":"-"}{parseFloat(tx.amount).toFixed(2)}</div>
                                             </div>
                                         </div>
                                     ))}
@@ -1110,7 +1151,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <motion.div initial={{opacity:0,scale:0.9,y:20}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:0.9,y:20}}
                             className={`w-full max-w-md ${isLight ? 'bg-white border-[#e2ece5]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8 flex flex-col`}>
                             <div className="flex flex-col items-center text-center mb-4">
-                                <div className={`w-14 h-14 rounded-2xl ${isLight ? 'bg-[#eef5f1]' : 'bg-white/5'} flex items-center justify-center mb-4`}><AnimatedBell size={28} className="text-[#249C6C]"/></div>
+                                <div className={`w-14 h-14 rounded-2xl ${isLight ? 'bg-[#eef5f1]' : 'bg-white/5'} flex items-center justify-center mb-4`}><AnimatedBell size={28} className="text-[#1A6140]"/></div>
                                 <h3 className={`text-2xl font-black ${isLight ? 'text-[#133a2a]' : 'text-white'} uppercase font-comfortaa`}>Notifications</h3>
                             </div>
                             
@@ -1124,7 +1165,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 ) : (
                                     notifications.map((notif) => {
                                         const typeColors = {
-                                            success: 'border-[#249C6C]/20 bg-[#249C6C]/5 text-[#249C6C]',
+                                            success: 'border-[#1A6140]/20 bg-[#1A6140]/5 text-[#1A6140]',
                                             warning: 'border-amber-500/20 bg-amber-500/5 text-amber-500',
                                             info: 'border-sky-500/20 bg-sky-500/5 text-sky-500',
                                             error: 'border-rose-500/20 bg-rose-500/5 text-rose-500'
@@ -1134,7 +1175,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         return (
                                             <div key={notif.id} className={`p-4 rounded-2xl border ${isLight ? 'bg-[#f8fbf9] border-[#e2ece5]' : 'bg-white/[0.02] border-white/5'} flex gap-3 items-start transition-all`}>
                                                 <div className={`p-2 rounded-xl border ${colorClass.split(' ').slice(0, 2).join(' ')} flex-shrink-0 mt-0.5`}>
-                                                    {notif.type === 'success' && <Check size={14} className="text-[#249C6C]"/>}
+                                                    {notif.type === 'success' && <Check size={14} className="text-[#1A6140]"/>}
                                                     {notif.type === 'warning' && <AlertCircle size={14} className="text-amber-500"/>}
                                                     {notif.type === 'info' && <Bell size={14} className="text-sky-500"/>}
                                                     {notif.type === 'error' && <AlertCircle size={14} className="text-rose-500"/>}
@@ -1160,7 +1201,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         Clear All
                                     </button>
                                 )}
-                                <button onClick={() => setIsNotificationsOpen(false)} className="w-full py-4 bg-[#249C6C] text-white text-xs font-black uppercase tracking-widest rounded-full hover:brightness-110 transition-all shadow-[0_4px_16px_rgba(36,156,108,0.25)]">
+                                <button onClick={() => setIsNotificationsOpen(false)} className="w-full py-4 bg-[#1A6140] text-white text-xs font-black uppercase tracking-widest rounded-full hover:brightness-110 transition-all shadow-[0_4px_16px_rgba(26, 97, 64,0.25)]">
                                     Close
                                 </button>
                             </div>
@@ -1172,11 +1213,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             {isSettingsOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-black/30 backdrop-blur-sm">
                     <motion.div initial={{opacity:0,scale:0.9,y:20}} animate={{opacity:1,scale:1,y:0}}
-                        className={`w-full max-w-md ${isLight ? 'bg-white border-[#249C6C]/20' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-5 max-h-[90vh] overflow-y-auto no-scrollbar relative overflow-hidden`}>
+                        className={`w-full max-w-md ${isLight ? 'bg-white border-[#1A6140]/20' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-5 max-h-[90vh] overflow-y-auto no-scrollbar relative overflow-hidden`}>
                         {isLight && (
                             <div className="absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
                         )}
-                        <button onClick={() => setIsSettingsOpen(false)} className={`absolute top-5 right-5 z-20 p-2 rounded-xl border ${isLight ? 'bg-white/50 border-[#249C6C]/20 text-[#0a261a] hover:bg-white shadow-sm' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
+                        <button onClick={() => setIsSettingsOpen(false)} className={`absolute top-5 right-5 z-20 p-2 rounded-xl border ${isLight ? 'bg-white/50 border-[#1A6140]/20 text-[#0a261a] hover:bg-white shadow-sm' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
                             <X size={14} />
                         </button>
                         <div className="flex flex-col relative z-10">
@@ -1186,11 +1227,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <label className={`text-[9px] font-bold uppercase tracking-widest ${isLight ? 'text-[#133a2a]/50' : 'text-white/50'} mb-2 block`}>Username</label>
                                 {!isEditingUsername ? (
                                     <div className="flex flex-col gap-2">
-                                        <div className={`w-full ${isLight ? 'bg-white/40 text-[#133a2a] border border-[#249C6C]/10' : 'bg-white/5 text-white'} rounded-2xl py-3 px-6 font-bold text-center`}>
+                                        <div className={`w-full ${isLight ? 'bg-white/40 text-[#133a2a] border border-[#1A6140]/10' : 'bg-white/5 text-white'} rounded-2xl py-3 px-6 font-bold text-center`}>
                                             {userProfile?.username || 'Trader'}
                                         </div>
                                         <button onClick={() => setIsEditingUsername(true)}
-                                            className={`w-full py-2.5 bg-[#249C6C] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(36,156,108,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
+                                            className={`w-full py-2.5 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
                                             Change
                                         </button>
                                     </div>
@@ -1198,10 +1239,10 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     <div className="flex flex-col gap-2">
                                         <input type="text" autoFocus placeholder="Enter username" value={newUsername}
                                             onChange={(e) => setNewUsername(e.target.value)}
-                                            className={`w-full ${isLight ? 'bg-white/60 border-[#249C6C]/20 text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-3 px-6 font-bold text-center focus:border-[#249C6C] outline-none transition-all`}/>
+                                            className={`w-full ${isLight ? 'bg-white/60 border-[#1A6140]/20 text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-3 px-6 font-bold text-center focus:border-[#1A6140] outline-none transition-all`}/>
                                         <div className="flex gap-2">
                                             <button onClick={() => setIsEditingUsername(false)}
-                                                className={`flex-1 py-2.5 bg-[#249C6C] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(36,156,108,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
+                                                className={`flex-1 py-2.5 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
                                                 Cancel
                                             </button>
                                             <button onClick={async () => {
@@ -1223,7 +1264,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                 } catch (e) {
                                                     setToast("Update Failed");
                                                 }
-                                            }} className={`flex-1 py-2.5 bg-[#249C6C] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(36,156,108,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
+                                            }} className={`flex-1 py-2.5 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
                                                 Save
                                             </button>
                                         </div>
@@ -1252,7 +1293,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     } catch (e) {
                                         setToast("Failed to regenerate wallet");
                                     }
-                                }} className={`w-full py-3 bg-[#249C6C] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(36,156,108,0.4)] text-[10px] font-black uppercase tracking-widest rounded-full transition-all`}>
+                                }} className={`w-full py-3 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[10px] font-black uppercase tracking-widest rounded-full transition-all`}>
                                     Regenerate Wallet
                                 </button>
                             </div>
@@ -1266,7 +1307,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <input type="email" placeholder="you@email.com" value={linkedEmail}
                                     onChange={(e) => setLinkedEmail(e.target.value)}
                                     disabled={!!userProfile?.email}
-                                    className={`w-full ${isLight ? 'bg-white/60 border-[#249C6C]/20 text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-3 px-6 font-bold text-center focus:border-[#249C6C] outline-none transition-all mb-2 disabled:opacity-70 disabled:cursor-not-allowed`}/>
+                                    className={`w-full ${isLight ? 'bg-white/60 border-[#1A6140]/20 text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-3 px-6 font-bold text-center focus:border-[#1A6140] outline-none transition-all mb-2 disabled:opacity-70 disabled:cursor-not-allowed`}/>
                                 <button onClick={async () => {
                                     if (!linkedEmail.trim() || !address) return;
                                     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linkedEmail.trim())) {
@@ -1293,7 +1334,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         setIsSavingEmail(false);
                                     }
                                 }} disabled={isSavingEmail || !!userProfile?.email}
-                                    className={`w-full py-3 bg-[#249C6C] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(36,156,108,0.4)] text-[10px] font-black uppercase tracking-widest rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed`}>
+                                    className={`w-full py-3 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[10px] font-black uppercase tracking-widest rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed`}>
                                     {isSavingEmail ? 'Linking...' : (userProfile?.email ? 'Email Linked' : 'Link Email')}
                                 </button>
                             </div>
@@ -1304,7 +1345,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <label className={`text-[9px] font-bold uppercase tracking-widest ${isLight ? 'text-[#133a2a]/50' : 'text-white/50'} mb-1.5 block flex items-center gap-1.5`}>
                                     <Globe size={10}/> Social Accounts
                                 </label>
-                                <div className={`w-full rounded-2xl p-4 flex items-center justify-between ${isLight ? 'bg-white/40 border border-[#249C6C]/10' : 'bg-white/5 border border-white/5'}`}>
+                                <div className={`w-full rounded-2xl p-4 flex items-center justify-between ${isLight ? 'bg-white/40 border border-[#1A6140]/10' : 'bg-white/5 border border-white/5'}`}>
                                     <div className="flex items-center gap-3">
                                         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" className={isLight ? 'text-[#133a2a]' : 'text-white'}>
                                             <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
@@ -1312,7 +1353,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <div>
                                             <div className={`text-[10px] font-bold ${isLight ? 'text-[#133a2a]' : 'text-white'}`}>Discord</div>
                                             {userProfile?.discord ? (
-                                                <div className="text-[8px] font-mono text-[#249C6C] font-bold">@{userProfile.discord.username}</div>
+                                                <div className="text-[8px] font-mono text-[#1A6140] font-bold">@{userProfile.discord.username}</div>
                                             ) : (
                                                 <div className={`text-[8px] font-medium ${isLight ? 'text-[#133a2a]/40' : 'text-white/40'}`}>Not Linked</div>
                                             )}
@@ -1321,7 +1362,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     {!userProfile?.discord ? (
                                         <button onClick={() => {
                                             window.location.href = "https://discord.com/oauth2/authorize?client_id=1509759894348369980&response_type=code&redirect_uri=https%3A%2F%2F15market.online&scope=connections+identify";
-                                        }} className={`py-2 px-4 rounded-full text-[9px] font-black uppercase tracking-widest transition-all bg-[#249C6C] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110`}>
+                                        }} className={`py-2 px-4 rounded-full text-[9px] font-black uppercase tracking-widest transition-all bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110`}>
                                             Link
                                         </button>
                                     ) : (
@@ -1334,7 +1375,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                 });
                                                 window.location.reload();
                                             } catch (e) {}
-                                        }} className={`py-2 px-4 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${isLight ? 'bg-white/40 border-[#249C6C]/20 text-[#133a2a] hover:bg-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
+                                        }} className={`py-2 px-4 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${isLight ? 'bg-white/40 border-[#1A6140]/20 text-[#133a2a] hover:bg-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
                                             Unlink
                                         </button>
                                     )}
@@ -1362,19 +1403,19 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
                                      style={{ backgroundImage: `url(${isLight ? '/goblogo.png' : '/gowlogo.png'})`, backgroundSize: '30px 30px', backgroundRepeat: 'repeat', transform: 'rotate(-15deg) scale(1.6)' }} />
                                 {/* Gradient glow top-right */}
-                                <div className="absolute top-0 right-0 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(36,156,108,0.15) 0%, transparent 70%)' }} />
+                                <div className="absolute top-0 right-0 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26, 97, 64,0.15) 0%, transparent 70%)' }} />
                                 {/* Gradient glow bottom-left */}
-                                <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(36,156,108,0.08) 0%, transparent 70%)' }} />
+                                <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26, 97, 64,0.08) 0%, transparent 70%)' }} />
 
                                 <div className="relative z-10 flex flex-row items-stretch p-6 gap-5">
                                     {/* LEFT: Avatar + Identity */}
                                     <div className="flex flex-col items-center justify-center gap-3 min-w-[120px]">
-                                        <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden border-[3px] border-[#249C6C]/60 shadow-[0_0_20px_rgba(36,156,108,0.3)]">
+                                        <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden border-[3px] border-[#1A6140]/60 shadow-[0_0_20px_rgba(26, 97, 64,0.3)]">
                                             {(userProfile?.avatar || userProfile?.xProfileImage) ? (
                                                 <img src={userProfile?.avatar || userProfile?.xProfileImage} alt="avatar" className="w-full h-full object-cover" />
                                             ) : (
-                                                <div className="w-full h-full bg-[#249C6C]/15 flex items-center justify-center">
-                                                    <User size={30} className="text-[#249C6C]/60" />
+                                                <div className="w-full h-full bg-[#1A6140]/15 flex items-center justify-center">
+                                                    <User size={30} className="text-[#1A6140]/60" />
                                                 </div>
                                             )}
                                         </div>
@@ -1389,7 +1430,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     </div>
 
                                     {/* Vertical divider */}
-                                    <div className="w-px self-stretch bg-gradient-to-b from-transparent via-[#249C6C]/30 to-transparent flex-none" />
+                                    <div className="w-px self-stretch bg-gradient-to-b from-transparent via-[#1A6140]/30 to-transparent flex-none" />
 
                                     {/* RIGHT: Stats */}
                                     <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0">
@@ -1397,7 +1438,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <div className="flex gap-2.5">
                                             <div className={`flex-1 rounded-2xl p-3 ${isLight ? 'bg-black/[0.02] border border-black/[0.05]' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
                                                 <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>Win Rate</div>
-                                                <div className="text-xl font-black text-[#249C6C] leading-none">{derivedStats.winRate.toFixed(1)}%</div>
+                                                <div className="text-xl font-black text-[#1A6140] leading-none">{derivedStats.winRate.toFixed(1)}%</div>
                                             </div>
                                             <div className={`flex-1 rounded-2xl p-3 ${isLight ? 'bg-black/[0.02] border border-black/[0.05]' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
                                                 <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>Trades</div>
@@ -1408,11 +1449,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <div className="flex gap-2.5">
                                             <div className={`flex-1 rounded-2xl p-3 ${isLight ? 'bg-black/[0.02] border border-black/[0.05]' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
                                                 <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>Wins</div>
-                                                <div className="text-xl font-black text-[#249C6C] leading-none">{derivedStats.totalWins}</div>
+                                                <div className="text-xl font-black text-[#1A6140] leading-none">{derivedStats.totalWins}</div>
                                             </div>
                                             <div className={`flex-1 rounded-2xl p-3 ${isLight ? 'bg-black/[0.02] border border-black/[0.05]' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
                                                 <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>All-Time PnL</div>
-                                                <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#249C6C]' : 'text-[#FF6B6B]'}`}>
+                                                <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#1A6140]' : 'text-[#FF6B6B]'}`}>
                                                     {pnlStats.netPnl >= 0 ? '+' : ''}{pnlStats.netPnl.toFixed(2)}
                                                 </div>
                                             </div>
@@ -1421,7 +1462,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <div className="flex items-center justify-between mt-1">
                                             <img src={isLight ? '/goblogo.png' : '/gowlogo.png'} alt="15market" className="h-5 w-auto opacity-60" />
                                             <div className="flex items-center gap-1.5">
-                                                <div className="w-1 h-1 rounded-full bg-[#249C6C] animate-pulse" />
+                                                <div className="w-1 h-1 rounded-full bg-[#1A6140] animate-pulse" />
                                                 <span className={`text-[7px] font-black uppercase tracking-[0.15em] ${isLight ? 'text-[#133a2a]/40' : 'text-white/25'}`}>ARC TESTNET</span>
                                             </div>
                                         </div>
@@ -1436,19 +1477,19 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
                                          style={{ backgroundImage: `url('/gowlogo.png')`, backgroundSize: '30px 30px', backgroundRepeat: 'repeat', transform: 'rotate(-15deg) scale(1.6)' }} />
                                     {/* Gradient glow top-right */}
-                                    <div className="absolute top-0 right-0 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(36,156,108,0.15) 0%, transparent 70%)' }} />
+                                    <div className="absolute top-0 right-0 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26, 97, 64,0.15) 0%, transparent 70%)' }} />
                                     {/* Gradient glow bottom-left */}
-                                    <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(36,156,108,0.08) 0%, transparent 70%)' }} />
+                                    <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26, 97, 64,0.08) 0%, transparent 70%)' }} />
 
                                     <div className="relative z-10 flex flex-row items-stretch p-6 gap-5">
                                         {/* LEFT: Avatar + Identity */}
                                         <div className="flex flex-col items-center justify-center gap-3 min-w-[120px]">
-                                            <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden border-[3px] border-[#249C6C]/60 shadow-[0_0_20px_rgba(36,156,108,0.3)]">
+                                            <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden border-[3px] border-[#1A6140]/60 shadow-[0_0_20px_rgba(26, 97, 64,0.3)]">
                                                 {(userProfile?.avatar || userProfile?.xProfileImage) ? (
                                                     <img src={userProfile?.avatar || userProfile?.xProfileImage} alt="avatar" className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full bg-[#249C6C]/15 flex items-center justify-center">
-                                                        <User size={30} className="text-[#249C6C]/60" />
+                                                    <div className="w-full h-full bg-[#1A6140]/15 flex items-center justify-center">
+                                                        <User size={30} className="text-[#1A6140]/60" />
                                                     </div>
                                                 )}
                                             </div>
@@ -1463,7 +1504,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         </div>
 
                                         {/* Vertical divider */}
-                                        <div className="w-px self-stretch bg-gradient-to-b from-transparent via-[#249C6C]/30 to-transparent flex-none" />
+                                        <div className="w-px self-stretch bg-gradient-to-b from-transparent via-[#1A6140]/30 to-transparent flex-none" />
 
                                         {/* RIGHT: Stats */}
                                         <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0">
@@ -1471,7 +1512,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             <div className="flex gap-2.5">
                                                 <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3">
                                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">Win Rate</div>
-                                                    <div className="text-xl font-black text-[#249C6C] leading-none">{derivedStats.winRate.toFixed(1)}%</div>
+                                                    <div className="text-xl font-black text-[#1A6140] leading-none">{derivedStats.winRate.toFixed(1)}%</div>
                                                 </div>
                                                 <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3">
                                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">Trades</div>
@@ -1482,11 +1523,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             <div className="flex gap-2.5">
                                                 <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3">
                                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">Wins</div>
-                                                    <div className="text-xl font-black text-[#249C6C] leading-none">{derivedStats.totalWins}</div>
+                                                    <div className="text-xl font-black text-[#1A6140] leading-none">{derivedStats.totalWins}</div>
                                                 </div>
                                                 <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3">
                                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">All-Time PnL</div>
-                                                    <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#249C6C]' : 'text-[#FF6B6B]'}`}>
+                                                    <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#1A6140]' : 'text-[#FF6B6B]'}`}>
                                                         {pnlStats.netPnl >= 0 ? '+' : ''}{pnlStats.netPnl.toFixed(2)}
                                                     </div>
                                                 </div>
@@ -1495,7 +1536,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             <div className="flex items-center justify-between mt-1">
                                                 <img src="/gowlogo.png" alt="15market" className="h-5 w-auto opacity-60" />
                                                 <div className="flex items-center gap-1.5">
-                                                    <div className="w-1 h-1 rounded-full bg-[#249C6C] animate-pulse" />
+                                                    <div className="w-1 h-1 rounded-full bg-[#1A6140] animate-pulse" />
                                                     <span className="text-[7px] font-black uppercase tracking-[0.15em] text-white/25">ARC TESTNET</span>
                                                 </div>
                                             </div>
@@ -1526,7 +1567,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             setToast('Save Failed');
                                         }
                                     }}
-                                    className="flex-1 py-3.5 bg-[#249C6C] text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_4px_20px_rgba(36,156,108,0.3)] flex items-center justify-center gap-2"
+                                    className="flex-1 py-3.5 bg-[#1A6140] text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_4px_20px_rgba(26, 97, 64,0.3)] flex items-center justify-center gap-2"
                                 >
                                     <Download size={14} /> Save Card
                                 </button>
@@ -1548,7 +1589,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         className={`w-full max-w-md ${isLight ? 'bg-white border-[#e2ece5]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8`}>
                         <div className="flex flex-col items-center text-center">
                             <div className={`w-16 h-16 rounded-2xl ${isLight ? 'bg-[#eef5f1]' : 'bg-white/5'} flex items-center justify-center mb-6`}>
-                                {modalConfig.type==='alert'?<AlertCircle size={32} className="text-[#249C6C]"/>:<Zap size={32} className="text-[#249C6C]"/>}
+                                {modalConfig.type==='alert'?<AlertCircle size={32} className="text-[#1A6140]"/>:<Zap size={32} className="text-[#1A6140]"/>}
                             </div>
                             <h3 className={`text-2xl font-black ${isLight ? 'text-[#133a2a]' : 'text-white'} mb-2 uppercase`}>{modalConfig.title}</h3>
                             <p className={`text-sm font-medium ${isLight ? 'text-[#133a2a]/50' : 'text-white/50'} mb-8 whitespace-pre-line`}>{modalConfig.message}</p>
@@ -1575,7 +1616,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             <h3 className={`text-2xl font-black ${isLight ? 'text-[#133a2a]' : 'text-white'} mb-6 uppercase text-center`}>{promptConfig.title}</h3>
                             <input type={promptConfig.inputType||"text"} autoFocus placeholder={promptConfig.placeholder} value={promptValue}
                                 onChange={(e) => setPromptValue(e.target.value)}
-                                className={`w-full ${isLight ? 'bg-[#f0f6f2] border-[#e2ece5] text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-4 px-6 font-bold text-center focus:border-[#249C6C]/50 outline-none transition-all mb-6`}
+                                className={`w-full ${isLight ? 'bg-[#f0f6f2] border-[#e2ece5] text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-4 px-6 font-bold text-center focus:border-[#1A6140]/50 outline-none transition-all mb-6`}
                                 onKeyDown={(e) => { if(e.key==='Enter'){promptConfig.onConfirm(promptValue);setPromptConfig(null);} }}/>
                             <div className="grid grid-cols-2 gap-4 w-full">
                                 <button onClick={() => {setPromptConfig(null);setPromptValue("");}} className={`py-4 ${isLight ? 'bg-[#eef5f1] text-[#133a2a] hover:bg-[#e2ece5]' : 'bg-white/10 text-white hover:bg-white/20'} text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Cancel</button>
@@ -1604,32 +1645,32 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className={`fixed top-0 right-0 w-[65%] max-w-[300px] h-full z-[9999] shadow-2xl flex flex-col gap-3 p-6 pt-24 ${isLight ? 'bg-white border-l border-[#249C6C]/20' : 'bg-[#0a0a0a] border-l border-white/10'} overflow-hidden`}
+                            className={`fixed top-0 right-0 w-[65%] max-w-[300px] h-full z-[9999] shadow-2xl flex flex-col gap-3 p-6 pt-24 ${isLight ? 'bg-white border-l border-[#1A6140]/20' : 'bg-[#0a0a0a] border-l border-white/10'} overflow-hidden`}
                         >
                             {isLight && (
                                 <div className="absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
                             )}
                             
-                            <button onClick={() => setIsMobileMenuOpen(false)} className={`absolute top-6 right-6 z-10 p-2 rounded-xl border ${isLight ? 'bg-white/50 border-[#249C6C]/20 text-[#0a261a] shadow-sm hover:bg-white' : 'bg-white/5 border-white/10 text-white'}`}>
+                            <button onClick={() => setIsMobileMenuOpen(false)} className={`absolute top-6 right-6 z-10 p-2 rounded-xl border ${isLight ? 'bg-white/50 border-[#1A6140]/20 text-[#0a261a] shadow-sm hover:bg-white' : 'bg-white/5 border-white/10 text-white'}`}>
                                 <X size={16} />
                             </button>
 
-                            <button onClick={() => { setIsMobileMenuOpen(false); onDocs(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(36,156,108,0.15)] border border-[#249C6C]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
-                                <BookOpen size={16} className="text-[#249C6C]"/> <span className="text-[10px] font-black uppercase tracking-widest">Docs</span>
+                            <button onClick={() => { setIsMobileMenuOpen(false); onDocs(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                                <BookOpen size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Docs</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); onCampaign(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(36,156,108,0.15)] border border-[#249C6C]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
-                                <Trophy size={16} className="text-[#249C6C]"/> <span className="text-[10px] font-black uppercase tracking-widest">Campaign</span>
+                            <button onClick={() => { setIsMobileMenuOpen(false); onCampaign(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                                <Trophy size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Campaign</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); onAssistedTrading(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(36,156,108,0.15)] border border-[#249C6C]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
-                                <Bot size={16} className="text-[#249C6C]"/> <span className="text-[10px] font-black uppercase tracking-widest">Assisted Trading</span>
+                            <button onClick={() => { setIsMobileMenuOpen(false); onAssistedTrading(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                                <Bot size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Assisted Trading</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); onTransferHub?.() || onOpenCircleWallet?.(null); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(36,156,108,0.15)] border border-[#249C6C]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                            <button onClick={() => { setIsMobileMenuOpen(false); onTransferHub?.() || onOpenCircleWallet?.(null); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Send size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Transfer Hub</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); setIsNotificationsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(36,156,108,0.15)] border border-[#249C6C]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                            <button onClick={() => { setIsMobileMenuOpen(false); setIsNotificationsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Bell size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Notifications</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); setNewUsername(userProfile?.username || ''); setLinkedEmail(userProfile?.email || ''); setIsSettingsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(36,156,108,0.15)] border border-[#249C6C]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                            <button onClick={() => { setIsMobileMenuOpen(false); setNewUsername(userProfile?.username || ''); setLinkedEmail(userProfile?.email || ''); setIsSettingsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Settings size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Settings</span>
                             </button>
                         </motion.div>

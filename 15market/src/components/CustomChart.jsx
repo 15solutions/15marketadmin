@@ -4,11 +4,11 @@ import { ChevronDown, ChevronUp, Zap, Loader2, Globe } from 'lucide-react';
 import LiveStreamingChart from './LiveStreamingChart';
 
 const LOGO_MAP = {
-    eth: '/ethereum.png',
-    btc: '/btc.png',
-    sol: '/sol.png',
-    mon: '/monad.png',
-    avax: '/avax.png',
+    eth: '/logos/eth.png',
+    btc: '/logos/btc.png',
+    sol: '/logos/sol.png',
+    mon: '/logos/mon.png',
+    avax: '/logos/avax.png',
 };
 
 const FALLBACK_LOGOS = {
@@ -22,8 +22,8 @@ const getLogoFilter = (isLight) => (isLight ? 'brightness(0)' : 'brightness(0) s
 
 export default function CustomChart({ symbol = 'SOLUSDT', theme = 'dark', currentPrice, activeMarket, setActiveMarket, activeTrades = [], uiVersion = 'v1', priceHistory = [], windowMs = 20000 }) {
     const isDark = theme !== 'light';
-    const controlBgAlt = isDark ? 'bg-[#0a0a0a]/95' : 'bg-[#b5d3c7]/95';
-    const controlBorder = isDark ? 'border-white/10' : 'border-[#17A364]/25';
+    const controlBgAlt = isDark ? 'bg-[#0a0a0a]/95' : 'bg-[#8CB09D]/95';
+    const controlBorder = isDark ? 'border-white/10' : 'border-[#1A6140]/25';
     const controlText = isDark ? 'text-white' : 'text-[#0a261a]';
     const controlTextDim = isDark ? 'text-white/40' : 'text-[#0a261a]/60';
 
@@ -70,8 +70,9 @@ export default function CustomChart({ symbol = 'SOLUSDT', theme = 'dark', curren
         setHasReceivedPrice(false); // Reset for new asset
         setActiveMarket(t);
         setIsSelectorOpen(false);
-        // Minimum loading time for smooth blur-to-stream transition
-        setTimeout(() => setIsInternalLoading(false), 1500);
+        // The chart now seeds its full window from backend history instantly, so
+        // only a brief blur is needed for the transition — not a long wait.
+        setTimeout(() => setIsInternalLoading(false), 400);
     };
     const tokens = useMemo(() => {
         const saved = JSON.parse(localStorage.getItem('15market_listed_tokens') || '[]');
@@ -114,22 +115,27 @@ export default function CustomChart({ symbol = 'SOLUSDT', theme = 'dark', curren
                     transition: 'filter 0.5s ease-in-out',
                 }}
             >
-{/* Asset Label (like dark mode screenshot) */}
-                <div className="absolute top-4 left-6 z-[20] pointer-events-none flex items-center gap-2.5">
+{/* Asset Label — FIXED logo box + FIXED gap so the ticker text sits at the
+    exact same position and size for every asset. Logos are pre-normalised
+    (uniform content height) so no per-asset sizing is needed. */}
+                <div className="absolute top-4 left-6 z-[20] pointer-events-none flex items-center">
                     {(() => {
                         const marketKey = (activeMarket?.id || activeMarket?.symbol || symbol.replace('USDT', '')).toLowerCase();
                         const logoSrc = LOGO_MAP[marketKey] || FALLBACK_LOGOS[marketKey];
                         const cleanSym = activeMarket?.symbol || symbol.replace('USDT', '');
-                        return logoSrc ? (
-                            <img
-                                src={logoSrc}
-                                alt={cleanSym}
-                                className={`${marketKey === 'eth' ? 'w-12 h-12' : marketKey === 'sol' ? 'w-[31.2px] h-[31.2px]' : 'w-6 h-6'} object-contain shrink-0`}
-                                style={{ filter: getLogoFilter(!isDark) }}
-                            />
-                        ) : null;
+                        if (!logoSrc) return null;
+                        return (
+                            <span className="w-10 h-10 flex items-center justify-center shrink-0">
+                                <img
+                                    src={logoSrc}
+                                    alt={cleanSym}
+                                    className="w-full h-full object-contain"
+                                    style={{ filter: getLogoFilter(!isDark) }}
+                                />
+                            </span>
+                        );
                     })()}
-                    <span className={`text-[20px] font-bold tracking-widest ${isDark ? 'text-white' : 'text-[#0a261a]'}`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+                    <span className={`ml-2.5 text-[20px] leading-none font-bold tracking-widest ${isDark ? 'text-white' : 'text-[#0a261a]'}`} style={{ fontFamily: '"Comfortaa", cursive' }}>
                         {activeMarket?.symbol || symbol.replace('USDT', '')}
                     </span>
                 </div>
@@ -155,8 +161,8 @@ export default function CustomChart({ symbol = 'SOLUSDT', theme = 'dark', curren
                         className="absolute inset-0 z-[60] flex items-center justify-center pointer-events-none"
                     >
                         <div className="relative">
-                            <Loader2 size={36} className="text-[#17A364] animate-spin opacity-70" />
-                            <div className="absolute inset-0 blur-2xl bg-[#17A364]/10 animate-pulse" />
+                            <Loader2 size={36} className="text-[#1A6140] animate-spin opacity-70" />
+                            <div className="absolute inset-0 blur-2xl bg-[#1A6140]/10 animate-pulse" />
                         </div>
                     </motion.div>
                 )}

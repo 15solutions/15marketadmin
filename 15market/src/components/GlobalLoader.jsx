@@ -10,7 +10,7 @@ const GlobalLoader = ({ theme = 'dark', progress = 0 }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[10000] flex items-center justify-center overflow-hidden ${isLight ? 'bg-[#17A364]' : 'bg-[#050505]'}`}
+            className={`fixed inset-0 z-[10000] flex items-center justify-center overflow-hidden ${isLight ? 'bg-[#1A6140]' : 'bg-[#050505]'}`}
         >
             {/* Branded Background Texture - DARK MODE ONLY */}
             <div className="absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />

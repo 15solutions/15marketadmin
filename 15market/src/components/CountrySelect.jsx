@@ -31,8 +31,8 @@ export function CountrySelect({ theme, value, onChange, placeholder = 'Select yo
                 aria-expanded={open}
                 className={`w-full py-4 pl-5 pr-5 rounded-2xl border outline-none transition-all flex items-center gap-3 cursor-pointer ${
                     isLight
-                        ? 'bg-gray-50 border-gray-200 text-black focus:border-[#17A364]'
-                        : 'bg-white/5 border-white/10 text-white focus:border-[#17A364]'
+                        ? 'bg-gray-50 border-gray-200 text-black focus:border-[#1A6140]'
+                        : 'bg-white/5 border-white/10 text-white focus:border-[#1A6140]'
                 } ${!selected ? (isLight ? 'text-black/40' : 'text-white/40') : ''}`}
             >
                 {selected ? (
@@ -69,7 +69,7 @@ export function CountrySelect({ theme, value, onChange, placeholder = 'Select yo
                                     onClick={() => pick(c.code)}
                                     className={`w-full flex items-center gap-3 px-5 py-3 text-left transition-colors ${
                                         active
-                                            ? 'bg-[#17A364]/15'
+                                            ? 'bg-[#1A6140]/15'
                                             : (isLight ? 'hover:bg-black/5' : 'hover:bg-white/5')
                                     }`}
                                 >
@@ -77,7 +77,7 @@ export function CountrySelect({ theme, value, onChange, placeholder = 'Select yo
                                     <span className={`text-sm font-black flex-1 ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>
                                         {c.name}
                                     </span>
-                                    {active && <Check size={16} className="text-[#17A364] shrink-0" strokeWidth={3} />}
+                                    {active && <Check size={16} className="text-[#1A6140] shrink-0" strokeWidth={3} />}
                                 </button>
                             );
                         })}

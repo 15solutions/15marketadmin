@@ -1850,6 +1850,47 @@ app.get('/stats/global', (req, res) => {
   res.json(profiles.getGlobalStats());
 });
 
+// ─── PRICE HISTORY (live chart seed) ─────────────────────────────────────────
+// Recent backend-authoritative price points for one asset so a live chart can
+// render a COMPLETE, correctly-scaled window the instant it mounts, instead of
+// building up from an empty buffer (which made the first seconds look like a
+// wider timeframe until enough ticks arrived).
+//
+// Reads cache.priceHistory — the same feed the settlement engine uses — so what
+// the chart draws and what settles can never disagree. Read-only, public.
+//
+// IMPORTANT: the raw buffer is appended on EVERY trade (tens of points/second).
+// Sending it verbatim would both overflow the window (a few seconds of data)
+// and draw as noise. So we downsample into even ~50ms buckets, keeping the
+// latest tick in each — a clean series that spans the whole window.
+app.get('/prices/history', (req, res) => {
+  const key = String(req.query.key || '').trim().toLowerCase();
+  const ms = Math.min(Math.max(parseInt(req.query.ms, 10) || 20000, 1000), 600000);
+  const maxPoints = Math.min(Math.max(parseInt(req.query.limit, 10) || 500, 20), 4000);
+  const hist = key ? cache.priceHistory[key] : null;
+  const points = [];
+  if (Array.isArray(hist) && hist.length) {
+    const since = Date.now() - ms;
+    const bucketMs = Math.max(ms / maxPoints, 20);
+    let lastBucket = -1;
+    // History is appended chronologically, so walk backwards until we pass the
+    // window start. Within each time bucket keep only the newest tick.
+    for (let i = hist.length - 1; i >= 0; i--) {
+      const e = hist[i];
+      if (!e || typeof e.time !== 'number') continue;
+      if (e.time < since) break;
+      if (!(typeof e.price === 'number' && e.price > 0)) continue;
+      const b = Math.floor((e.time - since) / bucketMs);
+      if (b === lastBucket) continue;
+      lastBucket = b;
+      points.push({ t: e.time, p: e.price });
+      if (points.length >= maxPoints) break;
+    }
+    points.reverse();
+  }
+  res.json({ key, ms, points });
+});
+
 app.post('/profiles', async (req, res) => {
   const { address, xHandle, avatar, onboardedAt } = req.body;
   const username = typeof req.body.username === 'string' ? req.body.username.trim() : req.body.username;
@@ -1859,6 +1900,27 @@ app.post('/profiles', async (req, res) => {
     ? req.body.country.trim().toUpperCase()
     : undefined;
   if (!address) return res.status(400).json({ error: 'Address required' });
+
+  // Username uniqueness is enforced HERE, at write time. The live availability
+  // check is only a hint (fail-open); without this gate a returning/overwriting
+  // signup could claim a name another account already holds. Strict mode fails
+  // closed, so an unreachable DB returns 503 instead of risking a duplicate.
+  if (username) {
+    const existingProfile = profiles.get(address.toLowerCase());
+    const currentName = typeof existingProfile?.username === 'string' ? existingProfile.username.trim() : '';
+    if (username.toLowerCase() !== currentName.toLowerCase()) {
+      const taken = await profiles.isUsernameTaken(username, address, { strict: true });
+      if (taken.taken) {
+        return res.status(taken.reason === 'unavailable' ? 503 : 409).json({
+          error: taken.reason === 'unavailable'
+            ? 'Could not verify that username right now. Try again.'
+            : 'That username is taken. Try another.',
+          reason: taken.reason
+        });
+      }
+    }
+  }
+
   const sessionWallet = deriveSessionWallet(address.toLowerCase());
   const onboarded = req.body.onboarded === true || onboardedAt != null || !!username;
   const profileData = {
@@ -1884,62 +1946,11 @@ app.post('/profiles', async (req, res) => {
   res.json({ success: true, profile, walletAddress: sessionWallet.address });
 });
 
-// ─── NATIVE EMAIL/PASSWORD AUTH ───────────────────────────────────────────
-// Passwords exist because the signup flow promises them (Bayse parity).
-// Privy has no password auth, so verification happens here and a successful
-// login mints a Privy CUSTOM JWT — the frontend exchanges it via
-// linkWithCustomJwt and lands in the SAME Privy identity + embedded wallet
-// as the OTP path. One identity, however you log in.
-//
-// NEVER returns hashes. Requires dashboard custom-auth trust + env keys
-// (see auth.js); otherwise minting fails closed with a configuration error.
-app.post('/auth/set-password', async (req, res) => {
-  const auth = require('./auth');
-  const { address, privyUserId, email, password, oldPassword } = req.body || {};
-  const addr = String(address || '').toLowerCase();
-  if (!addr) return res.status(400).json({ error: 'Address required' });
-  if (!auth.setAllowed(addr)) {
-    return res.status(429).json({ error: 'Too many attempts. Wait 10 minutes.' });
-  }
-  if (!privyUserId || !email || !auth.validPassword(password)) {
-    return res.status(400).json({ error: 'Valid Privy user, email and a password of 8+ characters are required.' });
-  }
-  const existing = auth.getCredentialByAddress(addr);
-  if (existing) {
-    // Changes require the old password. No reset flow yet — OTP login always
-    // works as the fallback, so nobody is ever locked out of their account.
-    if (!oldPassword || !auth.verifyPassword(oldPassword, existing.hash)) {
-      return res.status(403).json({ error: 'A password already exists. Provide the old one to change it.' });
-    }
-  }
-  auth.setCredential({ address: addr, privyUserId, email, password });
-  res.json({ success: true });
-});
-
-app.post('/auth/login-password', async (req, res) => {
-  const auth = require('./auth');
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
-  if (!auth.loginAllowed(email)) {
-    return res.status(429).json({ error: 'Too many attempts. Wait 10 minutes.' });
-  }
-  const cred = auth.getCredentialByEmail(email);
-  if (!cred || !auth.verifyPassword(password, cred.hash)) {
-    auth.recordLoginFailure(email);
-    return res.status(401).json({ error: 'Wrong email or password.' });
-  }
-  if (!cred.privyUserId) {
-    return res.status(500).json({ error: 'Account is missing its identity link. Log in another way and re-set your password.' });
-  }
-  auth.recordLoginSuccess(email);
-  try {
-    const token = auth.mintCustomJwt(cred.privyUserId);
-    res.json({ success: true, token, address: cred.address });
-  } catch (e) {
-    console.error('[Auth] mint failed:', e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
+// NOTE: Native email/password auth was removed. Privy owns authentication
+// (email code, Google, Discord, wallet); Supabase is the database, written by
+// this backend with the service-role key. Returning users are detected after
+// Privy auth by checking whether their profile is already onboarded
+// (GET /profiles/:address), not by any password registry.
 
 app.patch('/profiles/:address', async (req, res) => {
   const addr = req.params.address.toLowerCase();
@@ -1968,6 +1979,24 @@ app.patch('/profiles/:address', async (req, res) => {
     updates.username = updates.username.trim();
     updates.onboarded = true;
     updates.onboardedAt = Date.now();
+  }
+  // Same uniqueness gate as POST /profiles — a PATCH can rename an account too.
+  if (typeof updates.username === 'string' && updates.username.trim()) {
+    const name = updates.username.trim();
+    const current = profiles.get(addr);
+    const currentName = typeof current?.username === 'string' ? current.username.trim() : '';
+    if (name.toLowerCase() !== currentName.toLowerCase()) {
+      const taken = await profiles.isUsernameTaken(name, addr, { strict: true });
+      if (taken.taken) {
+        return res.status(taken.reason === 'unavailable' ? 503 : 409).json({
+          error: taken.reason === 'unavailable'
+            ? 'Could not verify that username right now. Try again.'
+            : 'That username is taken. Try another.',
+          reason: taken.reason
+        });
+      }
+      updates.username = name;
+    }
   }
   const profile = profiles.upsert(addr, updates);
   await profiles.syncToSupabase(addr);
@@ -2528,7 +2557,7 @@ app.get('/copy-trading/wallet/:address', async (req, res) => {
 
     // Sync with real on-chain balance for instant deposit reflection
     try {
-      const arcRpc = config.RPCS?.[0] || 'https://rpc.testnet.arc.network';
+      const arcRpc = config.RPCS?.[0] || 'https://rpc.testnet.arc.io';
       const provider = new ethers.JsonRpcProvider(arcRpc);
       const onChainBalance = await provider.getBalance(profile.copyTradingWallet.address);
       const onChainBalanceNum = parseFloat(ethers.formatEther(onChainBalance));

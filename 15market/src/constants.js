@@ -5,7 +5,10 @@ import { defineChain } from 'viem'
 export const ARC_CHAIN_ID = 5042002;
 
 export const ARC_RPCS = [
-    "https://rpc.testnet.arc.network", // Arc Official
+    "https://rpc.testnet.arc.io", // Arc Official (Circle)
+    "https://rpc.blockdaemon.testnet.arc.io", // Blockdaemon
+    "https://rpc.drpc.testnet.arc.io", // dRPC
+    "https://rpc.quicknode.testnet.arc.io", // QuickNode
 ];
 
 export const ARC_RPC = ARC_RPCS[0];

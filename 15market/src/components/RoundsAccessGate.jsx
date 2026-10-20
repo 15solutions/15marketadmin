@@ -182,16 +182,16 @@ export default function RoundsAccessGate({ children, theme, active, onUnlock, ve
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
-                        className={`relative z-10 max-w-md w-full p-8 rounded-[40px] border shadow-2xl ${isDark ? 'bg-[#0f110f] border-white/10 text-white' : 'bg-white border-[#249C6C]/20 text-black'
+                        className={`relative z-10 max-w-md w-full p-8 rounded-[40px] border shadow-2xl ${isDark ? 'bg-[#0f110f] border-white/10 text-white' : 'bg-white border-[#1A6140]/20 text-black'
                             }`}
                     >
                         <div className="flex flex-col items-center text-center">
                             <motion.div
                                 animate={{ scale: [1, 1.05, 1] }}
                                 transition={{ repeat: Infinity, duration: 3 }}
-                                className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${error ? 'bg-red-500/10' : 'bg-[#249C6C]/10'}`}
+                                className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${error ? 'bg-red-500/10' : 'bg-[#1A6140]/10'}`}
                             >
-                                {error ? <ShieldAlert size={32} className="text-red-500" /> : <Lock size={32} className="text-[#249C6C]" />}
+                                {error ? <ShieldAlert size={32} className="text-red-500" /> : <Lock size={32} className="text-[#1A6140]" />}
                             </motion.div>
 
                             <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">Secure Access</h2>
@@ -214,13 +214,13 @@ export default function RoundsAccessGate({ children, theme, active, onUnlock, ve
                                     placeholder="ENTER ACCESS CODE"
                                     maxLength={12}
                                     disabled={!address || isVerifying}
-                                    className={`w-full px-6 py-5 rounded-2xl text-center font-black tracking-widest outline-none border-2 transition-all disabled:opacity-40 ${isDark ? 'bg-white/5 border-white/5 focus:border-[#249C6C]/30' : 'bg-black/5 border-black/5 focus:border-[#249C6C]/30'
+                                    className={`w-full px-6 py-5 rounded-2xl text-center font-black tracking-widest outline-none border-2 transition-all disabled:opacity-40 ${isDark ? 'bg-white/5 border-white/5 focus:border-[#1A6140]/30' : 'bg-black/5 border-black/5 focus:border-[#1A6140]/30'
                                         } ${error ? 'border-red-500/50 animate-shake' : ''}`}
                                 />
                                 <button
                                     onClick={handleVerify}
                                     disabled={!inputCode.trim() || !address || isVerifying}
-                                    className="w-full py-5 rounded-2xl bg-[#249C6C] hover:brightness-110 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-[#249C6C]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="w-full py-5 rounded-2xl bg-[#1A6140] hover:brightness-110 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-[#1A6140]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     {isVerifying ? (
                                         <span className="flex items-center justify-center gap-2">
@@ -243,7 +243,7 @@ export default function RoundsAccessGate({ children, theme, active, onUnlock, ve
                                 <p className={`text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-center ${isDark ? 'text-white/20' : 'text-black/20'}`}>No code yet?</p>
                                 <button
                                     onClick={() => setView('apply')}
-                                    className="text-[10px] font-black text-[#249C6C] uppercase underline underline-offset-4 hover:opacity-80 transition-all"
+                                    className="text-[10px] font-black text-[#1A6140] uppercase underline underline-offset-4 hover:opacity-80 transition-all"
                                 >
                                     Request Beta Pass →
                                 </button>
@@ -259,7 +259,7 @@ export default function RoundsAccessGate({ children, theme, active, onUnlock, ve
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
-                        className={`relative z-10 max-w-md w-full p-8 rounded-[40px] border shadow-2xl ${isDark ? 'bg-[#0f110f] border-white/10 text-white' : 'bg-white border-[#249C6C]/20 text-black'
+                        className={`relative z-10 max-w-md w-full p-8 rounded-[40px] border shadow-2xl ${isDark ? 'bg-[#0f110f] border-white/10 text-white' : 'bg-white border-[#1A6140]/20 text-black'
                             }`}
                     >
                         <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">Beta Application</h2>
@@ -282,7 +282,7 @@ export default function RoundsAccessGate({ children, theme, active, onUnlock, ve
                             <button
                                 disabled={isApplying}
                                 type="submit"
-                                className="w-full py-5 rounded-2xl bg-[#249C6C] font-black uppercase text-[10px] tracking-widest shadow-lg shadow-[#249C6C]/20 mt-4 disabled:opacity-50"
+                                className="w-full py-5 rounded-2xl bg-[#1A6140] font-black uppercase text-[10px] tracking-widest shadow-lg shadow-[#1A6140]/20 mt-4 disabled:opacity-50"
                             >
                                 {isApplying ? 'SUBMITTING...' : 'SUBMIT APPLICATION'}
                             </button>
@@ -307,17 +307,17 @@ export default function RoundsAccessGate({ children, theme, active, onUnlock, ve
                         key="success"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className={`relative z-10 max-w-md w-full p-8 rounded-[40px] border shadow-2xl text-center ${isDark ? 'bg-[#0f110f] border-white/10 text-white' : 'bg-white border-[#249C6C]/20 text-black'
+                        className={`relative z-10 max-w-md w-full p-8 rounded-[40px] border shadow-2xl text-center ${isDark ? 'bg-[#0f110f] border-white/10 text-white' : 'bg-white border-[#1A6140]/20 text-black'
                             }`}
                     >
-                        <ShieldCheck size={48} className="text-[#249C6C] mx-auto mb-4" />
+                        <ShieldCheck size={48} className="text-[#1A6140] mx-auto mb-4" />
                         <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">Application Sent!</h2>
                         <p className={`text-[10px] font-bold uppercase tracking-widest mb-6 ${isDark ? 'text-white/40' : 'text-black/40'}`}>
                             Please check your email for a unique access code.<br />Check back regularly — it may take some time.
                         </p>
                         <button
                             onClick={() => setView('gate')}
-                            className="text-[10px] font-black text-[#249C6C] uppercase underline underline-offset-4"
+                            className="text-[10px] font-black text-[#1A6140] uppercase underline underline-offset-4"
                         >
                             ← Enter Code
                         </button>
@@ -329,8 +329,8 @@ export default function RoundsAccessGate({ children, theme, active, onUnlock, ve
 }
 
 const Step = ({ icon, text, link }) => (
-    <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-[#249C6C]/30 transition-all group">
-        <div className="p-1.5 rounded-lg bg-[#249C6C]/10 text-[#249C6C] group-hover:bg-[#249C6C]/20 transition-all">{icon}</div>
+    <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-[#1A6140]/30 transition-all group">
+        <div className="p-1.5 rounded-lg bg-[#1A6140]/10 text-[#1A6140] group-hover:bg-[#1A6140]/20 transition-all">{icon}</div>
         <span className="text-[10px] font-bold uppercase tracking-tight text-white/60">{text}</span>
         <ExternalLink size={10} className="ml-auto text-white/20" />
     </a>
@@ -338,14 +338,14 @@ const Step = ({ icon, text, link }) => (
 
 const GateInput = ({ icon, placeholder, value, onChange, type = 'text', isDark, required }) => (
     <div className="relative group">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-[#249C6C] transition-all">{icon}</div>
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-[#1A6140] transition-all">{icon}</div>
         <input
             type={type}
             required={required}
             value={value}
             onChange={e => onChange(e.target.value)}
             placeholder={placeholder}
-            className={`w-full pl-12 pr-6 py-4 rounded-xl text-xs font-bold outline-none border-2 transition-all ${isDark ? 'bg-white/5 border-white/5 focus:border-[#249C6C]/30' : 'bg-black/5 border-black/5 focus:border-[#249C6C]/30'
+            className={`w-full pl-12 pr-6 py-4 rounded-xl text-xs font-bold outline-none border-2 transition-all ${isDark ? 'bg-white/5 border-white/5 focus:border-[#1A6140]/30' : 'bg-black/5 border-black/5 focus:border-[#1A6140]/30'
                 }`}
         />
     </div>

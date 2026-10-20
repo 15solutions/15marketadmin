@@ -9,7 +9,7 @@ export default function DashboardStats() {
         value="$43,300.55"
         percentage={1.85}
         icon={DollarSign}
-        iconBgColor="bg-[#249C6C]"
+        iconBgColor="bg-[#1A6140]"
       />
       <StatCard
         title="24h Volume"
@@ -23,7 +23,7 @@ export default function DashboardStats() {
         value="850B"
         percentage={-2.11}
         icon={Briefcase}
-        iconBgColor="bg-[#249C6C]"
+        iconBgColor="bg-[#1A6140]"
       />
       <StatCard
         title="Open Trades"

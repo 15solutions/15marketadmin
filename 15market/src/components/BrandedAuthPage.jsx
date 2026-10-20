@@ -1,38 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePrivy, useLoginWithEmail, useLoginWithOAuth, useCustomAuth, useWallets } from '@privy-io/react-auth';
+import { usePrivy, useLoginWithEmail, useLoginWithOAuth, useWallets } from '@privy-io/react-auth';
 import { useConnect, useAccount } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-import { Mail, ArrowLeft, Loader2, Eye, EyeOff, Check, Wallet } from 'lucide-react';
+import { Mail, ArrowLeft, Loader2, Check, Wallet } from 'lucide-react';
 import { KEEPER_URL_ARC } from '../constants';
 import { CountrySelect } from './CountrySelect';
 
 /**
  * BrandedAuthPage — fully 15market-owned auth, fullscreen on every viewport.
  *
+ * Privy owns authentication end to end: email one-time code, Google, Discord
+ * and external wallet. There are NO passwords (Privy has no password auth, and
+ * Supabase is only the database — see the backend note in nexus-core/index.js).
+ *
  * Entry offers LOGIN and SIGNUP separately. Signup is a wizard:
  *   country → methods (email field, then Google / Discord / wallet below) →
- *   email: code verify → bio → username → password → trading-wallet finale
+ *   email: code verify → bio → username → trading-wallet finale
  *   wallet: connect → first name + username → finale (wallet is the main auth)
- *   google/discord: details prefilled from the provider, no password → finale
- * Login is email+password (backend verifies, Privy custom JWT lands the
- * same identity) plus the OAuth/wallet buttons. No Privy modal anywhere.
+ *   google/discord: details prefilled from the provider → finale
+ *
+ * Login is email → code, plus the OAuth/wallet buttons. No Privy modal anywhere.
+ *
+ * A returning email user who starts the signup wizard is detected right after
+ * the code verifies (their profile already exists) and is handed straight into
+ * the app instead of being walked through onboarding again.
  *
  * Wallet model: email/google/discord accounts get the trading wallet ONLY;
  * only wallet-connect gets two wallets (connected = main, derived = trading).
  */
 const inputCls = (isLight) => `w-full py-4 px-6 rounded-2xl border outline-none text-lg font-black transition-all placeholder:opacity-30 ${
     isLight
-        ? 'bg-gray-50 border-gray-200 text-black focus:border-[#249C6C]'
-        : 'bg-white/5 border-white/10 text-white focus:border-[#249C6C]'
+        ? 'bg-gray-50 border-gray-200 text-black focus:border-[#1A6140]'
+        : 'bg-white/5 border-white/10 text-white focus:border-[#1A6140]'
 }`;
 
-const btnPrimary = 'w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#17A364] text-white shadow-xl hover:brightness-110 active:scale-[0.98] disabled:opacity-40';
+const btnPrimary = 'w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#1A6140] text-white shadow-xl hover:brightness-110 active:scale-[0.98] disabled:opacity-40';
 
 const btnGhost = (isLight) => `w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 border active:scale-[0.98] disabled:opacity-40 ${
     isLight
-        ? 'bg-white border-gray-200 text-[#0a261a] hover:border-[#17A364] shadow-sm'
-        : 'bg-white/5 border-white/10 text-white hover:border-[#17A364]/60'
+        ? 'bg-white border-gray-200 text-[#0a261a] hover:border-[#1A6140] shadow-sm'
+        : 'bg-white/5 border-white/10 text-white hover:border-[#1A6140]/60'
 }`;
 
 const stepAnim = {
@@ -42,8 +50,10 @@ const stepAnim = {
     transition: { duration: 0.2 },
 };
 
-// Live availability line under username fields. Shows nothing until typed;
-// fail-open results still read "Available" (duplicates are cosmetic).
+// Live availability line under username fields. Shows nothing until typed.
+// The hint itself fails open (a stale "Available" on a network blip is not
+// worth blocking the field), but the actual write is gated server-side and by
+// the DB unique index, so a taken name can never be saved.
 function UsernameStatus({ value, check, isLight }) {
     const v = String(value || '').trim();
     if (!v || check.forValue !== v) return null;
@@ -55,7 +65,7 @@ function UsernameStatus({ value, check, isLight }) {
         return <div className={`${base} text-[#EF5350]`}>That username is taken.</div>;
     }
     if (check.state === 'free') {
-        return <div className={`${base} text-[#17A364]`}>Available ✓</div>;
+        return <div className={`${base} text-[#1A6140]`}>Available ✓</div>;
     }
     return <div className={`${base} ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>3–20 letters, numbers or underscores.</div>;
 }
@@ -66,7 +76,6 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     const { address: wagmiAddress } = useAccount();
     const { sendCode, loginWithCode } = useLoginWithEmail();
     const { initOAuth } = useLoginWithOAuth();
-    const customAuth = useCustomAuth();
     const { connect, isPending: isWalletPending } = useConnect();
 
     // Wizard state. Header buttons land directly: Login -> login page,
@@ -88,7 +97,7 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
         if (initialStep !== 'signup') return 'entry';
         const s = readProgress().step;
         return ['country', 'methods', 'code', 'bio', 'username', 'names'].includes(s) ? s : 'country';
-    }); // entry|login|country|methods|code|bio|username|password|finale
+    }); // entry|login|country|methods|code|bio|username|finale
     const [method, setMethod] = useState(() => readProgress().method || null); // email|google|discord|wallet
     const [country, setCountry] = useState(() => readProgress().country || '');
     const [email, setEmail] = useState(() => readProgress().email || '');
@@ -106,12 +115,14 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
             }
         } catch {}
     }, [step, method, country, email, firstName, lastName, username]);
-    const [password, setPassword] = useState('');
-    const [showPw, setShowPw] = useState(false);
     const [loginEmail, setLoginEmail] = useState('');
-    const [loginPassword, setLoginPassword] = useState('');
     const [busy, setBusy] = useState(null);
     const [error, setError] = useState('');
+    // Info line (not an error): e.g. "you already have an account".
+    const [notice, setNotice] = useState('');
+    // Login via email code. When true the code step hands back to the login
+    // handoff (existing account) instead of continuing into the signup wizard.
+    const [codeForLogin, setCodeForLogin] = useState(false);
     // Policies + 18 gate: every signup path stays disabled until this is on.
     const [acceptedPolicies, setAcceptedPolicies] = useState(false);
     const requirePolicies = () => {
@@ -123,23 +134,22 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     const savedOnce = useRef(false);
     const codeRefs = useRef([]);
 
-    const fail = (msg) => { setError(msg); setBusy(null); };
-    const clearErr = () => setError('');
+    const fail = (msg) => { setError(msg); setNotice(''); setBusy(null); };
+    const clearErr = () => { setError(''); setNotice(''); };
 
     // Progress markers (dots) for the signup wizard. Totals follow the
     // chosen path: email 6 screens, OAuth 4, wallet 3. Entry, login and
     // finale show none.
     const getMarkers = () => {
-        if (step === 'country') return { index: 0, total: 6 };
-        if (step === 'methods') return { index: 1, total: 6 };
-        if (step === 'code') return { index: 2, total: 6 };
+        if (step === 'country') return { index: 0, total: 5 };
+        if (step === 'methods') return { index: 1, total: 5 };
+        if (step === 'code') return { index: 2, total: 5 };
         if (step === 'bio') return method === 'email'
-            ? { index: 3, total: 6 }
+            ? { index: 3, total: 5 }
             : { index: 2, total: 4 };
         if (step === 'username') return method === 'email'
-            ? { index: 4, total: 6 }
+            ? { index: 4, total: 5 }
             : { index: 3, total: 4 };
-        if (step === 'password') return { index: 5, total: 6 };
         if (step === 'names') return { index: 2, total: 3 };
         return null;
     };
@@ -153,14 +163,13 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
         if (step === 'code') { setStep('methods'); return; }
         if (step === 'bio' || step === 'names') { setStep('methods'); return; }
         if (step === 'username') { setStep('bio'); return; }
-        if (step === 'password') { setStep('username'); return; }
     };
 
     // A completed PRIVY identity hands off — but ONLY from terminal states.
     // During the signup wizard (code and beyond) an authenticated flip is
     // expected mid-flow (OTP verified, OAuth returned). Closing there used
-    // to yeet fresh users straight to trading, skipping bio, username and
-    // password entirely. The wizard closes itself at the finale; the login
+    // to yeet fresh users straight to trading, skipping bio and username
+    // entirely. The wizard closes itself at the finale; the login
     // page closes the moment its login lands. (Deliberately NOT wagmi
     // isConnected either: auto-reconnect lands on its own schedule and used
     // to slam the page shut on open, looking like dead buttons.)
@@ -228,6 +237,23 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
         };
         tick();
     });
+
+    // After Privy signs the user in, ask the backend whether this identity is
+    // already onboarded. Used to hand a returning user who restarted the signup
+    // wizard straight into the app. Fails open (treats them as new) so a
+    // backend blip can never lock a brand-new user out of finishing signup.
+    const hasOnboardedProfile = async () => {
+        try {
+            const addr = await resolveIdentityAddress();
+            if (!addr) return false;
+            const res = await fetch(`${KEEPER_URL_ARC}/profiles/${String(addr).toLowerCase()}`);
+            if (!res.ok) return false;
+            const data = await res.json().catch(() => null);
+            return !!data?.onboarded;
+        } catch {
+            return false;
+        }
+    };
 
     // Username availability: debounced server check, fail-open. Guards read
     // nameCheck synchronously; the checker re-arms on every keystroke.
@@ -306,6 +332,9 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     };
 
     // ── Email signup ────────────────────────────────────────────────
+    // Send the one-time code. Privy logs an existing email straight in and
+    // creates a new user otherwise; a returning user who lands here is caught
+    // right after the code verifies (see handleVerifyCode).
     const handleSendCode = async () => {
         if (!requirePolicies()) return;
         const clean = email.trim().toLowerCase();
@@ -322,6 +351,25 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
         setBusy(null);
     };
 
+    // Send a code for an EXISTING account (login path). This is the login
+    // screen's primary action.
+    const sendLoginCode = async () => {
+        const clean = loginEmail.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) return fail('Enter your email address first.');
+        setError('');
+        setBusy('login-code');
+        try {
+            await sendCode({ email: clean });
+            setEmail(clean);
+            setCodeForLogin(true);
+            setStep('code');
+        } catch (e) {
+            fail(e?.message || 'Could not send a code. Check the address and retry.');
+            return;
+        }
+        setBusy(null);
+    };
+
     const handleVerifyCode = async (override) => {
         const value = (override ?? code).trim();
         if (value.length < 6) return fail('Enter the 6-digit code from your email.');
@@ -329,6 +377,24 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
         setBusy('code');
         try {
             await loginWithCode({ code: value });
+            // Login-code path: the user is now authenticated; hand back to the
+            // login step so the handoff effect closes the page.
+            if (codeForLogin) {
+                setCodeForLogin(false);
+                setStep('login');
+                setBusy(null);
+                return;
+            }
+            // Signup path: the code signed the user into Privy. If they already
+            // have an onboarded profile this is really a LOGIN (they restarted
+            // the signup wizard) — send them into the app instead of walking
+            // them through onboarding again, which used to clobber profiles and
+            // make their own username look "taken".
+            if (await hasOnboardedProfile()) {
+                setBusy(null);
+                onAuthenticated?.();
+                return;
+            }
             setStep('bio'); // authenticated flips too; bio continues the wizard
         } catch (e) {
             fail(e?.message || 'That code did not work. Request a fresh one.');
@@ -377,15 +443,19 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     };
 
     // ── OAuth (google / discord) ────────────────────────────────────
-    const handleOAuth = async (provider) => {
-        if (!requirePolicies()) return;
+    // From the signup wizard we continue into the wizard (bio next). From the
+    // LOGIN screen we must NOT: the policy checkbox is never shown there, and
+    // routing to bio would drag a returning user through signup again. On login
+    // we just let the authenticated flip close the page.
+    const handleOAuth = async (provider, { enforcePolicies = true, continueSignup = true } = {}) => {
+        if (enforcePolicies && !requirePolicies()) return;
         setError('');
         setBusy(provider);
         try {
             await initOAuth({ provider });
             // Redirect/popup completes → authenticated flips → prefill effect
-            // runs → user continues at bio.
-            setStep('bio');
+            // runs → user continues at bio (signup) or the page closes (login).
+            if (continueSignup) setStep('bio');
         } catch (e) {
             fail(e?.message || `${provider} sign-in failed. Try email instead.`);
             return;
@@ -394,8 +464,8 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     };
 
     // ── Wallet ──────────────────────────────────────────────────────
-    const handleWallet = (next) => {
-        if (!requirePolicies()) return;
+    const handleWallet = (next, { enforcePolicies = true } = {}) => {
+        if (enforcePolicies && !requirePolicies()) return;
         setError('');
         if (typeof window === 'undefined' || !window.ethereum) {
             return fail('No browser wallet detected. Install MetaMask or Rabby first.');
@@ -410,36 +480,8 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
         );
     };
 
-    // ── Email signup finale: profile + password ─────────────────────
-    const finishEmailSignup = async () => {
-        if (password.length < 8) return fail('Password needs at least 8 characters.');
-        setError('');
-        setBusy('finale');
-        try {
-            const { data, address: savedAddr } = await saveProfile();
-            setAssignedWallet(data.walletAddress || '');
-            try {
-                await fetch(`${KEEPER_URL_ARC}/auth/set-password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        address: String(savedAddr).toLowerCase(),
-                        privyUserId: user?.id,
-                        email: email.trim().toLowerCase(),
-                        password,
-                    }),
-                });
-            } catch {}
-            setStep('finale');
-        } catch (e) {
-            fail(e?.message || 'Could not finish setup. Retry.');
-            return;
-        }
-        setBusy(null);
-    };
-
-    // ── OAuth signup finale: profile only (no password — provider owns auth)
-    const finishOAuthSignup = async () => {
+    // ── Signup finale: profile only (Privy owns auth; no passwords) ─────
+    const finishSignup = async () => {
         if (!ensureNameFree()) return;
         setError('');
         setBusy('finale');
@@ -458,6 +500,9 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     const finishWalletSignup = async () => {
         if (!firstName.trim()) return fail('Enter your first name.');
         if (!username.trim()) return fail('Choose a username.');
+        // Same uniqueness gate as the email path — a wallet signup must not be
+        // able to claim a taken username either.
+        if (!ensureNameFree()) return;
         setError('');
         setBusy('finale');
         try {
@@ -466,35 +511,6 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
             setStep('finale');
         } catch (e) {
             fail(e?.message || 'Could not finish setup. Retry.');
-            return;
-        }
-        setBusy(null);
-    };
-
-    // ── Password login ──────────────────────────────────────────────
-    const handlePasswordLogin = async () => {
-        if (!loginEmail.trim() || !loginPassword) return fail('Enter your email and password.');
-        setError('');
-        setBusy('login');
-        try {
-            const res = await fetch(`${KEEPER_URL_ARC}/auth/login-password`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: loginEmail.trim().toLowerCase(), password: loginPassword }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.token) {
-                fail(data.error || 'Wrong email or password.');
-                return;
-            }
-            if (typeof customAuth?.linkWithCustomJwt !== 'function') {
-                fail('Login service unavailable. Try another method.');
-                return;
-            }
-            await customAuth.linkWithCustomJwt(data.token);
-            // authenticated flips → handoff effect closes the page.
-        } catch (e) {
-            fail(e?.message || 'Login failed. Retry.');
             return;
         }
         setBusy(null);
@@ -529,9 +545,9 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                     key={i}
                                     className={`h-2 rounded-full transition-all duration-300 ${
                                         i < markers.index
-                                            ? 'w-2 bg-[#17A364]'
+                                            ? 'w-2 bg-[#1A6140]'
                                             : i === markers.index
-                                              ? 'w-6 bg-[#17A364]'
+                                              ? 'w-6 bg-[#1A6140]'
                                               : `w-2 ${isLight ? 'bg-black/15' : 'bg-white/15'}`
                                     }`}
                                 />
@@ -559,28 +575,22 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                 <h1 className={`text-2xl font-black uppercase tracking-tighter ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Welcome back</h1>
                                 <p className={`text-xs font-bold uppercase tracking-widest mt-2 mb-6 ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>Login to your account</p>
                                 <div className="w-full flex flex-col gap-3">
-                                    <input type="email" autoComplete="email" value={loginEmail} onChange={(e) => { setLoginEmail(e.target.value); clearErr(); }} placeholder="Email address" className={`${inputCls(isLight)} !tracking-normal !text-base`} />
-                                    <div className="relative">
-                                        <input type={showPw ? 'text' : 'password'} autoComplete="current-password" value={loginPassword} onChange={(e) => { setLoginPassword(e.target.value); clearErr(); }} onKeyDown={(e) => { if (e.key === 'Enter') handlePasswordLogin(); }} placeholder="Password" className={`${inputCls(isLight)} !tracking-normal !text-base pr-14`} />
-                                        <button onClick={() => setShowPw(v => !v)} aria-label="Show password" className={`absolute right-5 top-1/2 -translate-y-1/2 ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>
-                                            {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
-                                        </button>
-                                    </div>
-                                    <button onClick={handlePasswordLogin} disabled={busy !== null} className={btnPrimary}>
-                                        {busy === 'login' ? <Loader2 size={18} className="animate-spin" /> : 'Login'}
+                                    <input type="email" autoComplete="email" value={loginEmail} onChange={(e) => { setLoginEmail(e.target.value); clearErr(); }} onKeyDown={(e) => { if (e.key === 'Enter') sendLoginCode(); }} placeholder="Email address" className={`${inputCls(isLight)} !tracking-normal !text-base`} />
+                                    <button onClick={sendLoginCode} disabled={busy !== null} className={btnPrimary}>
+                                        {busy === 'login-code' ? <Loader2 size={18} className="animate-spin" /> : <><Mail size={18} /> Continue with email</>}
                                     </button>
                                     <div className="flex items-center gap-3 my-1">
                                         <div className={`flex-1 h-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
                                         <span className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-[#0a261a]/40' : 'text-white/30'}`}>or</span>
                                         <div className={`flex-1 h-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
                                     </div>
-                                    <button onClick={() => handleOAuth('google')} disabled={busy !== null} className={btnGhost(isLight)}>
+                                    <button onClick={() => handleOAuth('google', { enforcePolicies: false, continueSignup: false })} disabled={busy !== null} className={btnGhost(isLight)}>
                                         {busy === 'google' ? <Loader2 size={18} className="animate-spin" /> : <><span className="text-[18px] font-black leading-none">G</span> Google</>}
                                     </button>
-                                    <button onClick={() => handleOAuth('discord')} disabled={busy !== null} className={btnGhost(isLight)}>
+                                    <button onClick={() => handleOAuth('discord', { enforcePolicies: false, continueSignup: false })} disabled={busy !== null} className={btnGhost(isLight)}>
                                         {busy === 'discord' ? <Loader2 size={18} className="animate-spin" /> : 'Discord'}
                                     </button>
-                                    <button onClick={() => handleWallet('methods')} disabled={busy !== null || isWalletPending} className={btnGhost(isLight)}>
+                                    <button onClick={() => handleWallet('login', { enforcePolicies: false })} disabled={busy !== null || isWalletPending} className={btnGhost(isLight)}>
                                         {busy === 'wallet' || isWalletPending ? <Loader2 size={18} className="animate-spin" /> : 'Connect wallet'}
                                     </button>
                                     <button onClick={() => { clearErr(); setStep('country'); setMethod(null); }} className={`text-[11px] font-black uppercase tracking-widest mt-1 ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>
@@ -628,7 +638,7 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                         aria-checked={acceptedPolicies}
                                         className="w-full flex items-start gap-3 text-left mt-1 px-1"
                                     >
-                                        <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${acceptedPolicies ? 'bg-[#17A364] border-[#17A364]' : (isLight ? 'border-gray-300' : 'border-white/20')}`}>
+                                        <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${acceptedPolicies ? 'bg-[#1A6140] border-[#1A6140]' : (isLight ? 'border-gray-300' : 'border-white/20')}`}>
                                             {acceptedPolicies && <Check size={14} className="text-white" strokeWidth={3.5} />}
                                         </span>
                                         <span className={`text-[11px] font-bold leading-relaxed ${isLight ? 'text-[#0a261a]/60' : 'text-white/50'}`}>
@@ -659,16 +669,24 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                             aria-label={`Digit ${i + 1}`}
                                             className={`w-11 h-14 text-center text-xl font-black rounded-2xl border outline-none transition-all ${
                                                 isLight
-                                                    ? 'bg-gray-50 border-gray-200 text-black focus:border-[#17A364]'
-                                                    : 'bg-white/5 border-white/10 text-white focus:border-[#17A364]'
-                                            } ${code[i] ? (isLight ? 'border-[#17A364]/60' : 'border-[#17A364]/60') : ''}`}
+                                                    ? 'bg-gray-50 border-gray-200 text-black focus:border-[#1A6140]'
+                                                    : 'bg-white/5 border-white/10 text-white focus:border-[#1A6140]'
+                                            } ${code[i] ? (isLight ? 'border-[#1A6140]/60' : 'border-[#1A6140]/60') : ''}`}
                                         />
                                     ))}
                                 </div>
                                 <button onClick={() => handleVerifyCode()} disabled={busy !== null} className={`${btnPrimary} mt-3`}>
                                     {busy === 'code' ? <Loader2 size={18} className="animate-spin" /> : 'Verify'}
                                 </button>
-                                <button onClick={() => { setCode(''); codeRefs.current[0]?.focus(); handleSendCode(); }} disabled={busy !== null} className="text-[11px] font-black uppercase tracking-widest text-[#17A364] mt-3">Resend code</button>
+                                <button onClick={() => {
+                                    setCode('');
+                                    codeRefs.current[0]?.focus();
+                                    if (codeForLogin) {
+                                        sendLoginCode();
+                                    } else {
+                                        handleSendCode();
+                                    }
+                                }} disabled={busy !== null} className="text-[11px] font-black uppercase tracking-widest text-[#1A6140] mt-3">Resend code</button>
                             </motion.div>
                         )}
 
@@ -723,12 +741,7 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                 <input value={username} onChange={(e) => { setUsername(e.target.value); clearErr(); checkUsername(e.target.value); }} placeholder="Username" maxLength={20} className={`${inputCls(isLight)} !tracking-normal !text-base`} />
                                 <UsernameStatus value={username} check={nameCheck} isLight={isLight} />
                                 <button
-                                    onClick={() => {
-                                        if (!ensureNameFree()) return;
-                                        clearErr();
-                                        if (method === 'email') setStep('password');
-                                        else finishOAuthSignup();
-                                    }}
+                                    onClick={() => { clearErr(); finishSignup(); }}
                                     disabled={busy !== null}
                                     className={`${btnPrimary} mt-4`}
                                 >
@@ -737,35 +750,18 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                             </motion.div>
                         )}
 
-                        {/* ── Password (email path only) ── */}
-                        {step === 'password' && (
-                            <motion.div key="password" {...stepAnim} className="w-full flex flex-col items-center">
-                                <h1 className={`text-2xl font-black uppercase tracking-tighter ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Set a password</h1>
-                                <p className={`text-xs font-bold uppercase tracking-widest mt-2 mb-6 ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>For quick logins</p>
-                                <div className="relative w-full">
-                                    <input type={showPw ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={(e) => { setPassword(e.target.value); clearErr(); }} onKeyDown={(e) => { if (e.key === 'Enter') finishEmailSignup(); }} placeholder="8+ characters" className={`${inputCls(isLight)} !tracking-normal !text-base pr-14`} />
-                                    <button onClick={() => setShowPw(v => !v)} aria-label="Show password" className={`absolute right-5 top-1/2 -translate-y-1/2 ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>
-                                        {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
-                                    </button>
-                                </div>
-                                <button onClick={finishEmailSignup} disabled={busy !== null} className={`${btnPrimary} mt-4`}>
-                                    {busy === 'finale' ? <Loader2 size={18} className="animate-spin" /> : 'Create account'}
-                                </button>
-                            </motion.div>
-                        )}
-
                         {/* ── Finale: trading wallet assigned ── */}
                         {step === 'finale' && (
                             <motion.div key="finale" {...stepAnim} className="w-full flex flex-col items-center">
-                                <div className="w-14 h-14 rounded-full bg-[#17A364]/15 border border-[#17A364]/30 flex items-center justify-center mb-4">
-                                    <Check size={26} className="text-[#17A364]" strokeWidth={3} />
+                                <div className="w-14 h-14 rounded-full bg-[#1A6140]/15 border border-[#1A6140]/30 flex items-center justify-center mb-4">
+                                    <Check size={26} className="text-[#1A6140]" strokeWidth={3} />
                                 </div>
                                 <h1 className={`text-2xl font-black uppercase tracking-tighter text-center ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Trading wallet assigned</h1>
                                 <p className={`text-xs font-bold uppercase tracking-widest mt-2 mb-4 text-center ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>
                                     {method === 'wallet' ? 'Main + trading wallets ready' : 'Your only wallet — fund it to play'}
                                 </p>
                                 {assignedWallet && (
-                                    <div className={`w-full p-4 rounded-2xl border text-center mb-4 ${isLight ? 'bg-black/5 border-[#17A364]/20' : 'bg-white/5 border-white/10'}`}>
+                                    <div className={`w-full p-4 rounded-2xl border text-center mb-4 ${isLight ? 'bg-black/5 border-[#1A6140]/20' : 'bg-white/5 border-white/10'}`}>
                                         <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>Trading wallet</div>
                                         <div className={`text-sm font-mono font-bold break-all ${isLight ? 'text-[#0a261a]' : 'text-white/90'}`}>{assignedWallet}</div>
                                     </div>
@@ -775,6 +771,11 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                         )}
                     </AnimatePresence>
 
+                    {notice && step === 'login' && (
+                        <div className={`w-full mt-4 px-4 py-3 rounded-2xl border text-xs font-bold text-center ${isLight ? 'bg-[#1A6140]/10 border-[#1A6140]/30 text-[#0a261a]' : 'bg-[#1A6140]/10 border-[#1A6140]/30 text-white/80'}`}>
+                            {notice}
+                        </div>
+                    )}
                     {error && (
                         <div className="w-full mt-4 px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold text-center">
                             {error}

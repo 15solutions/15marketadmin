@@ -11,7 +11,7 @@ async function check(rpc, addr) {
 }
 
 async function run() {
-    await check("https://rpc.testnet.arc.network", "0xd8F519179d16Fb4B791Cd12eF027bD29ABeBC71e");
+    await check("https://rpc.testnet.arc.io", "0xd8F519179d16Fb4B791Cd12eF027bD29ABeBC71e");
     await check("https://5042002.rpc.thirdweb.com", "0x4AD92eAFb8867f4d5c95dcB7eDc922E30B3bc1C8");
 }
 

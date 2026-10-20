@@ -18,7 +18,7 @@ if (fs.existsSync(envPath)) {
 const OLD_TREASURY = process.env.TREASURY_ADDRESS;
 const NEW_TREASURY = "0x02858fddB58899bdEdC10E54253e4E63d9A1dd00";
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
-const ARC_RPC = process.env.ARC_RPC_1 || "https://rpc.testnet.arc.network";
+const ARC_RPC = process.env.ARC_RPC_1 || "https://rpc.testnet.arc.io";
 const ENV_PATH = path.resolve("../nexus-core/.env");
 
 const OLD_ABI = [

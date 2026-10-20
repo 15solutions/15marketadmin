@@ -117,8 +117,8 @@ export default function LeftSidebar({
           onChange={(e) => setSearchQuery(e.target.value)}
           className={`w-full h-[36px] pl-9 pr-3 rounded-full text-[12px] font-medium border outline-none transition-colors ${
             isLight
-              ? 'bg-[#F5F5F5] border-[#E9E9E9] text-[#111827] placeholder:text-[#9CA3AF] focus:border-[#17A364]'
-              : 'bg-white/5 border-white/10 text-white/80 placeholder:text-white/30 focus:border-[#17A364]'
+              ? 'bg-[#F5F5F5] border-[#E9E9E9] text-[#111827] placeholder:text-[#9CA3AF] focus:border-[#1A6140]'
+              : 'bg-white/5 border-white/10 text-white/80 placeholder:text-white/30 focus:border-[#1A6140]'
           }`}
         />
       </div>
@@ -141,10 +141,10 @@ export default function LeftSidebar({
             }}
             className={`flex-1 py-1 rounded-full text-[8px] font-bold uppercase tracking-wider border transition-all ${
               activeCategory === tab
-                ? 'bg-[#17A364] border-[#17A364] text-white'
+                ? 'bg-[#1A6140] border-[#1A6140] text-white'
                 : isLight
-                  ? 'bg-white border-[#E9E9E9] text-[#6B7280] hover:border-[#17A364] hover:text-[#17A364]'
-                  : 'bg-white/5 border-white/10 text-white/40 hover:border-[#17A364] hover:text-[#17A364]'
+                  ? 'bg-white border-[#E9E9E9] text-[#6B7280] hover:border-[#1A6140] hover:text-[#1A6140]'
+                  : 'bg-white/5 border-white/10 text-white/40 hover:border-[#1A6140] hover:text-[#1A6140]'
             }`}
           >
             {tab}
@@ -226,7 +226,7 @@ export default function LeftSidebar({
                     style={{ filter: getLogoFilter(isLight) }}
                   />
                 ) : (
-                  <div className="w-4 h-4 rounded-full bg-[#17A364] flex items-center justify-center shrink-0">
+                  <div className="w-4 h-4 rounded-full bg-[#1A6140] flex items-center justify-center shrink-0">
                     <span className="text-white text-[9px] font-black">{(m.symbol || 'E').slice(0, 1)}</span>
                   </div>
                 )}
@@ -243,7 +243,7 @@ export default function LeftSidebar({
                     ) : (
                       <>
                         <span className={`text-[12px] font-medium ${isLight ? 'text-[#111827]' : 'text-white/80'}`}>${priceStr}</span>
-                        <span className="text-[11px] font-bold" style={{ color: isUp ? '#17A364' : '#E13E27' }}>{changeStr}</span>
+                        <span className="text-[11px] font-bold" style={{ color: isUp ? '#1A6140' : '#E13E27' }}>{changeStr}</span>
                       </>
                     )}
                   </div>

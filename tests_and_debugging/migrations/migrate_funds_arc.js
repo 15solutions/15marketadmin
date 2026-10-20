@@ -9,7 +9,7 @@ dns.lookup = (hostname, options, callback) => {
         callback = options;
         options = {};
     }
-    if (hostname === 'rpc.testnet.arc.network') {
+    if (hostname === 'rpc.testnet.arc.io') {
         if (options && options.all) {
             return callback(null, [{ address: '64.130.40.38', family: 4 }]);
         }
@@ -18,7 +18,7 @@ dns.lookup = (hostname, options, callback) => {
     return originalLookup(hostname, options, callback);
 };
 
-const ARC_RPC = process.env.ARC_RPC || "https://rpc.testnet.arc.network";
+const ARC_RPC = process.env.ARC_RPC || "https://rpc.testnet.arc.io";
 const OLD_CONTRACT = "0x4AD92eAFb8867f4d5c95dcB7eDc922E30B3bc1C8";
 const NEW_CONTRACT = "0xd8F519179d16Fb4B791Cd12eF027bD29ABeBC71e";
 const PRIVATE_KEY = process.env.PRIVATE_KEY;

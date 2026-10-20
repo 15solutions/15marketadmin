@@ -1001,13 +1001,20 @@ class ProfileService {
         return this.profiles[addr];
     }
 
-    // Username availability for signup validation. Memory first (recent,
-    // unsynced signups live here), then the durable store case-insensitively.
-    // Fail-open: when the database is unreachable we report available — a
-    // duplicate display name is cosmetic (address is the identity key) while
-    // blocking signup on a network blip loses the user. Never returns profile
-    // data, only taken/free (same exposure as any availability check).
-    async isUsernameTaken(name, excludeAddr = '') {
+    // Username availability. Memory first (recent, unsynced signups live here),
+    // then the durable store case-insensitively. Never returns profile data,
+    // only taken/free (same exposure as any availability check).
+    //
+    // Two modes:
+    // - hint (default, strict=false): FAIL-OPEN. When the database is
+    //   unreachable we report available, because this only powers the live
+    //   "Available ✓" line and blocking the field on a network blip is worse
+    //   than a stale hint.
+    // - strict (strict=true): FAIL-CLOSED. Used by the profile write gate, where
+    //   a duplicate must never slip through. If we cannot prove the name is
+    //   free, report it unavailable so the caller retries instead of writing a
+    //   duplicate. The DB unique index (migration 008) is the final backstop.
+    async isUsernameTaken(name, excludeAddr = '', { strict = false } = {}) {
         const lower = String(name || '').trim().toLowerCase();
         if (!/^[a-z0-9_]{3,20}$/.test(lower)) return { taken: true, reason: 'format' };
         const excl = String(excludeAddr || '').toLowerCase();
@@ -1020,19 +1027,21 @@ class ProfileService {
         }
         try {
             await this.initSupabase();
+            // Supabase not configured at all: the in-memory scan above is the
+            // whole store (single-instance/file mode), so it is authoritative.
             if (!SUPABASE_ENABLED) return { taken: false, degraded: true };
             const res = await supabaseRequest(
                 `/rest/v1/profiles?select=address,username&username=ilike.${encodeURIComponent(lower)}&limit=5`,
                 { timeout: 10000 }
             );
-            if (!res.ok) return { taken: false, degraded: true };
+            if (!res.ok) return strict ? { taken: true, reason: 'unavailable' } : { taken: false, degraded: true };
             const rows = await res.json();
             const hit = (rows || []).some(r =>
                 String(r.address || '').toLowerCase() !== excl &&
                 String(r.username || '').trim().toLowerCase() === lower);
             return hit ? { taken: true, reason: 'taken' } : { taken: false };
         } catch (e) {
-            return { taken: false, degraded: true };
+            return strict ? { taken: true, reason: 'unavailable' } : { taken: false, degraded: true };
         }
     }
 

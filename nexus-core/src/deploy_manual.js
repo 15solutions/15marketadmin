@@ -4,7 +4,7 @@ const solc = require('solc');
 const { ethers } = require('ethers');
 require('dotenv').config();
 
-const RPC_URL = process.env.ARC_RPC_1 || "https://rpc.testnet.arc.network";
+const RPC_URL = process.env.ARC_RPC_1 || "https://rpc.testnet.arc.io";
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
 async function deploy() {

@@ -51,7 +51,7 @@ function PriceMeterTicker({ value }) {
 // Brand green face with high-contrast numbers: black in dark mode, white in light mode.
 function FlipDigit({ digit, isLight }) {
   return (
-    <div className={`relative w-[26px] h-[40px] bg-[#17A364] rounded-[7px] shadow-[0_2px_10px_rgba(23,163,100,0.55)] overflow-hidden flex flex-col items-center justify-center select-none ${isLight ? 'text-white' : 'text-black'}`}>
+    <div className={`relative w-[26px] h-[40px] bg-[#1A6140] rounded-[7px] shadow-[0_2px_10px_rgba(26, 97, 64,0.55)] overflow-hidden flex flex-col items-center justify-center select-none ${isLight ? 'text-white' : 'text-black'}`}>
       <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/10 pointer-events-none" />
 
       {/* Horizontal split crease seam */}
@@ -86,7 +86,7 @@ function FlipClock({ seconds, isLight }) {
     <div className="flex items-center gap-[3px] select-none shrink-0">
       <FlipDigit digit={tens} isLight={isLight} />
       <FlipDigit digit={ones} isLight={isLight} />
-      <span className={`text-[13px] font-mono font-black ${isLight ? 'text-[#17A364]' : 'text-[#17A364]'} ml-1 uppercase tracking-tight`}>s</span>
+      <span className={`text-[13px] font-mono font-black ${isLight ? 'text-[#1A6140]' : 'text-[#1A6140]'} ml-1 uppercase tracking-tight`}>s</span>
     </div>
   );
 }
@@ -100,8 +100,8 @@ function ProgressBeam({ progress, isWinning }) {
   const clamped = Math.max(0, Math.min(100, progress));
 
   // Whole-beam color = live win/lose status
-  const color = isWinning ? '#17A364' : '#FF914D';
-  const head = isWinning ? '#3DDC97' : '#FFB085'; // brighter head shade for the laser
+  const color = isWinning ? '#1A6140' : '#FF914D';
+  const head = isWinning ? '#1A6140' : '#FFB085'; // brighter head shade for the laser
   const glow = color;
 
   return (
@@ -233,9 +233,9 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
   const enter = { opacity: 1, scale: 1, filter: 'blur(0px)' };
   const isWin = !!won;
   const cardClass = isWin
-    ? 'bg-[#17A364]/15 border-[#17A364]/30'
+    ? 'bg-[#1A6140]/15 border-[#1A6140]/30'
     : 'bg-[#FF7F50]/15 border-[#FF7F50]/40';
-  const textClass = isWin ? 'text-[#17A364]' : 'text-[#FF7F50]';
+  const textClass = isWin ? 'text-[#1A6140]' : 'text-[#FF7F50]';
 
   const stakeStr = (amount != null && !isNaN(Number(amount))) ? `$${Number(amount).toFixed(2)}` : null;
   const payoutStr = (payout != null && !isNaN(Number(payout)) && Number(payout) > 0) ? `+$${Number(payout).toFixed(2)}` : null;
@@ -244,7 +244,7 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
 
   const resultRow = (
     <>
-      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isWin ? 'bg-[#17A364] text-white' : 'bg-[#FF7F50] text-white'}`}>
+      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isWin ? 'bg-[#1A6140] text-white' : 'bg-[#FF7F50] text-white'}`}>
         <motion.svg
           viewBox="0 0 24 24"
           width="13"
@@ -264,7 +264,7 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
         animate={{ opacity: [1, 0.7, 1] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
         className={`${fit ? 'text-[13px]' : 'text-[15px]'} font-black italic tracking-widest ${textClass}`}
-        style={{ filter: `drop-shadow(0 0 10px ${isWin ? 'rgba(23,163,100,0.5)' : 'rgba(255,127,80,0.5)'})` }}
+        style={{ filter: `drop-shadow(0 0 10px ${isWin ? 'rgba(26, 97, 64,0.5)' : 'rgba(255,127,80,0.5)'})` }}
       >
         {isWin ? 'WIN' : 'LOSS'}{symbol ? ` · ${String(symbol).toUpperCase()}` : ''}
       </motion.span>
@@ -304,10 +304,10 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
   const word = resultWon ? 'WON' : 'LOST';
 
   // Colors — theme-aware. Loss is the NO-button red, both themes.
-  const accentGlow = resultWon ? 'rgba(23,163,100,0.35)' : 'rgba(239,83,80,0.3)';
+  const accentGlow = resultWon ? 'rgba(26, 97, 64,0.35)' : 'rgba(239,83,80,0.3)';
 
   const textColor = resultWon
-    ? (isLight ? 'text-[#17A364]' : 'text-[#22C55E]')
+    ? (isLight ? 'text-[#1A6140]' : 'text-[#1A6140]')
     : 'text-[#EF5350]';
 
   return (
@@ -332,7 +332,7 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
             background: !isResultPhase
               ? 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)'
               : resultWon
-                ? 'linear-gradient(90deg, transparent, #17A364, transparent)'
+                ? 'linear-gradient(90deg, transparent, #1A6140, transparent)'
                 : 'linear-gradient(90deg, transparent, #EF5350, transparent)',
             boxShadow: isResultPhase ? `0 0 10px ${accentGlow}` : 'none',
           }}
@@ -378,9 +378,9 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
                   className="flex"
                   animate={{ scale: [1, 1.18, 1], rotate: [0, -6, 5, 0] }}
                   transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-                  style={{ filter: `drop-shadow(0 0 10px ${isLight ? 'rgba(23,163,100,0.65)' : 'rgba(34,197,94,0.65)'})` }}
+                  style={{ filter: `drop-shadow(0 0 10px ${isLight ? 'rgba(26, 97, 64,0.65)' : 'rgba(26, 97, 64,0.65)'})` }}
                 >
-                  <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={isLight ? 'text-[#17A364]' : 'text-[#22C55E]'}>
+                  <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={isLight ? 'text-[#1A6140]' : 'text-[#1A6140]'}>
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </motion.span>
@@ -620,7 +620,7 @@ export default function TradingWidget({
       {/* Duration Section */}
       <div className="flex items-center justify-between mb-2">
         <div className={`text-[12px] font-bold ${isLight ? 'text-[#111827]' : 'text-white/90'}`}>DURATION</div>
-        <div className={`text-[12px] font-black ${isLight ? 'text-[#17A364]' : 'text-[#17A364]'}`}>
+        <div className={`text-[12px] font-black ${isLight ? 'text-[#1A6140]' : 'text-[#1A6140]'}`}>
           ${parseFloat(price || 0).toFixed(2)}
         </div>
       </div>
@@ -631,7 +631,7 @@ export default function TradingWidget({
             onClick={() => setSelectedDuration(d)}
             className={`flex-1 py-2 rounded-full text-[14px] font-bold transition-all ${
               selectedDuration === d
-                ? 'bg-[#17A364] text-white shadow-sm'
+                ? 'bg-[#1A6140] text-white shadow-sm'
                 : isLight ? 'bg-[#F8F9FA] text-[#111827] border border-[#E5E7EB] hover:bg-gray-50' : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
             }`}
           >
@@ -661,7 +661,7 @@ export default function TradingWidget({
           placeholder="STAKE"
           min="0"
           step="0.01"
-          className={`w-full rounded-full py-2 px-8 text-center text-[14px] font-bold text-[#17A364] placeholder-[#17A364] outline-none focus:border-[#17A364] transition-all ${isLight ? 'bg-[#F8F9FA]' : 'bg-white/5'}`}
+          className={`w-full rounded-full py-2 px-8 text-center text-[14px] font-bold text-[#1A6140] placeholder-[#1A6140] outline-none focus:border-[#1A6140] transition-all ${isLight ? 'bg-[#F8F9FA]' : 'bg-white/5'}`}
         />
       </div>
 
@@ -673,7 +673,7 @@ export default function TradingWidget({
             style={{ width: `${Math.min((stake / (sessionBalance || 100)) * 100, 100)}%` }}
           />
           <div 
-            className={`absolute w-4 h-4 border-[3px] border-[#17A364] rounded-full top-1/2 -translate-y-1/2 -ml-2 transition-all ${isLight ? 'bg-white' : 'bg-[#0a0a0a]'}`}
+            className={`absolute w-4 h-4 border-[3px] border-[#1A6140] rounded-full top-1/2 -translate-y-1/2 -ml-2 transition-all ${isLight ? 'bg-white' : 'bg-[#0a0a0a]'}`}
             style={{ left: `${Math.min((stake / (sessionBalance || 100)) * 100, 100)}%` }}
           />
         </div>
@@ -691,7 +691,7 @@ export default function TradingWidget({
       {/* Estimated Return (Split above buttons) */}
       <div className={`flex gap-3 mb-2 text-[12px] font-bold ${isLight ? 'text-[#111827]' : 'text-white/80'}`}>
         <div className="flex-1 flex items-center justify-center gap-1.5">
-          <span className="text-[#17A364]">YES ${stake > 0 ? yesPayoutAmt : "0.00"}</span>
+          <span className="text-[#1A6140]">YES ${stake > 0 ? yesPayoutAmt : "0.00"}</span>
         </div>
         <span className={isLight ? 'text-gray-300' : 'text-white/20'}>|</span>
         <div className="flex-1 flex items-center justify-center gap-1.5">
@@ -730,8 +730,8 @@ export default function TradingWidget({
                   // still running AND no verdict on screen. A settled or latched
                   // result always wins — placing must never cover it, however
                   // isExecuting got stuck.
-                  <div className="w-full text-center text-[#17A364] animate-pulse text-[16px] font-black tracking-widest flex items-center justify-center gap-2">
-                    <div className="w-3 h-3 rounded-full border-2 border-[#17A364] border-t-transparent animate-spin" />
+                  <div className="w-full text-center text-[#1A6140] animate-pulse text-[16px] font-black tracking-widest flex items-center justify-center gap-2">
+                    <div className="w-3 h-3 rounded-full border-2 border-[#1A6140] border-t-transparent animate-spin" />
                     PLACING TRADE...
                   </div>
                 ) : (
@@ -763,11 +763,11 @@ export default function TradingWidget({
               transition={{ duration: 0.2 }}
               className="flex justify-between gap-3 h-full relative"
             >
-              <div className="absolute inset-0 -inset-x-4 -inset-y-2 bg-[#17A364]/10 rounded-full blur-xl pointer-events-none" />
+              <div className="absolute inset-0 -inset-x-4 -inset-y-2 bg-[#1A6140]/10 rounded-full blur-xl pointer-events-none" />
               <button
                 onClick={() => handleTrade('YES')}
                 disabled={stake <= 0 || stake > (sessionBalance || 0)}
-                className={`flex-1 h-full rounded-full flex items-center justify-center gap-2 transition-all text-[20px] font-black tracking-wide text-white bg-[#17A364] ${!address ? 'opacity-40' : ''}`}
+                className={`flex-1 h-full rounded-full flex items-center justify-center gap-2 transition-all text-[20px] font-black tracking-wide text-white bg-[#1A6140] ${!address ? 'opacity-40' : ''}`}
               >
                 YES <span className="text-[18px] inline-flex items-center"><PriceMeterTicker value={Math.round(yesShare * 100)} />¢</span>
               </button>
@@ -784,7 +784,7 @@ export default function TradingWidget({
       </div>
 
       <div className={`text-center text-[11px] font-medium ${isLight ? 'text-[#6B7280]' : 'text-white/40'}`}>
-        By clicking, you agree to the <span className="text-[#17A364] cursor-pointer hover:underline">Terms of Use</span>.
+        By clicking, you agree to the <span className="text-[#1A6140] cursor-pointer hover:underline">Terms of Use</span>.
       </div>
     </div>
   );

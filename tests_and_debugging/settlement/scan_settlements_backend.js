@@ -8,7 +8,7 @@ dns.lookup = (hostname, options, callback) => {
         callback = options;
         options = {};
     }
-    if (hostname === 'rpc.testnet.arc.network' || hostname === 'rpc-test-1.arc.market') {
+    if (hostname === 'rpc.testnet.arc.io' || hostname === 'rpc-test-1.arc.market') {
         const ip = '64.130.40.38';
         if (options && options.all) {
             return callback(null, [{ address: ip, family: 4 }]);
@@ -18,7 +18,7 @@ dns.lookup = (hostname, options, callback) => {
     return originalLookup(hostname, options, callback);
 };
 
-const RPC = "https://rpc.testnet.arc.network";
+const RPC = "https://rpc.testnet.arc.io";
 const CONTRACT = "0x345014899b42bF9034D9475760609e64B1433A6a";
 
 async function main() {

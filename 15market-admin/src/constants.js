@@ -1,9 +1,9 @@
 import { defineChain } from 'viem'
 // Arc Network Constants
 export const ARC_CONTRACT_ADDRESS = import.meta.env.VITE_ARC_CONTRACT_ADDRESS;
-export const ARC_RPC_DRPC_OFFICIAL = "https://rpc.drpc.testnet.arc.network";
-export const ARC_RPC_DRPC_PROXY = "https://arc-testnet.drpc.org";
-export const ARC_RPC_OFFICIAL = "https://rpc.testnet.arc.network";
+export const ARC_RPC_DRPC_OFFICIAL = "https://rpc.drpc.testnet.arc.io";
+export const ARC_RPC_DRPC_PROXY = "https://rpc.blockdaemon.testnet.arc.io";
+export const ARC_RPC_OFFICIAL = "https://rpc.testnet.arc.io";
 export const ARC_RPC = ARC_RPC_DRPC_OFFICIAL;
 export const ARC_RPC_FALLBACK = ARC_RPC_DRPC_PROXY;
 

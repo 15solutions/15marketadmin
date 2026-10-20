@@ -258,9 +258,9 @@ const handleNativeShare = async () => {
 
   if (!trade) return null;
 
-  const accent = isWin ? '#00FF88' : '#FF1744';
-  const accentMid = isWin ? '#17A364' : '#D50000';
-  const accentDark = isWin ? '#0d5c38' : '#8B0000';
+  const accent = isWin ? '#1A6140' : '#FF1744';
+  const accentMid = isWin ? '#1A6140' : '#D50000';
+  const accentDark = isWin ? '#123F28' : '#8B0000';
   const accentDeep = isWin ? '#063d23' : '#4a0000';
 
   return (
@@ -306,11 +306,11 @@ const handleNativeShare = async () => {
               {/* Ambient Glow */}
               <div
                 className="absolute -top-32 -left-32 w-80 h-80 rounded-full blur-[100px] opacity-25"
-                style={{ backgroundColor: isWin ? '#17A364' : '#EF5350' }}
+                style={{ backgroundColor: isWin ? '#1A6140' : '#EF5350' }}
               />
               <div
                 className="absolute -bottom-32 -right-32 w-80 h-80 rounded-full blur-[100px] opacity-15"
-                style={{ backgroundColor: isWin ? '#17A364' : '#EF5350' }}
+                style={{ backgroundColor: isWin ? '#1A6140' : '#EF5350' }}
               />
 
               {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ Ultra-Faded Sci-Fi Cyberspace Background ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
@@ -415,8 +415,8 @@ const handleNativeShare = async () => {
                     <div className="mt-[-3%]">
                       <div className="text-white text-[17px] font-bold">{sym}/USDC</div>
                       <div className="flex items-center gap-2">
-                        {isUp ? <ArrowUp size={13} className="text-[#17A364]" /> : <ArrowDown size={13} className="text-[#EF5350]" />}
-                        <span className={`text-[13px] font-bold ${isUp ? 'text-[#17A364]' : 'text-[#EF5350]'}`}>
+                        {isUp ? <ArrowUp size={13} className="text-[#1A6140]" /> : <ArrowDown size={13} className="text-[#EF5350]" />}
+                        <span className={`text-[13px] font-bold ${isUp ? 'text-[#1A6140]' : 'text-[#EF5350]'}`}>
                           {isUp ? 'YES' : 'NO'}
                         </span>
                         <span className="text-white/15 text-[10px]">|</span>
@@ -431,8 +431,8 @@ const handleNativeShare = async () => {
                       <div
                         className="text-[52px] font-black leading-none tracking-tighter"
                         style={{
-                          color: isWin ? '#17A364' : '#EF5350',
-                          textShadow: isWin ? '0 0 30px rgba(23,163,100,0.3)' : '0 0 30px rgba(239,83,80,0.3)'
+                          color: isWin ? '#1A6140' : '#EF5350',
+                          textShadow: isWin ? '0 0 30px rgba(26, 97, 64,0.3)' : '0 0 30px rgba(239,83,80,0.3)'
                         }}
                       >
                         {isWin ? '+' : '-'}${Number(isWin ? (trade.payout || 0) : (trade.amount || 0)).toFixed(2)}
@@ -471,7 +471,7 @@ const handleNativeShare = async () => {
                   className="w-full h-full overflow-hidden flex flex-col items-center"
                   style={{
                     background: isWin
-                      ? 'linear-gradient(180deg, #17A364 0%, #0d6b42 100%)'
+                      ? 'linear-gradient(180deg, #1A6140 0%, #123F28 100%)'
                       : 'linear-gradient(180deg, #EF5350 0%, #c62828 100%)',
                     // Shadows are cast to the LEFT only. An omni or rightward
                     // glow spilled onto the 52px signature strip beside it and,
@@ -499,7 +499,7 @@ const handleNativeShare = async () => {
                       className="text-white font-black text-[13px] tracking-[0.22em] uppercase drop-shadow-sm"
                       style={{
                         fontFamily: '"Comfortaa", cursive',
-                        filter: isWin ? 'drop-shadow(0 0 10px rgba(23,163,100,0.8))' : 'drop-shadow(0 0 10px rgba(239,83,80,0.8))'
+                        filter: isWin ? 'drop-shadow(0 0 10px rgba(26, 97, 64,0.8))' : 'drop-shadow(0 0 10px rgba(239,83,80,0.8))'
                       }}
                     >
                       {isWin ? 'WON' : 'LOST'}
@@ -511,12 +511,12 @@ const handleNativeShare = async () => {
               {/* 15market signature in right strip */}
               <style>{`@font-face { font-family: 'Autography'; src: url('/Autography.otf') format('opentype'); }`}</style>
               <div className="absolute right-0 top-0 bottom-0 w-[52px] flex flex-col items-center justify-center gap-2 pointer-events-none z-0 overflow-hidden">
-                <div className="h-[26px] w-px" style={{ backgroundColor: isWin ? '#17A364' : '#EF5350', opacity: 0.3 }} />
+                <div className="h-[26px] w-px" style={{ backgroundColor: isWin ? '#1A6140' : '#EF5350', opacity: 0.3 }} />
                 <span
                   style={{
                     fontFamily: '"Autography", cursive',
                     fontSize: '22px',
-                    color: isWin ? '#17A364' : '#EF5350',
+                    color: isWin ? '#1A6140' : '#EF5350',
                     opacity: 0.3,
                     whiteSpace: 'nowrap',
                     writingMode: 'vertical-rl',
@@ -525,7 +525,7 @@ const handleNativeShare = async () => {
                 >
                   15market
                 </span>
-                <div className="h-[26px] w-px" style={{ backgroundColor: isWin ? '#17A364' : '#EF5350', opacity: 0.3 }} />
+                <div className="h-[26px] w-px" style={{ backgroundColor: isWin ? '#1A6140' : '#EF5350', opacity: 0.3 }} />
               </div>
 
               {/* QR Code */}
@@ -594,7 +594,7 @@ const handleNativeShare = async () => {
                     style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
                   >
                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', damping: 15, stiffness: 300 }}>
-                      <Check size={48} className="text-[#17A364]" strokeWidth={3} />
+                      <Check size={48} className="text-[#1A6140]" strokeWidth={3} />
                     </motion.div>
                     <motion.span
                       initial={{ opacity: 0, y: 10 }}
@@ -618,7 +618,7 @@ const handleNativeShare = async () => {
                 onClick={handleNativeShare}
                 disabled={!!saveState}
                 className="flex items-center gap-2 px-8 py-2.5 rounded-full text-[12px] font-bold text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                style={{ backgroundColor: '#17A364', fontFamily: '"Comfortaa", cursive' }}
+                style={{ backgroundColor: '#1A6140', fontFamily: '"Comfortaa", cursive' }}
               >
                 {saveState === 'saving' ? (
                   <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />

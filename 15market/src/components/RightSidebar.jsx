@@ -31,19 +31,19 @@ function SentimentGauge({ yesPct = 62, noPct = 38 }) {
       <div className="relative w-[160px] h-[90px] flex items-center justify-center">
         <svg width={svgWidth} height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`}>
           {/* Background arc - green side */}
-          <path d={describeArc(startAngle, startAngle + yesAngle)} fill="none" stroke="#249C6C" strokeWidth={strokeWidth} strokeLinecap="round" opacity="0.1" />
+          <path d={describeArc(startAngle, startAngle + yesAngle)} fill="none" stroke="#1A6140" strokeWidth={strokeWidth} strokeLinecap="round" opacity="0.1" />
           {/* Background arc - red side */}
           <path d={describeArc(startAngle + yesAngle, endAngle)} fill="none" stroke="#E13E27" strokeWidth={strokeWidth} strokeLinecap="round" opacity="0.1" />
           {/* Active green arc */}
-          <path d={describeArc(startAngle, startAngle + yesAngle)} fill="none" stroke="#249C6C" strokeWidth={strokeWidth} strokeLinecap="round" />
+          <path d={describeArc(startAngle, startAngle + yesAngle)} fill="none" stroke="#1A6140" strokeWidth={strokeWidth} strokeLinecap="round" />
           {/* Active red arc */}
           <path d={describeArc(startAngle + yesAngle, endAngle)} fill="none" stroke="#E13E27" strokeWidth={strokeWidth} strokeLinecap="round" />
         </svg>
       </div>
       <div className="flex items-center justify-between w-full px-2 mt-1">
         <div className="text-center flex-1">
-          <div className="text-[#249C6C] text-[15px] font-black leading-none">{yesPct}%</div>
-          <div className="text-[9px] font-black text-[#249C6C] tracking-[0.15em] uppercase mt-0.5">YES</div>
+          <div className="text-[#1A6140] text-[15px] font-black leading-none">{yesPct}%</div>
+          <div className="text-[9px] font-black text-[#1A6140] tracking-[0.15em] uppercase mt-0.5">YES</div>
         </div>
         <div className="text-center flex-1">
           <div className="text-[#E13E27] text-[15px] font-black leading-none">{noPct}%</div>
@@ -130,7 +130,7 @@ export default function RightSidebar({
         <div className="space-y-2">
           {[
             { label: 'Current Price', value: `$${stats.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}` },
-            { label: '24h Change', value: `${stats.change >= 0 ? '+' : ''}${stats.change.toFixed(2)}%`, color: stats.change >= 0 ? 'text-[#249C6C]' : 'text-[#E13E27]' },
+            { label: '24h Change', value: `${stats.change >= 0 ? '+' : ''}${stats.change.toFixed(2)}%`, color: stats.change >= 0 ? 'text-[#1A6140]' : 'text-[#E13E27]' },
             { label: '24h High', value: `$${stats.high.toLocaleString(undefined, { minimumFractionDigits: 2 })}` },
             { label: '24h Low', value: `$${stats.low.toLocaleString(undefined, { minimumFractionDigits: 2 })}` },
             { label: '24h Volume', value: `$${stats.volume.toFixed(2)}M` },
@@ -165,13 +165,13 @@ export default function RightSidebar({
                 </div>
                 <span className="text-[11px] font-black text-gray-700">{m.symbol}</span>
               </div>
-              <span className="px-2 py-[1.5px] border border-[#249C6C]/25 text-[7px] font-black text-[#249C6C] uppercase rounded tracking-wider bg-[#249C6C]/5">
+              <span className="px-2 py-[1.5px] border border-[#1A6140]/25 text-[7px] font-black text-[#1A6140] uppercase rounded tracking-wider bg-[#1A6140]/5">
                 NEW
               </span>
             </div>
           ))}
         </div>
-        <button className="w-full mt-3 pt-2.5 border-t border-gray-50 flex items-center justify-center gap-1 text-[10px] font-bold text-gray-400 hover:text-[#249C6C] transition-colors uppercase tracking-wider">
+        <button className="w-full mt-3 pt-2.5 border-t border-gray-50 flex items-center justify-center gap-1 text-[10px] font-bold text-gray-400 hover:text-[#1A6140] transition-colors uppercase tracking-wider">
           View All New Markets
           <span className="text-[12px] font-bold">›</span>
         </button>

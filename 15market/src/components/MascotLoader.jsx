@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 
 const LineArtPlane = ({ isTakingOff = false, progress = 0 }) => {
-    const color = '#249C6C';
+    const color = '#1A6140';
 
     // Lift up as takeoff approaches (roughly after 70% progress)
     // We'll lift it up more and pitch it up
@@ -81,7 +81,7 @@ export const MascotLoader = ({ progress = 0, status = 'walking', label = "Loadin
                 {/* Runway Dashed Markings */}
                 <div className={`absolute inset-x-0 -bottom-3 flex justify-around px-8 ${isLight ? 'opacity-30' : 'opacity-20'}`}>
                     {[...Array(8)].map((_, i) => (
-                        <div key={i} className="w-4 h-[1px] bg-[#249C6C]" />
+                        <div key={i} className="w-4 h-[1px] bg-[#1A6140]" />
                     ))}
                 </div>
 
@@ -101,7 +101,7 @@ export const MascotLoader = ({ progress = 0, status = 'walking', label = "Loadin
 
                 {/* Ground Heat Blur VFX */}
                 <motion.div
-                    className="absolute -bottom-6 w-16 h-4 blur-xl bg-[#249C6C]/20 rounded-full"
+                    className="absolute -bottom-6 w-16 h-4 blur-xl bg-[#1A6140]/20 rounded-full"
                     animate={{
                         left: `${progress}%`,
                         opacity: isTakingOff ? [0.3, 0.6, 0.3] : 0,
@@ -112,7 +112,7 @@ export const MascotLoader = ({ progress = 0, status = 'walking', label = "Loadin
 
                 {/* Progress Fill (Fuel/Thrust Path) */}
                 <motion.div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-[#249C6C]/40 to-[#249C6C] rounded-full shadow-[0_0_20px_rgba(36, 156, 108,0.4)]"
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-[#1A6140]/40 to-[#1A6140] rounded-full shadow-[0_0_20px_rgba(26, 97, 64,0.4)]"
                     animate={{ width: `${progress}%` }}
                     transition={{
                         type: "tween",

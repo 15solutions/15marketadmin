@@ -5,7 +5,7 @@ const CheckmarkSVG = () => (
   <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
     <motion.circle
       cx="36" cy="36" r="32"
-      stroke="#249C6C"
+      stroke="#1A6140"
       strokeWidth="3"
       fill="none"
       initial={{ pathLength: 0, opacity: 0 }}
@@ -14,7 +14,7 @@ const CheckmarkSVG = () => (
     />
     <motion.path
       d="M22 36 L32 46 L50 26"
-      stroke="#249C6C"
+      stroke="#1A6140"
       strokeWidth="3.5"
       strokeLinecap="round"
       strokeLinejoin="round"

@@ -6,8 +6,8 @@ import { isTradeSettled } from '../utils/tradeStatus';
 import { KEEPER_URL_ARC } from '../constants';
 
 const LCD_COUNTER_STYLE = `
-  .lcd-live-dot-dark { background: #3dff8f; box-shadow: 0 0 6px #00ff41, 0 0 14px #249C6C; }
-  .lcd-live-dot-light { background: #249C6C; box-shadow: 0 0 5px rgba(36,156,108,0.55); }
+  .lcd-live-dot-dark { background: #1A6140; box-shadow: 0 0 6px #1A6140, 0 0 14px #1A6140; }
+  .lcd-live-dot-light { background: #1A6140; box-shadow: 0 0 5px rgba(26, 97, 64,0.55); }
   .lcd-live-blink { animation: lcd-live-blink-kf 1s step-end infinite; }
   @keyframes lcd-live-blink-kf { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
   @keyframes futuristic-sweep { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
@@ -150,8 +150,8 @@ function LiveExecutionComponent({
                         const outerCirc = 2 * Math.PI * outerR;
                         const progress = Math.max(0, Math.min(1, rawTimeLeft / duration));
                         const offset = circ * (1 - progress);
-                        const ringColor = liveWinning ? '#249C6C' : '#FF4D4D';
-                        const glowColor = liveWinning ? 'rgba(36,156,108,0.4)' : 'rgba(255,77,77,0.4)';
+                        const ringColor = liveWinning ? '#1A6140' : '#FF4D4D';
+                        const glowColor = liveWinning ? 'rgba(26, 97, 64,0.4)' : 'rgba(255,77,77,0.4)';
                         const tickCount = 40;
 
                         return (
@@ -167,14 +167,14 @@ function LiveExecutionComponent({
                                     <div className="flex items-center justify-between w-full mb-1">
                                         <div className="flex items-center gap-1.5">
                                             <div className={`w-1.5 h-1.5 rounded-full ${displayFinal
-                                                ? ((instantStatus === "WON") ? 'bg-[#249C6C]' : 'bg-[#FF7F50]')
-                                                : (timerExpired ? 'bg-yellow-400 animate-pulse shadow-[0_0_8px_#FBBF24]' : (liveWinning ? 'bg-[#249C6C] animate-pulse shadow-[0_0_8px_#249C6C]' : 'bg-[#FF7F50] animate-pulse shadow-[0_0_8px_#FF7F50]'))}`} />
+                                                ? ((instantStatus === "WON") ? 'bg-[#1A6140]' : 'bg-[#FF7F50]')
+                                                : (timerExpired ? 'bg-yellow-400 animate-pulse shadow-[0_0_8px_#FBBF24]' : (liveWinning ? 'bg-[#1A6140] animate-pulse shadow-[0_0_8px_#1A6140]' : 'bg-[#FF7F50] animate-pulse shadow-[0_0_8px_#FF7F50]'))}`} />
                                             <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>
                                                 {displayFinal ? instantStatus : (timerExpired ? "LOCKING..." : "")}
                                             </span>
                                         </div>
                                         {activeTrades.length > 0 && (
-                                            <div className={`flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-black ${isLight ? 'bg-[#249C6C] text-white shadow-sm' : 'bg-[#249C6C] text-black shadow-[0_0_10px_rgba(61,255,143,0.3)]'}`}>
+                                            <div className={`flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-black ${isLight ? 'bg-[#1A6140] text-white shadow-sm' : 'bg-[#1A6140] text-black shadow-[0_0_10px_rgba(26, 97, 64,0.3)]'}`}>
                                                 {activeTrades.length}
                                             </div>
                                         )}
@@ -266,7 +266,7 @@ function LiveExecutionComponent({
                                                 </div>
 
                                                 {/* Win/Loss status label */}
-                                                <span className={`text-[7px] font-black uppercase tracking-[0.25em] mb-1 md:mb-0 ${timerExpired ? 'text-yellow-400' : (liveWinning ? "text-[#249C6C]" : "text-[#FF7F50]")}`}>
+                                                <span className={`text-[7px] font-black uppercase tracking-[0.25em] mb-1 md:mb-0 ${timerExpired ? 'text-yellow-400' : (liveWinning ? "text-[#1A6140]" : "text-[#FF7F50]")}`}>
                                                     {timerExpired ? "LOCKING..." : (liveWinning ? "WINNING" : "LOSING")}
                                                 </span>
                                             </div>
@@ -274,16 +274,16 @@ function LiveExecutionComponent({
                                     ) : (
                                         /* Final Result View */
                                         <div className="flex flex-col items-center justify-center flex-1 gap-1 py-2">
-                                            <span className={`text-[10px] font-black uppercase tracking-widest ${(instantStatus === "WON") ? 'text-[#249C6C]' : 'text-[#FF7F50]'}`}>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${(instantStatus === "WON") ? 'text-[#1A6140]' : 'text-[#FF7F50]'}`}>
                                                 {(instantStatus === "WON") ? "Trade Won" : "Trade Lost"}
                                             </span>
-                                            <span className={`text-base font-matrix tracking-widest ${(instantStatus === "WON" || trade.status === "WON") ? 'text-[#249C6C]' : 'text-[#FF7F50]'}`}>
+                                            <span className={`text-base font-matrix tracking-widest ${(instantStatus === "WON" || trade.status === "WON") ? 'text-[#1A6140]' : 'text-[#FF7F50]'}`}>
                                                 {(instantStatus === "WON" || trade.status === "WON") ? `+$${Number(trade.payout || potentialProfit).toFixed(2)}` : "$0.00"}
                                             </span>
                                             {isPayoutPending && (
                                                 <div className="flex items-center gap-1">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#249C6C] animate-ping" />
-                                                    <span className="text-[6px] font-black uppercase tracking-widest text-[#249C6C]/60">Payout Pending</span>
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#1A6140] animate-ping" />
+                                                    <span className="text-[6px] font-black uppercase tracking-widest text-[#1A6140]/60">Payout Pending</span>
                                                 </div>
                                             )}
                                             <div className="flex items-center gap-2 mt-1">
@@ -301,7 +301,7 @@ function LiveExecutionComponent({
                                                 {isFinal && (
                                                     <button
                                                         onClick={() => removeTrade(trade.id)}
-                                                        className={`p-1 rounded-full transition-colors ${isLight ? 'bg-[#249C6C]/10 hover:bg-[#249C6C]/20 text-[#0a261a]/40' : 'bg-white/5 hover:bg-white/10 text-white/40'}`}
+                                                        className={`p-1 rounded-full transition-colors ${isLight ? 'bg-[#1A6140]/10 hover:bg-[#1A6140]/20 text-[#0a261a]/40' : 'bg-white/5 hover:bg-white/10 text-white/40'}`}
                                                     >
                                                         <X size={10} />
                                                     </button>

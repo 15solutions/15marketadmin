@@ -73,7 +73,7 @@ function AssetLogo({ symbol, size = 28, isLight = false, className = '' }) {
   if (hasError || !imgSrc) {
     return (
       <div
-        className={`flex items-center justify-center shrink-0 text-[#17A364] font-black text-[11px] tracking-tight ${className}`}
+        className={`flex items-center justify-center shrink-0 text-[#1A6140] font-black text-[11px] tracking-tight ${className}`}
         style={{ width: size, height: size }}
       >
         {cleanSym.slice(0, 3) || '???'}
@@ -222,10 +222,10 @@ export default function TradeHistoryTable({
               onClick={() => setShowVerifier(!showVerifier)}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-transparent border-none outline-none transition-colors ${
                 showVerifier
-                  ? 'text-[#17A364]'
+                  ? 'text-[#1A6140]'
                   : isLight
-                  ? 'text-gray-500 hover:text-[#17A364]'
-                  : 'text-white/40 hover:text-[#17A364]'
+                  ? 'text-gray-500 hover:text-[#1A6140]'
+                  : 'text-white/40 hover:text-[#1A6140]'
               }`}
             >
               <ShieldCheck size={13} />
@@ -235,7 +235,7 @@ export default function TradeHistoryTable({
             <button
               onClick={onToggleExpand}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-transparent border-none outline-none transition-colors ${
-                isLight ? 'text-gray-500 hover:text-[#17A364]' : 'text-white/40 hover:text-[#17A364]'
+                isLight ? 'text-gray-500 hover:text-[#1A6140]' : 'text-white/40 hover:text-[#1A6140]'
               }`}
             >
               <span>Collapse</span>
@@ -256,8 +256,8 @@ export default function TradeHistoryTable({
                 placeholder="Enter Trade ID / Tx Hash to verify & view card..."
                 className={`flex-1 px-3 py-2 rounded-xl text-[11px] font-bold outline-none border transition-all ${
                   isLight
-                    ? 'bg-transparent border-gray-300 text-[#111827] placeholder-gray-400 focus:border-[#17A364]'
-                    : 'bg-transparent border-white/15 text-white placeholder-white/30 focus:border-[#17A364]'
+                    ? 'bg-transparent border-gray-300 text-[#111827] placeholder-gray-400 focus:border-[#1A6140]'
+                    : 'bg-transparent border-white/15 text-white placeholder-white/30 focus:border-[#1A6140]'
                 }`}
               />
               <button
@@ -266,13 +266,13 @@ export default function TradeHistoryTable({
                 className={`px-4 py-2 rounded-xl text-[11px] font-bold text-white transition-all ${
                   verifying ? 'opacity-50' : 'hover:scale-105 active:scale-95'
                 }`}
-                style={{ backgroundColor: '#17A364' }}
+                style={{ backgroundColor: '#1A6140' }}
               >
                 {verifying ? 'Verifying...' : 'Verify'}
               </button>
             </div>
             {verifyResult && (
-              <div className={`mt-2 px-3 py-2.5 rounded-xl text-[11px] font-bold ${verifyResult.error ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-[#17A364]/10 text-[#17A364] border border-[#17A364]/20'}`}>
+              <div className={`mt-2 px-3 py-2.5 rounded-xl text-[11px] font-bold ${verifyResult.error ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-[#1A6140]/10 text-[#1A6140] border border-[#1A6140]/20'}`}>
                 {verifyResult.error ? (
                   <div className="flex items-center gap-1.5"><XCircle size={13} /> {verifyResult.error}</div>
                 ) : (
@@ -285,7 +285,7 @@ export default function TradeHistoryTable({
                     </div>
                     <button
                       onClick={() => onShare?.(verifyResult)}
-                      className="px-3 py-1.5 rounded-lg bg-[#17A364] text-white text-[10px] font-bold hover:brightness-110 active:scale-95 transition-all shrink-0"
+                      className="px-3 py-1.5 rounded-lg bg-[#1A6140] text-white text-[10px] font-bold hover:brightness-110 active:scale-95 transition-all shrink-0"
                     >
                       View Card
                     </button>
@@ -341,7 +341,7 @@ export default function TradeHistoryTable({
                       </span>
                       <span
                         className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                          isUp ? 'bg-[#17A364]/15 text-[#17A364]' : 'bg-[#EF5350]/15 text-[#EF5350]'
+                          isUp ? 'bg-[#1A6140]/15 text-[#1A6140]' : 'bg-[#EF5350]/15 text-[#EF5350]'
                         }`}
                       >
                         {isUp ? <ArrowUp size={9} /> : <ArrowDown size={9} />}
@@ -376,7 +376,7 @@ export default function TradeHistoryTable({
                         PENDING
                       </span>
                     ) : isWin ? (
-                      <span className="text-[13px] font-black text-[#17A364] tabular-nums">
+                      <span className="text-[13px] font-black text-[#1A6140] tabular-nums">
                         +${Number(trade.payout || 0).toFixed(2)}
                       </span>
                     ) : (
@@ -407,8 +407,8 @@ export default function TradeHistoryTable({
                     }}
                     className={`p-1.5 bg-transparent border-none outline-none transition-colors ${
                       isLight
-                        ? 'text-gray-400 hover:text-[#17A364]'
-                        : 'text-white/40 hover:text-[#17A364]'
+                        ? 'text-gray-400 hover:text-[#1A6140]'
+                        : 'text-white/40 hover:text-[#1A6140]'
                     }`}
                     title="Share Trade Card"
                   >
@@ -422,8 +422,8 @@ export default function TradeHistoryTable({
                     onClick={(e) => e.stopPropagation()}
                     className={`p-1.5 bg-transparent border-none outline-none transition-colors ${
                       isLight
-                        ? 'text-gray-400 hover:text-[#17A364]'
-                        : 'text-white/40 hover:text-[#17A364]'
+                        ? 'text-gray-400 hover:text-[#1A6140]'
+                        : 'text-white/40 hover:text-[#1A6140]'
                     }`}
                     title={hasTx ? 'View on ArcScan Explorer' : 'Open ArcScan Explorer'}
                   >
@@ -485,7 +485,7 @@ export default function TradeHistoryTable({
                 <div className="flex items-center gap-2 min-h-5">
                   <span className="inline-flex items-center gap-1">
                     <span className={`text-[11px] font-bold leading-none ${isLight ? 'text-gray-500' : 'text-white/40'}`}>Pos:</span>
-                    <span className={`text-[12px] font-black ${trade.direction === 'UP' ? 'text-[#17A364]' : 'text-[#EF5350]'}`}>
+                    <span className={`text-[12px] font-black ${trade.direction === 'UP' ? 'text-[#1A6140]' : 'text-[#EF5350]'}`}>
                       {trade.direction === 'UP' ? 'YES' : 'NO'}
                     </span>
                   </span>
@@ -499,7 +499,7 @@ export default function TradeHistoryTable({
                   {isTradeSettled(trade) && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onShare?.(trade); }}
-                    className={`inline-flex items-center justify-center w-5 h-5 shrink-0 rounded-full ${isLight ? 'text-[#249C6C] hover:bg-[#249C6C]/10' : 'text-[#17A364] hover:bg-[#17A364]/10'}`}
+                    className={`inline-flex items-center justify-center w-5 h-5 shrink-0 rounded-full ${isLight ? 'text-[#1A6140] hover:bg-[#1A6140]/10' : 'text-[#1A6140] hover:bg-[#1A6140]/10'}`}
                     title="Share Card"
                   >
                     <Share2 size={12} />
@@ -512,7 +512,7 @@ export default function TradeHistoryTable({
                     {isActive ? (
                       <span className="text-[12px] font-black text-yellow-500 animate-pulse">PENDING</span>
                     ) : (
-                      <span className={`text-[12px] font-black ${isWin ? 'text-[#17A364]' : 'text-[#EF5350]'}`}>
+                      <span className={`text-[12px] font-black ${isWin ? 'text-[#1A6140]' : 'text-[#EF5350]'}`}>
                         {isWin ? `Won $${Number(trade.payout || 0).toFixed(2)}` : `Lost -$${Number(trade.amount || 0).toFixed(2)}`}
                       </span>
                     )}
@@ -529,7 +529,7 @@ export default function TradeHistoryTable({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className={`inline-flex items-center justify-center w-5 h-5 shrink-0 rounded-full ${isLight ? 'text-[#249C6C] hover:bg-[#249C6C]/10' : 'text-[#17A364] hover:bg-[#17A364]/10'}`}
+                          className={`inline-flex items-center justify-center w-5 h-5 shrink-0 rounded-full ${isLight ? 'text-[#1A6140] hover:bg-[#1A6140]/10' : 'text-[#1A6140] hover:bg-[#1A6140]/10'}`}
                           title="View on ArcScan"
                         >
                           <ExternalLink size={12} />

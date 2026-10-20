@@ -79,7 +79,7 @@ export function CircleWalletSection({ address, isLight, notify, onOpen }) {
     if (isLoading) {
         return (
             <div className={`p-6 rounded-[24px] ${isLight ? 'bg-black/5' : 'bg-white/5'} flex items-center justify-center`}>
-                <RefreshCw size={20} className="animate-spin text-[#249C6C]" />
+                <RefreshCw size={20} className="animate-spin text-[#1A6140]" />
             </div>
         );
     }
@@ -92,13 +92,13 @@ export function CircleWalletSection({ address, isLight, notify, onOpen }) {
         <div className="mt-6">
             <div className={`p-5 rounded-[28px] ${isLight ? 'bg-white border-black/5' : 'bg-[#151515] border-white/5'} border shadow-xl relative overflow-hidden group`}>
                 {/* Decorative Background */}
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#249C6C]/5 blur-3xl rounded-full" />
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#1A6140]/5 blur-3xl rounded-full" />
                 
                 <div className="flex items-center justify-between mb-4 relative z-10">
                     <div>
                         <p className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>Circle Managed Wallet</p>
                         <div className="flex items-center gap-2 mt-1">
-                            <h4 className={`text-sm font-black font-mono ${isLight ? 'text-black' : 'text-[#249C6C]'}`}>
+                            <h4 className={`text-sm font-black font-mono ${isLight ? 'text-black' : 'text-[#1A6140]'}`}>
                                 {truncate(walletInfo.wallet.address)}
                             </h4>
                             <div className="flex items-center gap-1">
@@ -140,7 +140,7 @@ export function CircleWalletSection({ address, isLight, notify, onOpen }) {
                 <div className="grid grid-cols-2 gap-3 relative z-10">
                     <button 
                         onClick={() => onOpen?.('send')}
-                        className="flex items-center justify-center gap-2 bg-[#249C6C] text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-[#249C6C]/20"
+                        className="flex items-center justify-center gap-2 bg-[#1A6140] text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-[#1A6140]/20"
                     >
                         <Send size={14} />
                         Send Tokens

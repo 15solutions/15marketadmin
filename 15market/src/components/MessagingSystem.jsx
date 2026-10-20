@@ -74,14 +74,14 @@ function MessagingSystem({ wallet, connection, isOpen, onClose, isAdminView = fa
     };
 
     const getRoleColor = (addr) => {
-        if (addr === ROLES.ADMIN) return 'text-[#249C6C]';
+        if (addr === ROLES.ADMIN) return 'text-[#1A6140]';
         if (addr === ROLES.MODERATOR) return 'text-[#6366f1]';
         if (addr === ROLES.LISTER) return 'text-[#FF8C00]';
         return isLight ? 'text-[#0a261a]' : 'text-white';
     };
 
     const getRoleIcon = (addr) => {
-        if (addr === ROLES.ADMIN) return <ShieldCheck size={14} className="text-[#249C6C]" />;
+        if (addr === ROLES.ADMIN) return <ShieldCheck size={14} className="text-[#1A6140]" />;
         if (addr === ROLES.MODERATOR) return <Hammer size={14} className="text-[#6366f1]" />;
         if (addr === ROLES.LISTER) return <Hammer size={14} className="text-[#FF8C00]" />;
         return <User size={14} className={isLight ? 'text-[#0a261a]/20' : 'text-white/40'} />;
@@ -89,13 +89,13 @@ function MessagingSystem({ wallet, connection, isOpen, onClose, isAdminView = fa
 
     const content = (
         <div className={embedded
-            ? `w-full h-full ${isLight ? 'bg-[#f0f9f4] border-[#249C6C]/20' : 'bg-[#0D0D0D] border-white/10'} border rounded-[32px] flex flex-col overflow-hidden backdrop-blur-md`
-            : `w-[450px] h-[650px] ${isLight ? 'bg-[#f0f9f4] border-[#249C6C]/20' : 'bg-[#0D0D0D] border-white/10'} border rounded-[40px] shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden backdrop-blur-2xl`
+            ? `w-full h-full ${isLight ? 'bg-[#f0f9f4] border-[#1A6140]/20' : 'bg-[#0D0D0D] border-white/10'} border rounded-[32px] flex flex-col overflow-hidden backdrop-blur-md`
+            : `w-[450px] h-[650px] ${isLight ? 'bg-[#f0f9f4] border-[#1A6140]/20' : 'bg-[#0D0D0D] border-white/10'} border rounded-[40px] shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden backdrop-blur-2xl`
         }>
             {/* Header */}
-            <div className={`p-6 border-b ${isLight ? 'border-[#249C6C]/10' : 'border-white/5'} flex items-center justify-between`}>
+            <div className={`p-6 border-b ${isLight ? 'border-[#1A6140]/10' : 'border-white/5'} flex items-center justify-between`}>
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-[#249C6C]/10 border border-[#249C6C]/20 rounded-lg text-[#249C6C]">
+                    <div className="p-2 bg-[#1A6140]/10 border border-[#1A6140]/20 rounded-lg text-[#1A6140]">
                         <MessageSquare size={16} />
                     </div>
                     <div>
@@ -111,7 +111,7 @@ function MessagingSystem({ wallet, connection, isOpen, onClose, isAdminView = fa
             </div>
 
             {/* Chat Messages */}
-            <div className={`flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar ${isLight ? 'bg-[#249C6C]/5' : 'bg-black/20'}`}>
+            <div className={`flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar ${isLight ? 'bg-[#1A6140]/5' : 'bg-black/20'}`}>
                 {messages.length === 0 ? (
                     <div className={`h-full flex flex-col items-center justify-center text-center ${isLight ? 'opacity-10' : 'opacity-20'}`}>
                         <MessageSquare size={48} className="mb-4" />
@@ -122,8 +122,8 @@ function MessagingSystem({ wallet, connection, isOpen, onClose, isAdminView = fa
                     messages.map((m, i) => (
                         <div key={i} className={`flex flex-col ${m.sender === myAddress ? 'items-end' : 'items-start'}`}>
                             <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-[11px] font-bold shadow-xl ${m.sender === myAddress
-                                ? 'bg-[#249C6C] text-white rounded-tr-none'
-                                : (isLight ? 'bg-[#f8fdfb] text-[#0a261a] border border-[#249C6C]/10 rounded-tl-none' : 'bg-white/5 text-white/80 border border-white/5 rounded-tl-none')
+                                ? 'bg-[#1A6140] text-white rounded-tr-none'
+                                : (isLight ? 'bg-[#f8fdfb] text-[#0a261a] border border-[#1A6140]/10 rounded-tl-none' : 'bg-white/5 text-white/80 border border-white/5 rounded-tl-none')
                                 }`}>
                                 {m.text}
                             </div>
@@ -131,7 +131,7 @@ function MessagingSystem({ wallet, connection, isOpen, onClose, isAdminView = fa
                                 <span className={`text-[7px] uppercase font-black tracking-widest ${getRoleColor(m.sender)}`}>
                                     {m.senderName || formatAddress(m.sender)} • {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
-                                {m.sender === myAddress && <Check size={8} className="text-[#249C6C]" />}
+                                {m.sender === myAddress && <Check size={8} className="text-[#1A6140]" />}
                             </div>
                         </div>
                     ))
@@ -140,17 +140,17 @@ function MessagingSystem({ wallet, connection, isOpen, onClose, isAdminView = fa
             </div>
 
             {/* Input Area */}
-            <form onSubmit={handleSendMessage} className={`p-6 ${isLight ? 'bg-[#f0f9f4] border-[#249C6C]/10' : 'bg-black/40 border-white/5'} border-t`}>
+            <form onSubmit={handleSendMessage} className={`p-6 ${isLight ? 'bg-[#f0f9f4] border-[#1A6140]/10' : 'bg-black/40 border-white/5'} border-t`}>
                 <div className="flex gap-3">
                     <input
                         value={inputMessage}
                         onChange={(e) => setInputMessage(e.target.value)}
                         placeholder="Broadcast to lobby..."
-                        className={`flex-1 ${isLight ? 'bg-[#249C6C]/5 border-[#249C6C]/10 text-[#0a261a] placeholder:text-[#0a261a]/30' : 'bg-white/5 border-white/10 text-white'} border rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-[#249C6C]/40`}
+                        className={`flex-1 ${isLight ? 'bg-[#1A6140]/5 border-[#1A6140]/10 text-[#0a261a] placeholder:text-[#0a261a]/30' : 'bg-white/5 border-white/10 text-white'} border rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-[#1A6140]/40`}
                     />
                     <button
                         type="submit"
-                        className="p-3 bg-[#249C6C] text-white rounded-xl shadow-[0_10px_20px_rgba(36, 156, 108,0.3)] hover:scale-105 transition-all active:scale-95"
+                        className="p-3 bg-[#1A6140] text-white rounded-xl shadow-[0_10px_20px_rgba(26, 97, 64,0.3)] hover:scale-105 transition-all active:scale-95"
                     >
                         <Send size={18} />
                     </button>

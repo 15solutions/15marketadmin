@@ -54,14 +54,14 @@ export function LatencyMeter({ currentNetwork = 'arc' }) {
                 <div>
                     <h3 className="text-sm font-black uppercase tracking-widest text-white/40">Network Performance</h3>
                     <div className="flex items-center gap-2 mt-1">
-                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${status === "OPTIMAL" ? "bg-[#249C6C]" : status === "STABLE" ? "bg-orange-500" : "bg-red-500"}`} />
-                        <span className={`text-[10px] font-black uppercase ${status === "OPTIMAL" ? "text-[#249C6C]" : status === "STABLE" ? "text-orange-500" : "text-red-500"}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${status === "OPTIMAL" ? "bg-[#1A6140]" : status === "STABLE" ? "bg-orange-500" : "bg-red-500"}`} />
+                        <span className={`text-[10px] font-black uppercase ${status === "OPTIMAL" ? "text-[#1A6140]" : status === "STABLE" ? "text-orange-500" : "text-red-500"}`}>
                             SYSTEM {status}
                         </span>
                     </div>
                 </div>
                 <div className="p-2 rounded-lg bg-white/5">
-                    <Activity size={16} className="text-[#249C6C]" />
+                    <Activity size={16} className="text-[#1A6140]" />
                 </div>
             </div>
 
@@ -93,11 +93,11 @@ export function LatencyMeter({ currentNetwork = 'arc' }) {
                 {history.map((h, i) => (
                     <div key={i} className="flex-1 flex flex-col justify-end h-full">
                         <div
-                            className="w-full bg-[#249C6C]/30 rounded-t-[1px] transition-all duration-500"
+                            className="w-full bg-[#1A6140]/30 rounded-t-[1px] transition-all duration-500"
                             style={{ height: `${Math.min((h.rpc / 1000) * 100, 100)}%` }}
                         />
                         <div
-                            className="w-full bg-[#249C6C]/50 rounded-t-[1px] transition-all duration-500"
+                            className="w-full bg-[#1A6140]/50 rounded-t-[1px] transition-all duration-500"
                             style={{ height: `${Math.min((h.price / 1000) * 100, 100)}%` }}
                         />
                     </div>
@@ -106,11 +106,11 @@ export function LatencyMeter({ currentNetwork = 'arc' }) {
             <div className="flex justify-between mt-3 px-1">
                 <div className="flex gap-3">
                     <div className="flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#249C6C]/50" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#1A6140]/50" />
                         <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">RPC</span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#249C6C]/50" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#1A6140]/50" />
                         <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Oracle</span>
                     </div>
                 </div>

@@ -82,8 +82,8 @@ export function DocsPage({ onBack, theme = "dark", onToggleTheme, isSmallScreen 
             <style>{`.no-sb::-webkit-scrollbar{display:none}.no-sb{-ms-overflow-style:none;scrollbar-width:none}`}</style>
 
             {/* Glows */}
-            <div className="pointer-events-none absolute top-0 right-0 w-96 h-96 rounded-full bg-[#249C6C]/10 blur-[100px]" />
-            <div className="pointer-events-none absolute bottom-0 left-0 w-72 h-72 rounded-full bg-[#249C6C]/6 blur-[80px]" />
+            <div className="pointer-events-none absolute top-0 right-0 w-96 h-96 rounded-full bg-[#1A6140]/10 blur-[100px]" />
+            <div className="pointer-events-none absolute bottom-0 left-0 w-72 h-72 rounded-full bg-[#1A6140]/6 blur-[80px]" />
 
             {/* HEADER */}
             <div className="flex-none flex items-center justify-between px-5 md:px-10 pb-2 relative z-10 w-full"
@@ -93,7 +93,7 @@ export function DocsPage({ onBack, theme = "dark", onToggleTheme, isSmallScreen 
                         <ArrowLeft size={16} />
                     </button>
                     <div className="flex items-center gap-2">
-                        <BookOpen size={18} className="text-[#249C6C]" />
+                        <BookOpen size={18} className="text-[#1A6140]" />
                         <h1 className={`text-lg font-black uppercase tracking-widest ${isLight ? "text-[#0f2618]" : "text-white"}`}>Platform Documentation</h1>
                     </div>
                 </div>
@@ -106,7 +106,7 @@ export function DocsPage({ onBack, theme = "dark", onToggleTheme, isSmallScreen 
             <div className="md:hidden flex-none flex gap-2 overflow-x-auto no-sb px-5 pb-3">
                 {SECTIONS.map((s, i) => (
                     <button key={s.id} onClick={() => setActiveIdx(i)}
-                        className={`flex-none px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${i === activeIdx ? "bg-[#249C6C] text-white shadow-md" : isLight ? "bg-black/5 text-black/60 hover:bg-black/10" : "bg-white/5 text-white/50 hover:bg-white/10"}`}>
+                        className={`flex-none px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${i === activeIdx ? "bg-[#1A6140] text-white shadow-md" : isLight ? "bg-black/5 text-black/60 hover:bg-black/10" : "bg-white/5 text-white/50 hover:bg-white/10"}`}>
                         {s.title}
                     </button>
                 ))}
@@ -118,24 +118,24 @@ export function DocsPage({ onBack, theme = "dark", onToggleTheme, isSmallScreen 
                 {/* SIDEBAR */}
                 <div className="w-64 flex-none flex flex-col gap-3 overflow-y-auto no-sb hidden md:flex">
                     <div className={`rounded-[24px] border p-4 flex flex-col gap-1 ${gl}`}>
-                        <div className="text-[9px] font-black uppercase tracking-widest text-[#249C6C] mb-2 px-2">Chapters</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-[#1A6140] mb-2 px-2">Chapters</div>
                         {SECTIONS.map((s, i) => {
                             const Icon = s.icon;
                             const active = i === activeIdx;
                             return (
                                 <button key={s.id} onClick={() => setActiveIdx(i)}
                                     className={`w-full px-4 py-2.5 rounded-2xl border border-transparent flex items-center gap-3 text-left transition-all text-xs font-bold uppercase tracking-wide
-                                        ${active ? (isLight ? "bg-[#249C6C] text-white shadow translate-x-1" : "bg-[#249C6C]/20 text-[#34D399] border-[#249C6C]/40 translate-x-1") : isLight ? "hover:bg-black/5 text-black/70" : "hover:bg-white/5 text-white/60"}`}
+                                        ${active ? (isLight ? "bg-[#1A6140] text-white shadow translate-x-1" : "bg-[#1A6140]/20 text-[#1A6140] border-[#1A6140]/40 translate-x-1") : isLight ? "hover:bg-black/5 text-black/70" : "hover:bg-white/5 text-white/60"}`}
                                 >
-                                    <Icon size={14} className={active ? "text-inherit" : "text-[#249C6C]"} />
+                                    <Icon size={14} className={active ? "text-inherit" : "text-[#1A6140]"} />
                                     {s.title}
                                 </button>
                             );
                         })}
                     </div>
                     <div className={`rounded-[24px] border p-4 flex flex-col gap-2 relative overflow-hidden ${gl}`}>
-                        <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-[#249C6C]/10 rounded-full blur-xl" />
-                        <div className="flex items-center gap-2 text-[#249C6C]"><Sparkles size={14} /><span className="text-[9px] font-black uppercase tracking-wider">Sub-45ms Execution</span></div>
+                        <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-[#1A6140]/10 rounded-full blur-xl" />
+                        <div className="flex items-center gap-2 text-[#1A6140]"><Sparkles size={14} /><span className="text-[9px] font-black uppercase tracking-wider">Sub-45ms Execution</span></div>
                         <p className={`text-[11px] leading-relaxed ${body}`}>Session signers authorize trades silently in memory, bypassing browser popup latency entirely.</p>
                     </div>
                 </div>
@@ -153,7 +153,7 @@ export function DocsPage({ onBack, theme = "dark", onToggleTheme, isSmallScreen 
                                 <h2 className={`text-base md:text-lg font-black uppercase tracking-wider ${isLight ? "text-[#0f2618]" : "text-white"}`}>
                                     {SECTIONS[activeIdx].title}
                                 </h2>
-                                <div className="w-10 h-0.5 bg-[#249C6C] mt-1 rounded-full" />
+                                <div className="w-10 h-0.5 bg-[#1A6140] mt-1 rounded-full" />
                             </div>
 
                             {activeIdx === 0 && <RenderIntro isLight={isLight} body={body} />}

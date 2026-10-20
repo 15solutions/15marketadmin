@@ -166,37 +166,37 @@ export function ProfileModal({
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className={`w-full max-w-[90%] md:max-w-md ${isLight ? 'bg-[#f0f9f4] border-[#249C6C]/20' : 'bg-[#0D0D0D] border-[#249C6C]/30'} border rounded-[24px] md:rounded-[32px] p-5 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.1)] relative overflow-y-auto max-h-[90vh] custom-scrollbar`}
+                    className={`w-full max-w-[90%] md:max-w-md ${isLight ? 'bg-[#f0f9f4] border-[#1A6140]/20' : 'bg-[#0D0D0D] border-[#1A6140]/30'} border rounded-[24px] md:rounded-[32px] p-5 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.1)] relative overflow-y-auto max-h-[90vh] custom-scrollbar`}
                 >
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#249C6C] to-transparent" />
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#1A6140] to-transparent" />
 
                     <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-4">
                             <div className="relative group cursor-pointer" onClick={() => setShowAvatarSelector(!showAvatarSelector)}>
-                                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#249C6C] to-black p-[2px] overflow-hidden transition-all group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(36, 156, 108,0.3)]">
+                                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#1A6140] to-black p-[2px] overflow-hidden transition-all group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(26, 97, 64,0.3)]">
                                     <div className={`w-full h-full rounded-full ${isLight ? 'bg-[#e6f4ed]' : 'bg-[#050505]'} flex items-center justify-center overflow-hidden relative`}>
                                         {userProfile?.xProfileImage || avatar ? (
                                             <img src={userProfile?.xProfileImage || avatar} alt="Profile" className="w-full h-full object-cover" />
                                         ) : (
-                                            <span className="text-[#249C6C] font-black text-2xl">
+                                            <span className="text-[#1A6140] font-black text-2xl">
                                                 {(username || "A").charAt(0).toUpperCase()}
                                             </span>
                                         )}
                                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                                            <div className="w-8 h-8 rounded-full bg-[#249C6C] flex items-center justify-center text-white shadow-lg scale-75 group-hover:scale-100 transition-transform">
+                                            <div className="w-8 h-8 rounded-full bg-[#1A6140] flex items-center justify-center text-white shadow-lg scale-75 group-hover:scale-100 transition-transform">
                                                 <span className="text-xl font-black">+</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#249C6C] border-4 border-[#0D0D0D] flex items-center justify-center shadow-lg">
+                                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#1A6140] border-4 border-[#0D0D0D] flex items-center justify-center shadow-lg">
                                     <Camera size={12} className="text-black font-black" />
                                 </div>
                             </div>
                             <div className="flex flex-col">
                                 <h3 className={`text-xl font-black uppercase tracking-widest ${isLight ? 'text-black' : 'text-white'} flex items-center gap-2`}>
                                     DeGen Account
-                                    <Edit3 size={12} className="text-[#249C6C] opacity-40" />
+                                    <Edit3 size={12} className="text-[#1A6140] opacity-40" />
                                 </h3>
                                 <p className={`text-[9px] ${isLight ? 'text-black/40' : 'text-white/20'} uppercase font-bold tracking-widest mt-1`}>Identity & Metrics</p>
                             </div>
@@ -212,7 +212,7 @@ export function ProfileModal({
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: 'auto', opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
-                                className={`mb-6 p-4 rounded-[24px] ${isLight ? 'bg-black/5' : 'bg-white/5'} border border-[#249C6C]/20 overflow-hidden`}
+                                className={`mb-6 p-4 rounded-[24px] ${isLight ? 'bg-black/5' : 'bg-white/5'} border border-[#1A6140]/20 overflow-hidden`}
                             >
                                 <div className="flex flex-col gap-3">
                                     <p className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>Select Avatar Or Upload Custom</p>
@@ -221,11 +221,11 @@ export function ProfileModal({
                                             <button
                                                 key={i}
                                                 onClick={() => { setAvatar(url); setCustomAvatarUrl(""); }}
-                                                className={`relative w-12 h-12 rounded-full border-2 transition-all overflow-hidden ${avatar === url ? 'border-[#249C6C] scale-110 shadow-lg z-10' : 'border-transparent opacity-40 hover:opacity-100'}`}
+                                                className={`relative w-12 h-12 rounded-full border-2 transition-all overflow-hidden ${avatar === url ? 'border-[#1A6140] scale-110 shadow-lg z-10' : 'border-transparent opacity-40 hover:opacity-100'}`}
                                             >
                                                 <img src={url} alt="Avatar" className="w-full h-full" />
                                                 {avatar === url && (
-                                                    <div className="absolute inset-0 bg-[#249C6C]/20 flex items-center justify-center">
+                                                    <div className="absolute inset-0 bg-[#1A6140]/20 flex items-center justify-center">
                                                         <Check size={16} className="text-white" />
                                                     </div>
                                                 )}
@@ -250,10 +250,10 @@ export function ProfileModal({
                                                 };
                                                 input.click();
                                             }}
-                                            className={`relative w-12 h-12 rounded-full border-2 border-dashed border-[#249C6C]/40 flex flex-col items-center justify-center gap-1 hover:border-[#249C6C] transition-all bg-[#249C6C]/5`}
+                                            className={`relative w-12 h-12 rounded-full border-2 border-dashed border-[#1A6140]/40 flex flex-col items-center justify-center gap-1 hover:border-[#1A6140] transition-all bg-[#1A6140]/5`}
                                         >
-                                            <Camera size={14} className="text-[#249C6C]" />
-                                            <span className="text-[6px] font-black uppercase text-[#249C6C]">UP</span>
+                                            <Camera size={14} className="text-[#1A6140]" />
+                                            <span className="text-[6px] font-black uppercase text-[#1A6140]">UP</span>
                                         </button>
                                     </div>
                                 </div>
@@ -264,7 +264,7 @@ export function ProfileModal({
                     {metrics && (
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             <div className={`p-4 rounded-[22px] ${isLight ? 'bg-black/5 border-black/5' : 'bg-white/5 border-white/5'} border flex flex-col justify-center`}>
-                                <p className="text-[8px] font-bold text-[#249C6C] uppercase tracking-widest mb-1">Win Rate</p>
+                                <p className="text-[8px] font-bold text-[#1A6140] uppercase tracking-widest mb-1">Win Rate</p>
                                 <div className="flex items-baseline gap-1">
                                     <p className={`text-2xl font-black ${isLight ? 'text-[#05140b]' : 'text-white'}`}>
                                         {metrics.trades > 0 ? ((metrics.wins / metrics.trades) * 100).toFixed(0) : 0}
@@ -292,7 +292,7 @@ export function ProfileModal({
                                         <p className={`text-[8px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>Trading Wallet (On-Chain)</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <h4 
-                                                className={`text-sm font-black font-mono cursor-pointer hover:opacity-80 transition-all ${isLight ? 'text-black' : 'text-[#249C6C]'}`}
+                                                className={`text-sm font-black font-mono cursor-pointer hover:opacity-80 transition-all ${isLight ? 'text-black' : 'text-[#1A6140]'}`}
                                                 onClick={() => {
                                                     if (!evmSessionWallet?.address && !isSignerInitializing && address) {
                                                         onRetryInit?.();
@@ -320,7 +320,7 @@ export function ProfileModal({
                                                         className={`p-1 rounded-md ${isLight ? 'bg-black/5 hover:bg-black/10' : 'bg-white/5 hover:bg-white/10'} transition-all`}
                                                         title="View on ArcScan"
                                                     >
-                                                        <Shield size={10} className="text-[#249C6C] opacity-60" />
+                                                        <Shield size={10} className="text-[#1A6140] opacity-60" />
                                                     </a>
                                                 )}
                                             </div>
@@ -407,9 +407,9 @@ export function ProfileModal({
                             </div>
 
                             {isEmbedded && (
-                                <div className={`mb-4 p-3 rounded-xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border border-[#249C6C]/20 flex items-center justify-between`}>
+                                <div className={`mb-4 p-3 rounded-xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border border-[#1A6140]/20 flex items-center justify-between`}>
                                     <div className="flex items-center gap-2">
-                                        <div className={`p-1.5 rounded-full ${isDelegated ? 'bg-[#249C6C]/20 text-[#249C6C]' : 'bg-yellow-500/20 text-yellow-500'}`}>
+                                        <div className={`p-1.5 rounded-full ${isDelegated ? 'bg-[#1A6140]/20 text-[#1A6140]' : 'bg-yellow-500/20 text-yellow-500'}`}>
                                             <Zap size={12} />
                                         </div>
                                         <div>
@@ -422,7 +422,7 @@ export function ProfileModal({
                                     {!isDelegated && (
                                         <button 
                                             onClick={onDelegate}
-                                            className="px-3 py-1.5 rounded-lg bg-[#249C6C] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-[#249C6C]/20"
+                                            className="px-3 py-1.5 rounded-lg bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-[#1A6140]/20"
                                         >
                                             Enable
                                         </button>
@@ -435,7 +435,7 @@ export function ProfileModal({
                                     <input 
                                         type="number"
                                         placeholder="0.00"
-                                        className={`w-full py-3 px-4 rounded-xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border border-transparent focus:border-[#249C6C]/50 outline-none text-xs font-black transition-all`}
+                                        className={`w-full py-3 px-4 rounded-xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border border-transparent focus:border-[#1A6140]/50 outline-none text-xs font-black transition-all`}
                                         id="wallet-amount-input"
                                         onChange={(e) => setActionAmount(e.target.value)}
                                         value={actionAmount}
@@ -443,7 +443,7 @@ export function ProfileModal({
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2">
                                         <button 
                                             onClick={() => setActionAmount(evmBalance)}
-                                            className="text-[9px] font-black text-[#249C6C] uppercase hover:underline"
+                                            className="text-[9px] font-black text-[#1A6140] uppercase hover:underline"
                                         >
                                             Max
                                         </button>
@@ -456,7 +456,7 @@ export function ProfileModal({
                                             onDeposit(parseFloat(actionAmount));
                                             setActionAmount("");
                                         }}
-                                        className="flex items-center justify-center gap-2 bg-[#249C6C] text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                        className="flex items-center justify-center gap-2 bg-[#1A6140] text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all"
                                     >
                                         <Zap size={14} />
                                         Deposit
@@ -474,14 +474,14 @@ export function ProfileModal({
                                     </button>
                                 </div>
                                 <div className="text-center mt-2">
-                                    <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer" className="text-[9px] text-[#249C6C] uppercase tracking-widest font-black underline hover:text-[#249C6C]/80">Faucet ↗</a>
+                                    <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer" className="text-[9px] text-[#1A6140] uppercase tracking-widest font-black underline hover:text-[#1A6140]/80">Faucet ↗</a>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 mt-4">
                                 <button 
                                     onClick={() => onOpenCircleWallet?.('send')}
-                                    className="flex items-center justify-center gap-2 bg-[#249C6C] text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-[#249C6C]/20"
+                                    className="flex items-center justify-center gap-2 bg-[#1A6140] text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-[#1A6140]/20"
                                 >
                                     <Send size={14} />
                                     Send Tokens
@@ -511,7 +511,7 @@ export function ProfileModal({
                                         return (
                                             <div key={t.id || `trade-${i}`} className={`flex items-center justify-between p-3 rounded-xl ${isLight ? 'bg-white/60 border-black/5' : 'bg-white/[0.02] border-white/5'} border`}>
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`p-1.5 rounded-full ${isUp ? 'bg-[#249C6C]/10 text-[#249C6C]' : 'bg-[#FF7F50]/10 text-[#FF7F50]'}`}>
+                                                    <div className={`p-1.5 rounded-full ${isUp ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-[#FF7F50]/10 text-[#FF7F50]'}`}>
                                                         {isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                                                     </div>
                                                     <div>
@@ -524,14 +524,14 @@ export function ProfileModal({
                                                     </div>
                                                 </div>
                                                 <div className="text-right flex flex-col items-end">
-                                                    <div className={`text-[11px] font-black ${isWon ? 'text-[#249C6C]' : 'text-[#FF7F50]'}`}>
+                                                    <div className={`text-[11px] font-black ${isWon ? 'text-[#1A6140]' : 'text-[#FF7F50]'}`}>
                                                         {isWon ? `+${Number(t.payout || 0).toFixed(2)}` : `-${Number(t.amount || 0).toFixed(2)}`}
                                                     </div>
                                                     <div className="flex gap-2 items-center">
-                                                        <span className={`text-[7px] font-black uppercase ${isWon ? 'text-[#249C6C]/60' : 'text-[#FF7F50]/60'}`}>{t.status}</span>
+                                                        <span className={`text-[7px] font-black uppercase ${isWon ? 'text-[#1A6140]/60' : 'text-[#FF7F50]/60'}`}>{t.status}</span>
                                                         <button
                                                             onClick={() => onViewReceipt && onViewReceipt(t)}
-                                                            className="text-[7px] font-black text-[#249C6C] uppercase underline"
+                                                            className="text-[7px] font-black text-[#1A6140] uppercase underline"
                                                         >
                                                             Receipt
                                                         </button>
@@ -544,10 +544,10 @@ export function ProfileModal({
                                     {/* Deposit / Withdraw from local storage */}
                                     {transactionHistory && transactionHistory.map((tx, i) => (
                                         <div key={tx.id || `tx-${i}`} className={`flex flex-row items-center justify-between p-2 lg:p-4 rounded-xl border transition-all group ${isLight
-                                            ? 'bg-[#f0f9f4] border-[#249C6C]/10 shadow-sm hover:shadow-md hover:border-[#249C6C]/40'
-                                            : 'bg-black/40 border-white/10 hover:border-[#249C6C]/30'}`}>
+                                            ? 'bg-[#f0f9f4] border-[#1A6140]/10 shadow-sm hover:shadow-md hover:border-[#1A6140]/40'
+                                            : 'bg-black/40 border-white/10 hover:border-[#1A6140]/30'}`}>
                                             <div className="flex items-center gap-3">
-                                                <div className={`p-1.5 rounded-lg ${tx.type === "DEPOSIT" ? "bg-[#249C6C]/10 text-[#249C6C]" : "bg-orange-500/10 text-orange-500"}`}>
+                                                <div className={`p-1.5 rounded-lg ${tx.type === "DEPOSIT" ? "bg-[#1A6140]/10 text-[#1A6140]" : "bg-orange-500/10 text-orange-500"}`}>
                                                     {tx.type === "DEPOSIT" ? <Zap size={14} /> : <Shield size={14} />}
                                                 </div>
                                                 <div>
@@ -556,12 +556,12 @@ export function ProfileModal({
                                                 </div>
                                             </div>
                                             <div className="text-right flex flex-col items-end">
-                                                <div className={`text-[11px] font-black ${tx.type === "DEPOSIT" ? "text-[#249C6C]" : (isLight ? "text-black/80" : "text-white/80")}`}>
+                                                <div className={`text-[11px] font-black ${tx.type === "DEPOSIT" ? "text-[#1A6140]" : (isLight ? "text-black/80" : "text-white/80")}`}>
                                                     {tx.type === "DEPOSIT" ? '+' : '-'}{tx.amount}
                                                 </div>
                                                 <button
                                                     onClick={() => onViewReceipt && onViewReceipt(tx)}
-                                                    className="text-[7px] font-black text-[#249C6C] uppercase underline"
+                                                    className="text-[7px] font-black text-[#1A6140] uppercase underline"
                                                 >
                                                     Receipt
                                                 </button>
@@ -577,14 +577,14 @@ export function ProfileModal({
                         <div className="relative">
                             <label className={`text-[10px] font-black ${isLight ? 'text-black/40' : 'text-white/40'} uppercase tracking-[0.3em] ml-1 mb-2 block`}>Username (Public)</label>
                             <div className="relative">
-                                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-[#249C6C]">
+                                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-[#1A6140]">
                                     <Edit3 size={14} />
                                 </div>
                                 <input
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     placeholder="Anonymous DeGen"
-                                    className={`w-full ${isLight ? 'bg-white text-black border-black/10' : 'bg-black text-white border-white/10'} border rounded-2xl pl-12 pr-5 py-3.5 text-xs font-bold focus:border-[#249C6C]/50 outline-none transition-all placeholder:text-black/20`}
+                                    className={`w-full ${isLight ? 'bg-white text-black border-black/10' : 'bg-black text-white border-white/10'} border rounded-2xl pl-12 pr-5 py-3.5 text-xs font-bold focus:border-[#1A6140]/50 outline-none transition-all placeholder:text-black/20`}
                                 />
                             </div>
                         </div>
@@ -594,7 +594,7 @@ export function ProfileModal({
                         <button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className={`w-full bg-[#249C6C] ${isLight ? 'text-white' : 'text-black'} font-black py-4 rounded-full transition-all flex items-center justify-center gap-2 ${isSaving ? 'opacity-50' : 'hover:scale-[1.02] active:scale-[0.98]'}`}
+                            className={`w-full bg-[#1A6140] ${isLight ? 'text-white' : 'text-black'} font-black py-4 rounded-full transition-all flex items-center justify-center gap-2 ${isSaving ? 'opacity-50' : 'hover:scale-[1.02] active:scale-[0.98]'}`}
                         >
                             {isSaving ? "SYNCING..." : "SAVE PROFILE"}
                         </button>

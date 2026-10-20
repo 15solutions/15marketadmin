@@ -77,7 +77,7 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
                     className="relative max-w-[90vw] sm:max-w-sm w-full"
                 >
                     {/* Top Notch */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full z-20 border-2 border-[rgba(23, 163, 100,0.5)]"
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full z-20 border-2 border-[rgba(26, 97, 64,0.5)]"
                         style={{
                             background: 'transparent',
                             boxShadow: 'none',
@@ -95,7 +95,7 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
                             background: isLight ? 'rgba(245, 250, 245, 0.95)' : 'rgba(14, 14, 14, 0.97)',
                             backdropFilter: 'blur(20px)',
                             WebkitBackdropFilter: 'blur(20px)',
-                            border: '2px solid rgba(23, 163, 100, 0.45)',
+                            border: '2px solid rgba(26, 97, 64, 0.45)',
                             clipPath: 'polygon(0% 0%, 44% 0%, 44% 0%, 50% 0%, 56% 0%, 100% 0%, 100% calc(100% - 8px), 96% 100%, 92% calc(100% - 8px), 88% 100%, 84% calc(100% - 8px), 80% 100%, 76% calc(100% - 8px), 72% 100%, 68% calc(100% - 8px), 64% 100%, 60% calc(100% - 8px), 56% 100%, 52% calc(100% - 8px), 48% 100%, 44% calc(100% - 8px), 40% 100%, 36% calc(100% - 8px), 32% 100%, 28% calc(100% - 8px), 24% 100%, 20% calc(100% - 8px), 16% 100%, 12% calc(100% - 8px), 8% 100%, 4% calc(100% - 8px), 0% 100%)',
                             minHeight: '500px',
                         }}
@@ -117,11 +117,11 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
                                 </div>
                                 
                                 <div className={`w-full border-t border-b ${isLight ? 'border-black/20' : 'border-white/20'} py-2 mb-2 flex items-center justify-center gap-3`}>
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[#17A364]"></div>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#1A6140]"></div>
                                     <h1 className="text-3xl font-black tracking-widest">
                                         {trade.type === 'rounds' ? 'ROUNDS SETTLE' : '15MARKET'}
                                     </h1>
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[#17A364]"></div>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#1A6140]"></div>
                                 </div>
 
                                 
@@ -159,7 +159,7 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
 
                                 <div className="flex justify-between items-center">
                                     <span className={`uppercase ${isLight ? 'text-black/50' : 'text-white/50'}`}>TRADE PROFIT:</span>
-                                    <span className={isWon ? 'text-[#17A364]' : 'opacity-60'}>${finalProfit.toFixed(2)}</span>
+                                    <span className={isWon ? 'text-[#1A6140]' : 'opacity-60'}>${finalProfit.toFixed(2)}</span>
                                 </div>
                             </div>
 
@@ -175,7 +175,7 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
                                 </div>
                                 <div className="flex flex-col items-end text-right">
                                     <span className={`text-[10px] font-bold uppercase mb-1 ${isLight ? 'text-black/50' : 'text-white/50'}`}>{trade.type === 'rounds' ? 'P2P DIRECTION' : 'EXECUTION'}</span>
-                                    <span className={`font-black uppercase text-xl ${isUp ? 'text-[#17A364]' : 'text-[#FF7F50]'}`}>
+                                    <span className={`font-black uppercase text-xl ${isUp ? 'text-[#1A6140]' : 'text-[#FF7F50]'}`}>
                                         {trade.type === 'rounds' ? (isUp ? 'LONG POOL' : 'SHORT POOL') : (isUp ? 'LONG' : 'SHORT')}
                                     </span>
                                 </div>
@@ -191,13 +191,13 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
 
                                 <div className="flex flex-col items-start text-left mt-2">
                                     <span className={`text-[10px] font-bold uppercase mb-1 ${isLight ? 'text-black/50' : 'text-white/50'}`}>SETTLED</span>
-                                    <span className={`text-lg font-black ${trade.status === "PENDING" ? 'text-[#17A364]' : ''}`}>
+                                    <span className={`text-lg font-black ${trade.status === "PENDING" ? 'text-[#1A6140]' : ''}`}>
                                         {trade.status !== "PENDING" && (trade.settlementPrice || trade.exitPrice) ? `$${Number(trade.settlementPrice || trade.exitPrice || 0).toFixed(2)}` : 'PENDING'}
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-end text-right mt-2">
                                     <span className={`text-[10px] font-bold uppercase mb-1 ${isLight ? 'text-black/50' : 'text-white/50'}`}>PNL</span>
-                                    <span className={`text-xl font-black tracking-tight ${isWon ? 'text-[#17A364]' : 'text-[#FF7F50]'}`}>
+                                    <span className={`text-xl font-black tracking-tight ${isWon ? 'text-[#1A6140]' : 'text-[#FF7F50]'}`}>
                                         {isWon ? '▲' : '▼'}{profitDisplay} <span className="text-xs">{currency}</span>
                                     </span>
                                 </div>
@@ -216,14 +216,14 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
                             <div className="w-full grid grid-cols-2 gap-4 mt-auto mb-6 receipt-control relative z-20">
                                 <button
                                     onClick={handleDownload}
-                                    className="py-3 bg-[#2d7a46] text-white text-xs font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 hover:bg-[#17A364] transition-all shadow-lg"
+                                    className="py-3 bg-[#1A6140] text-white text-xs font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 hover:bg-[#1A6140] transition-all shadow-lg"
                                 >
                                     <Download size={16} />
                                     SAVE IMAGE
                                 </button>
                                 <button
                                     onClick={onClose}
-                                    className={`py-3 bg-transparent ${isLight ? 'text-[#2d7a46]' : 'text-[#17A364]'} border border-[#17A364]/50 text-xs font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 hover:bg-[#17A364]/10 transition-all`}
+                                    className={`py-3 bg-transparent ${isLight ? 'text-[#1A6140]' : 'text-[#1A6140]'} border border-[#1A6140]/50 text-xs font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 hover:bg-[#1A6140]/10 transition-all`}
                                 >
                                     <X size={16} />
                                     CLOSE VIEW

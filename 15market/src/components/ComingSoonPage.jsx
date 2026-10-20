@@ -11,8 +11,8 @@ export default function ComingSoonPage({ onBack, theme }) {
       
       {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-[#249C6C]/10 rounded-full blur-[120px] mix-blend-screen opacity-30" />
-          <div className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-[#249C6C]/5 rounded-full blur-[100px] mix-blend-screen opacity-30" />
+          <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-[#1A6140]/10 rounded-full blur-[120px] mix-blend-screen opacity-30" />
+          <div className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-[#1A6140]/5 rounded-full blur-[100px] mix-blend-screen opacity-30" />
       </div>
 
       {/* Content */}
@@ -20,7 +20,7 @@ export default function ComingSoonPage({ onBack, theme }) {
         {/* Back button */}
         <button
           onClick={onBack}
-          className={`absolute left-4 p-2 rounded-full ${isLight ? 'bg-white/40 hover:bg-white/80 border border-[#249C6C]/20 shadow-sm' : 'bg-white/5 hover:bg-white/10 border border-white/5 shadow-md'} transition-all`}
+          className={`absolute left-4 p-2 rounded-full ${isLight ? 'bg-white/40 hover:bg-white/80 border border-[#1A6140]/20 shadow-sm' : 'bg-white/5 hover:bg-white/10 border border-white/5 shadow-md'} transition-all`}
           style={{ top: typeof window !== 'undefined' && window.innerWidth < 1024 ? 'calc(env(safe-area-inset-top) + 16px)' : '16px' }}
           title="Back"
         >
@@ -29,7 +29,7 @@ export default function ComingSoonPage({ onBack, theme }) {
 
       {/* Icon */}
       <motion.div
-        className={`w-32 h-32 mb-8 rounded-full flex items-center justify-center ${isLight ? 'bg-[#249C6C]/10 shadow-[0_0_40px_rgba(36,156,108,0.2)]' : 'bg-[#249C6C]/20 shadow-[0_0_40px_rgba(36,156,108,0.4)]'}`}
+        className={`w-32 h-32 mb-8 rounded-full flex items-center justify-center ${isLight ? 'bg-[#1A6140]/10 shadow-[0_0_40px_rgba(26, 97, 64,0.2)]' : 'bg-[#1A6140]/20 shadow-[0_0_40px_rgba(26, 97, 64,0.4)]'}`}
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1, y: [0, -10, 0] }}
         transition={{ 
@@ -38,7 +38,7 @@ export default function ComingSoonPage({ onBack, theme }) {
             opacity: { duration: 0.5 }
         }}
       >
-        <Rocket size={64} className="text-[#249C6C]" />
+        <Rocket size={64} className="text-[#1A6140]" />
       </motion.div>
 
       {/* Message */}

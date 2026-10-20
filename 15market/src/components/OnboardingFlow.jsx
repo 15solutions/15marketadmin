@@ -70,7 +70,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
             <motion.div 
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                className={`w-full max-w-lg ${isLight ? 'bg-white' : 'bg-[#0a0a0a]'} border ${isLight ? 'border-[#249C6C]/20' : 'border-white/10'} rounded-[40px] overflow-hidden shadow-2xl`}
+                className={`w-full max-w-lg ${isLight ? 'bg-white' : 'bg-[#0a0a0a]'} border ${isLight ? 'border-[#1A6140]/20' : 'border-white/10'} rounded-[40px] overflow-hidden shadow-2xl`}
             >
                 <div className="p-8 md:p-12">
                     <AnimatePresence mode="wait">
@@ -82,7 +82,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                 exit={{ opacity: 0, x: -20 }}
                                 className="space-y-6 text-center"
                             >
-                                <div className="w-20 h-20 bg-[#249C6C]/5 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-[#249C6C]/10">
+                                <div className="w-20 h-20 bg-[#1A6140]/5 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-[#1A6140]/10">
                                     <img src={isLight ? "/goblogo.png" : "/gowlogo.png"} alt="15market" className="w-12 h-auto" />
                                 </div>
                                 <h2 className={`text-3xl font-black uppercase tracking-tighter ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>
@@ -94,7 +94,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                 </p>
                                 <button 
                                     onClick={() => setStep(2)}
-                                    className="w-full py-5 bg-[#249C6C] text-white rounded-2xl font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-2 group"
+                                    className="w-full py-5 bg-[#1A6140] text-white rounded-2xl font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-2 group"
                                 >
                                     Get Started
                                     <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
@@ -122,7 +122,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                     <div className="flex justify-center mb-6">
                                         <div 
                                             onClick={() => document.getElementById('avatar-upload').click()}
-                                            className={`relative w-28 h-28 rounded-full border-2 ${isLight ? 'border-[#249C6C]/30 bg-black/5 hover:border-[#249C6C]' : 'border-white/10 bg-white/5 hover:border-[#249C6C]'} flex items-center justify-center overflow-hidden cursor-pointer transition-all group shadow-xl`}
+                                            className={`relative w-28 h-28 rounded-full border-2 ${isLight ? 'border-[#1A6140]/30 bg-black/5 hover:border-[#1A6140]' : 'border-white/10 bg-white/5 hover:border-[#1A6140]'} flex items-center justify-center overflow-hidden cursor-pointer transition-all group shadow-xl`}
                                         >
                                             {selectedAvatar ? (
                                                 <img src={selectedAvatar} alt="Avatar" className="w-full h-full object-cover" />
@@ -133,7 +133,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                                 </div>
                                             )}
                                             <div className={`absolute inset-0 bg-black/20 flex items-center justify-center transition-opacity ${selectedAvatar ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}>
-                                                <div className="w-8 h-8 rounded-full bg-[#249C6C] flex items-center justify-center text-white shadow-lg">
+                                                <div className="w-8 h-8 rounded-full bg-[#1A6140] flex items-center justify-center text-white shadow-lg">
                                                     <span className="text-xl font-black">+</span>
                                                 </div>
                                             </div>
@@ -169,7 +169,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                                 setSaveError('');
                                             }}
                                             placeholder="Choose a Display Name"
-                                            className={`w-full py-5 pl-14 pr-8 rounded-2xl ${isLight ? 'bg-gray-50 border-gray-200 text-black' : 'bg-white/5 border-white/10 text-white'} border focus:border-[#249C6C] outline-none text-lg font-black transition-all placeholder:opacity-30 shadow-inner`}
+                                            className={`w-full py-5 pl-14 pr-8 rounded-2xl ${isLight ? 'bg-gray-50 border-gray-200 text-black' : 'bg-white/5 border-white/10 text-white'} border focus:border-[#1A6140] outline-none text-lg font-black transition-all placeholder:opacity-30 shadow-inner`}
                                         />
                                     </div>
 
@@ -194,7 +194,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                 <button 
                                     disabled={!username.trim() || isSaving}
                                     onClick={handleSave}
-                                    className={`w-full py-5 ${!username.trim() ? 'bg-white/5 text-white/20' : 'bg-[#249C6C] text-white shadow-[0_0_20px_rgba(36, 156, 108,0.3)]'} rounded-2xl font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-3`}
+                                    className={`w-full py-5 ${!username.trim() ? 'bg-white/5 text-white/20' : 'bg-[#1A6140] text-white shadow-[0_0_20px_rgba(26, 97, 64,0.3)]'} rounded-2xl font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-3`}
                                 >
                                     {isSaving ? "Finalizing..." : "Complete Setup"}
                                     {!isSaving && <Zap size={18} />}
@@ -220,9 +220,9 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                 </div>
                                 <div className="space-y-4">
                                     {hasExternalWallet && (
-                                    <div className={`p-5 rounded-2xl border ${isLight ? 'bg-black/5 border-[#249C6C]/20' : 'bg-white/5 border-white/10'}`}>
+                                    <div className={`p-5 rounded-2xl border ${isLight ? 'bg-black/5 border-[#1A6140]/20' : 'bg-white/5 border-white/10'}`}>
                                         <div className="flex items-center gap-3 mb-2">
-                                            <Shield size={16} className="text-[#249C6C]" />
+                                            <Shield size={16} className="text-[#1A6140]" />
                                             <h4 className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Main Wallet</h4>
                                         </div>
                                         <p className={`text-sm font-mono font-bold ${isLight ? 'text-[#0a261a]/80' : 'text-white/80'} break-all`}>
@@ -232,9 +232,9 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                     </div>
                                     )}
 
-                                    <div className={`p-5 rounded-2xl border ${isLight ? 'bg-[#249C6C]/10 border-[#249C6C]/30' : 'bg-[#249C6C]/10 border-[#249C6C]/20'}`}>
+                                    <div className={`p-5 rounded-2xl border ${isLight ? 'bg-[#1A6140]/10 border-[#1A6140]/30' : 'bg-[#1A6140]/10 border-[#1A6140]/20'}`}>
                                         <div className="flex items-center gap-3 mb-2">
-                                            <Zap size={16} className="text-[#249C6C]" />
+                                            <Zap size={16} className="text-[#1A6140]" />
                                             <h4 className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Trading Wallet (Auto-Signer)</h4>
                                         </div>
                                         <p className={`text-sm font-mono font-bold ${isLight ? 'text-[#0a261a]/80' : 'text-white/80'} break-all`}>
@@ -246,7 +246,7 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
 
                                 <button 
                                     onClick={() => onComplete(savedProfile)}
-                                    className={`w-full py-5 bg-[#249C6C] text-white shadow-[0_0_20px_rgba(36, 156, 108,0.3)] rounded-2xl font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-3`}
+                                    className={`w-full py-5 bg-[#1A6140] text-white shadow-[0_0_20px_rgba(26, 97, 64,0.3)] rounded-2xl font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-3`}
                                 >
                                     Enter 15market
                                     <ChevronRight size={18} />

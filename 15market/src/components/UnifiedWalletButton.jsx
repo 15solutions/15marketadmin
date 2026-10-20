@@ -20,7 +20,7 @@ class AuthPageErrorBoundary extends React.Component {
                 <div className="fixed inset-0 z-[600] flex flex-col items-center justify-center gap-3 bg-black text-white p-6 text-center" style={{ fontFamily: '"Comfortaa", cursive' }}>
                     <div className="text-sm font-black">Sign-in screen failed to open</div>
                     <div className="text-[11px] opacity-60 break-all max-w-md">{String(this.state.error?.message || this.state.error)}</div>
-                    <button onClick={this.props.onClose} className="mt-2 px-6 py-3 rounded-2xl bg-[#17A364] text-white text-xs font-black uppercase tracking-widest">Close</button>
+                    <button onClick={this.props.onClose} className="mt-2 px-6 py-3 rounded-2xl bg-[#1A6140] text-white text-xs font-black uppercase tracking-widest">Close</button>
                 </div>
             );
         }
@@ -55,11 +55,11 @@ export function UnifiedWalletButton({ theme }) {
         }
     }, [isConnected, connectedChainId, switchChain]);
 
-    const currentColor = '#17A364';
+    const currentColor = '#1A6140';
 
     const greenBtn = {
-        backgroundColor: '#17A364',
-        boxShadow: `0 0 20px #17A36450`,
+        backgroundColor: '#1A6140',
+        boxShadow: `0 0 20px #1A614050`,
         fontFamily: '"Comfortaa", cursive',
     };
     const ghostBtn = {
@@ -105,7 +105,7 @@ export function UnifiedWalletButton({ theme }) {
                     <button
                         onClick={() => { console.log('[Auth] login tapped'); setAuthStep('login'); }}
                         id="login-btn"
-                        className={`px-4 lg:px-6 py-2.5 lg:py-3 font-black uppercase text-[10px] lg:text-xs tracking-[0.2em] rounded-xl transition-all active:scale-95 relative overflow-hidden group border-2 ${theme === 'light' ? 'border-[#17A364] text-[#17A364] hover:bg-[#17A364]/10' : 'border-white/25 text-white hover:border-white/60'}`}
+                        className={`px-4 lg:px-6 py-2.5 lg:py-3 font-black uppercase text-[10px] lg:text-xs tracking-[0.2em] rounded-xl transition-all active:scale-95 relative overflow-hidden group border-2 ${theme === 'light' ? 'border-[#1A6140] text-[#1A6140] hover:bg-[#1A6140]/10' : 'border-white/25 text-white hover:border-white/60'}`}
                         style={ghostBtn}
                     >
                         <span className="relative z-10 flex items-center gap-2">

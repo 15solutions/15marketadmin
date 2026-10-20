@@ -12,7 +12,7 @@ export default function OpenPositions() {
         {positions.map(position => (
           <li key={position.id} className="flex justify-between items-center">
             <span>Position {position.id}</span>
-            <span className={position.isPositive ? 'text-[#249C6C]' : 'text-red-500'}>
+            <span className={position.isPositive ? 'text-[#1A6140]' : 'text-red-500'}>
               {position.value}
             </span>
           </li>
