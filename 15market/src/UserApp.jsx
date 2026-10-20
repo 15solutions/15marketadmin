@@ -5,7 +5,6 @@ import { useAccount, useWalletClient, useSwitchChain } from "wagmi";
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { useTradingWallet } from './hooks/useTradingWallet';
 import { GlobalTradeScroller } from "./components/GlobalTradeScroller";
-import { RoundsTradeScroller } from "./components/RoundsTradeScroller";
 import {
   MessageSquare, User, Trophy, Calendar, CheckCircle, ChevronRight,
   Image as ImageIcon, PartyPopper, Settings, LogOut, Coins, Menu, X, Shield, Lock,
@@ -27,7 +26,7 @@ import ComingSoonPage from "./components/ComingSoonPage";
 import { CircleWalletPage } from "./components/CircleWalletPage";
 import { ReferralHub } from "./components/ReferralHub";
 
-import { DocsPage } from "./components/DocsPage";
+import HelpPage from "./components/HelpPage";
 
 // Lazy load conditionally rendered components
 const ProfileModal = lazy(() => import("./components/ProfileModal").then(m => ({ default: m.ProfileModal })));
@@ -36,16 +35,13 @@ const PnLModal = lazy(() => import("./components/PnLModal").then(m => ({ default
 const TradeShareCard = lazy(() => import("./components/TradeShareCard"));
 const OnboardingFlow = lazy(() => import("./components/OnboardingFlow").then(m => ({ default: m.OnboardingFlow })));
 const MessagingSystem = lazy(() => import("./components/MessagingSystem"));
-const RoundsAccessGate = lazy(() => import("./components/RoundsAccessGate"));
-
-import { ARC_CONTRACT_ADDRESS, ARC_USDC_ADDRESS, KEEPER_URL, KEEPER_URL_ARC, KEEPER_URL_ROUNDS, ADMIN_TOKEN, ARC_RPC, ARC_RPC_BACKUP, ARC_CHAIN_ID, ARC_ROUNDS_CONTRACT_ADDRESS } from "./constants";
+import { ARC_CONTRACT_ADDRESS, ARC_USDC_ADDRESS, KEEPER_URL, KEEPER_URL_ARC, ADMIN_TOKEN, ARC_RPC, ARC_RPC_BACKUP, ARC_CHAIN_ID } from "./constants";
 
 
 // Memoized Sub-components
 import { TradeTerminal } from "./components/TradeTerminal";
 import { LiveExecution } from "./components/LiveExecution";
 import { TradeHistory } from "./components/TradeHistory";
-import { RoundsTradeHistory } from "./components/RoundsTradeHistory";
 import { UnifiedWalletButton } from "./components/UnifiedWalletButton";
 import { OrderBook } from "./components/OrderBook";
 import { ActiveTradesSidebar } from "./components/ActiveTradesSidebar";
@@ -59,7 +55,6 @@ import SideHistoryPane from "./components/SideHistoryPane";
 import WalletConnectionLoading from "./components/WalletConnectionLoading";
 import GlobalLoader from "./components/GlobalLoader";
 
-import { RoundsTerminal } from "./components/RoundsTerminal";
 import LeftSidebar from './components/LeftSidebar';
 import TradingWidget from './components/TradingWidget';
 import TradeHistoryTable from './components/TradeHistoryTable';
@@ -349,16 +344,6 @@ export default function UserApp() {
   const [sliderValue, setSliderValue] = useState(0);
   // const [balance, setBalance] = useState(0); // Removed in favor of evmBalance/sessionBalance logic
   const [direction, setDirection] = useState("DOWN");
-  const loadLocalTrades = (userAddress, isHistory, type = 'classic') => {
-    if (type !== 'rounds') return [];
-    try {
-      if (!userAddress) return [];
-      const key = isHistory ? `15market_rounds_history_${userAddress.toLowerCase()}` : `15market_rounds_active_${userAddress.toLowerCase()}`;
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  };
-
   const [tradeHistory, setTradeHistory] = useState([]);
   const [activeTrades, setActiveTrades] = useState([]);
 
@@ -368,7 +353,6 @@ export default function UserApp() {
     if (address && address !== lastAddressRef.current) {
       setTradeHistory([]);
       setActiveTrades([]);
-      setRoundsTradeHistory(loadLocalTrades(address, true, 'rounds'));
       lastAddressRef.current = address;
     }
   }, [address]);
@@ -537,12 +521,6 @@ export default function UserApp() {
   // Main Network State
   const [network, setNetwork] = useState("arc");
   const uiVersion = "v2"; // Sunsetting v1, V2 is now the only authoritative UI
-  const [gameMode, setGameMode] = useState("classic"); // "classic" | "rounds"
-  const [roundsTradeHistory, setRoundsTradeHistory] = useState(() => loadLocalTrades(address, true, 'rounds'));
-  const [activeRounds, setActiveRounds] = useState(() => loadLocalTrades(address, false, 'rounds'));
-
-  // Rounds chart state — populated by RoundsTerminal via onRoundPhaseChange
-  const [roundsChartState, setRoundsChartState] = useState(null);
   const [platformSettings, setPlatformSettings] = useState(() => {
     try {
       const saved = localStorage.getItem("15market_citadel_settings");
@@ -559,7 +537,6 @@ export default function UserApp() {
   });
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [hasRoundsAccess, setHasRoundsAccess] = useState(null); // null = unknown, true/false = verified
   const [liveOdds, setLiveOdds] = useState(null);
   const [changes24h, setChanges24h] = useState({});
 
@@ -621,14 +598,13 @@ const performStealthChecks = useCallback(async (addr) => {
             };
 
             // Run checks in parallel to reduce total time
-            const [profileRes, sessionRes, roundsRes] = await Promise.all([
+            const [profileRes, sessionRes] = await Promise.all([
                 fetchWithTimeout(`${KEEPER_URL_ARC}/profiles/${addr.toLowerCase()}`).catch(() => null),
                 fetchWithTimeout(`${KEEPER_URL_ARC}/session/init`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ address: addr.toLowerCase() })
                 }).catch(() => null),
-                fetchWithTimeout(`${KEEPER_URL_ROUNDS}/access/check/${addr.toLowerCase()}`).catch(() => ({ ok: false }))
             ]);
 
             // Process profile result
@@ -649,14 +625,6 @@ const performStealthChecks = useCallback(async (addr) => {
             if (sessionRes && sessionRes.ok) {
                 const sData = await sessionRes.json();
                 setSessionBalance(parseFloat(sData.balance || 0));
-            }
-
-            // Process rounds result
-            if (roundsRes && roundsRes.ok) {
-                const rData = await roundsRes.json();
-                setHasRoundsAccess(rData.authorized === true);
-            } else {
-                setHasRoundsAccess(false); // Resolve to false if server is unreachable
             }
 
             return true;
@@ -686,7 +654,7 @@ const performStealthChecks = useCallback(async (addr) => {
         }
     }
 
-    // Stealth checks populate profile/session/rounds data in the background.
+    // Stealth checks populate profile/session data in the background.
     // Only dismiss the loader if these checks were the ones that showed it
     // (i.e. backend was not yet ready when stealth checks started).
     clearInterval(progressInterval);
@@ -708,7 +676,6 @@ const performStealthChecks = useCallback(async (addr) => {
       performStealthChecks(address);
     } else {
       setIsGlobalLoading(false);
-      setHasRoundsAccess(null);
     }
   }, [address, performStealthChecks]);
 
@@ -746,13 +713,6 @@ const performStealthChecks = useCallback(async (addr) => {
       window.removeEventListener('storage', syncLocal);
     };
   }, [fetchGlobalSettings]);
-
-  const handleRoundPhaseChange = useCallback((phase, entryPrice, pools, userDirection, timeLeft, odds, onResult, isSettled, result) => {
-    setRoundsChartState({ phase, entryPrice, pools, userDirection, timeLeft, odds, onResult, isSettled, result });
-  }, []);
-
-
-
 
   // Apply theme to html and body elements
   useEffect(() => {
@@ -865,9 +825,6 @@ const performStealthChecks = useCallback(async (addr) => {
   // Prevents the reconciler from re-inserting them from backend data.
   const removedTradeIds = useRef(new Set());
   const cleanupTimers = useRef({});
-  const tickProbeRef = useRef({});
-  const execProbeSeqRef = useRef(0);
-  const priceProbeRef = useRef({ start: 0, success: 0, fail: 0 });
 
   // Orientation & Device Detection (Decoupled & Robust)
   const [isSmallScreen, setIsSmallScreen] = useState(
@@ -924,17 +881,6 @@ const performStealthChecks = useCallback(async (addr) => {
       }
     };
   }, []);
-
-  const postDebugLog = useCallback((payload) => {
-
-  }, []);
-
-  const handleRoundsUnlock = useCallback(() => {
-    console.log('[AccessGate] Rounds access verified & unlocked');
-  }, []);
-
-
-
 
   // Custom balance fetcher (Replaces Wagmi useBalance)
   // 1. Core Balance Fetchers
@@ -1634,15 +1580,10 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
   // Execute trade
   const executeTrade = async (params = null) => {
-    const probeId = `exec-${Date.now()}-${++execProbeSeqRef.current}`;
-    // #region agent log
-    postDebugLog({ runId: 'initial', hypothesisId: 'H1', location: 'UserApp.jsx:executeTrade:entry', message: 'executeTrade entry', data: { probeId, isExecuting, gameMode, paramsType: params?.type || null, sessionMode, sessionBalance: sessionBalanceRef.current, amount, duration, direction } });
-    // #endregion
-    // Determine if we are placing a Rounds trade vs Classic trade
-    const activeType = params?.type || (gameMode === 'rounds' ? 'rounds' : 'classic');
-    const isRounds = activeType === 'round' || activeType === 'rounds';
+    // Determines the trade type (only classic exists today; kept for future modes)
+    const activeType = params?.type || 'classic';
 
-    // Block double-submission for both rounds and classic. The ref is the real
+    // Block double-submission. The ref is the real guard; isExecuting is kept
     // guard; isExecuting is kept only to drive the button's disabled styling.
     if (isExecuting || executeLockRef.current) return;
     // A previous submit timed out. Its outcome is still unknown, so placing a
@@ -1686,11 +1627,8 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     if (stakeAmt + gasMargin > currentBal) {
       return bail(() => notify(`Insufficient Session Balance. Need at least ${(stakeAmt + gasMargin).toFixed(4)} USDC. Please Deposit.`, "error"));
     }
-    // #region agent log
-    postDebugLog({ runId: 'initial', hypothesisId: 'H2', location: 'UserApp.jsx:executeTrade:validated', message: 'trade validated pre-submit', data: { probeId, activeType, stakeAmt, currentBal, gasMargin, activeDirection, activeDuration } });
-    // #endregion
 
-    if (Number(activeAmount) < parseFloat(platformSettings.minBet) && activeType !== 'rounds') {
+    if (Number(activeAmount) < parseFloat(platformSettings.minBet)) {
       return bail(() => notify(`Min trade: ${platformSettings.minBet} ${network === 'arc' ? 'USDC' : 'SOL'}`, "error"));
     }
 
@@ -1713,7 +1651,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     const amtNum = parseFloat(activeAmount);
 
     // --- INSTANT UI START ---
-    // Lock for both rounds and classic to prevent rapid-fire race conditions
+    // Lock to prevent rapid-fire race conditions
     setIsExecuting(true);
 
     try {
@@ -1722,80 +1660,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       }
 
       let txHash;
-
-      // ─── ROUNDS P2P (REAL CONTRACT & SESSION SUPPORT) ───
-      if (activeType === 'rounds') {
-        const roundId = params.roundId || params.poolId;
-        const dirVal = (activeDirection === "UP" ? 1 : 0);
-        const amountWei = parseEther(parseFloat(sanitizedAmount).toFixed(6));
-
-        // --- OPTIMISTIC BALANCE DEDUCTION (instant UI feedback) ---
-        setSessionBalance(prev => Math.max(0, prev - amtNum));
-        lastOptimisticActionTime.current = Date.now();
-        // #region agent log
-        postDebugLog({ runId: 'initial', hypothesisId: 'H3', location: 'UserApp.jsx:executeTrade:rounds:deduct1', message: 'rounds first optimistic deduction applied', data: { probeId, amtNum, balanceBefore: sessionBalanceRef.current } });
-        // #endregion
-
-        if (evmSessionWallet) {
-          // AUTO-SIGNER MODE (SESSION WALLET)
-          const res = await fetch(`${KEEPER_URL_ROUNDS}/session-enter`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              address, // main address
-              roundId: roundId.toString(),
-              direction: dirVal === 1 ? "UP" : "DOWN",
-              amount: sanitizedAmount
-            })
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Trading wallet failed to enter round");
-          txHash = data.txHash;
-        } else {
-          throw new Error("Trading wallet is still syncing. Please wait 1 second and try again.");
-        }
-
-        notify("Broadcasting Entry...", "pending");
-
-        const roundTrade = {
-          id: `round-${roundId}-${Date.now()}`,
-          type: 'rounds',
-          amount: activeAmount,
-          entryPrice: activePrice,
-          direction: activeDirection,
-          timestamp: new Date().toLocaleTimeString(),
-          symbol: activeMarket?.symbol || 'ETH',
-          status: 'LOCKED',
-          poolId: roundId,
-          tx: txHash,
-          confirmed: false // Marker for pending confirmation
-        };
-        const dedupeAndAdd = (prev, item) => [item, ...prev.filter(t => (String(t.id || t.tx) !== String(item.id || item.tx)))];
-        setTradeHistory(prev => dedupeAndAdd(prev, roundTrade));
-        setRoundsTradeHistory(prev => dedupeAndAdd(prev, roundTrade));
-        setIsExecuting(false); // RELEASE BLOCK IMMEDIATELY for burst mode
-        executeLockRef.current = false; // HTTP call is done; a new click may start
-
-        // Background Confirmation
-        publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 120_000 }).then((receipt) => {
-          if (!receipt || (receipt.status !== "success" && receipt.status !== 1)) {
-            // Restore balance if tx failed
-            setSessionBalance(prev => prev + amtNum);
-            notify("Round entry failed on-chain.", "error");
-            // Optionally remove from state if failed
-            setRoundsTradeHistory(prev => prev.filter(t => t.tx !== txHash));
-          } else {
-            setRoundsTradeHistory(prev => prev.map(t => t.tx === txHash ? { ...t, confirmed: true } : t));
-          }
-        }).catch(err => {
-          console.error("Rounds confirmation error:", err);
-          setSessionBalance(prev => prev + amtNum);
-        });
-
-        notify("Joined the Round Successfully!", "success");
-        triggerGlobalRefresh();
-        return;
-      }
 
       // ─── CLASSIC TRADING — EMBEDDED WALLET MODEL ───────────────────────────────
       // Step 1: Frontend calls /session/execute
@@ -2321,7 +2185,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
   }, []);
 
   const tickerTrades = useMemo(() => {
-    const recent = gameMode === 'rounds' ? roundsTradeHistory : tradeHistory;
+    const recent = tradeHistory;
     const mine = (recent || []).slice(-20).reverse().map(t => ({
       win: t.status === 'WON' || t.result === 'WIN',
       sym: (t.symbol || 'ETH').toUpperCase(),
@@ -2333,7 +2197,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       sym: (t.symbol || 'ETH').toUpperCase(),
       val: t.amount || '0.00',
     }));
-  }, [gameMode, roundsTradeHistory, tradeHistory, globalTickerTrades]);
+  }, [tradeHistory, globalTickerTrades]);
 
   // ─── UNIFIED PRICE CONSUMPTION ───
   // UI pricing is BACKEND-AUTHORITATIVE: the app consumes the engine's own
@@ -2629,7 +2493,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     });
 
     return () => { unbindTick(); unbindExpired(); };
-  }, [address, postDebugLog]);
+  }, [address]);
 
   // Sync Market Changes (Across Ports via Keeper)
   useEffect(() => {
@@ -2670,12 +2534,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       const resolvedMarket = mergeMarketWithDefault(market);
 
       if (resolvedMarket && resolvedMarket.id !== activeMarket.id) {
-        // #region agent log
-        postDebugLog({ runId: 'initial', hypothesisId: 'H9', location: 'UserApp.jsx:syncMarket:override', message: 'syncMarket changed active market and reset price', data: { from: activeMarket?.id, to: resolvedMarket?.id } });
-        // #endregion
-        // #region agent log
-
-        // #endregion
         // Re-sync with current local authority
         setActiveMarket(resolvedMarket);
         setPrice("0");
@@ -2699,9 +2557,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
   // Handle market changes from UI (persist to localStorage and sync with keeper)
   const handleMarketChange = useCallback(async (newMarket) => {
-    // #region agent log
-
-    // #endregion
     if (!newMarket || newMarket.id === activeMarket.id) return;
     if (newMarket.id === 'mon' || newMarket.id === 'avax') return;
 
@@ -3469,12 +3324,12 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                 setCircleWalletMode(initialMode);
                 setView("circle_wallet");
               }}
-              onDocs={() => setView("docs")}
+              onHelp={() => setView("help")}
               onReferral={() => setView("referral")}
               onSelect={(type) => setView("comingsoon")}
             />
-          ) : view === "comingsoon" ? (
-            <ComingSoonPage onBack={() => setView("dashboard")} theme={theme} />
+          ) : view === "comingsoon" || view === "ladders" ? (
+            <ComingSoonPage onBack={() => setView("dashboard")} theme={theme} title={view === "ladders" ? "Ladders" : undefined} />
           ) : view === "circle_wallet" ? (
             <CircleWalletPage
               address={address}
@@ -3505,11 +3360,10 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               theme={theme}
               onBack={() => setView("dashboard")}
             />
-          ) : view === "docs" ? (
-            <DocsPage
+          ) : view === "help" ? (
+            <HelpPage
               theme={theme}
               onBack={() => setView("dashboard")}
-              onToggleTheme={toggleTheme}
               isSmallScreen={isSmallScreen}
             />
           ) : (
@@ -3525,13 +3379,14 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                 <div className="hidden lg:flex items-center gap-2 px-2 py-1 origin-right">
                   {authenticated && (
                     <>
-                      {/* Game Mode Switcher */}
+                      {/* Game Mode Switcher: CLASSIC = live trading, LADDERS =
+                          coming-soon page (rounds model removed) */}
                       <div className={`flex items-center gap-0.5 p-[3px] rounded-full border transition-all duration-500 ${theme === 'light' ? 'bg-white border-[#E5E7EB]' : 'bg-white/5 border-white/10'}`}>
-                        {[{ key: 'classic', label: 'CLASSIC' }, { key: 'rounds', label: 'LADDERS' }].map(({ key, label }) => (
-                          <button key={key} onClick={() => { setGameMode(key); setView('trading'); }}
+                        {[{ key: 'classic', label: 'CLASSIC', action: () => setView('trading') }, { key: 'ladders', label: 'LADDERS', action: () => setView('ladders') }].map(({ key, label, action }) => (
+                          <button key={key} onClick={action}
                             style={{ fontFamily: '"Comfortaa", cursive' }}
                             className={`h-[26px] px-3 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center ${
-                              gameMode === key
+                              key === 'classic'
                                 ? 'bg-[#1A6140] text-white shadow-sm'
                                 : (theme === 'light' ? 'text-gray-400 hover:text-gray-600' : 'text-white/40 hover:text-white/60')
                             }`}>
@@ -3569,18 +3424,13 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                 <div className="flex lg:hidden landscape:hidden items-center gap-1.5 md:gap-2 scale-[0.88] origin-right">
                   {authenticated && (
                     <>
-                      {/* Branded Game Mode Switcher - Mobile */}
+                      {/* Branded Game Mode Switcher - Mobile: CLASSIC = trading,
+                          LADDERS = coming-soon page (rounds model removed) */}
                       <div className={`flex items-center p-0.5 rounded-full border backdrop-blur-3xl transition-all duration-500 ${theme === 'light' ? 'bg-white/40 border-[#1A6140]/20' : 'bg-black/40 border-white/5'}`}>
-                        <motion.div
-                          className="absolute top-0.5 bottom-0.5 rounded-full bg-[#1A6140]"
-                          initial={false}
-                          animate={{ x: gameMode === 'classic' ? 0 : 54, width: 54 }}
-                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                        />
-                        {[{ key: 'classic', Icon: Zap }, { key: 'rounds', Icon: Layers }].map(({ key, Icon }) => (
-                          <button key={key} onClick={() => { setGameMode(key); setView('trading'); }}
-                            className={`relative z-10 flex items-center justify-center h-[28px] w-[54px] transition-all duration-300`}>
-                            <Icon size={11} className={`transition-colors duration-300 ${gameMode === key ? 'text-white' : (theme === 'light' ? 'text-black/30' : 'text-white/20')}`} />
+                        {[{ key: 'classic', Icon: Zap, action: () => setView('trading') }, { key: 'ladders', Icon: Layers, action: () => setView('ladders') }].map(({ key, Icon, action }) => (
+                          <button key={key} onClick={action}
+                            className={`relative z-10 flex items-center justify-center h-[28px] w-[54px] transition-all duration-300 ${key === 'classic' ? 'text-[#1A6140]' : (theme === 'light' ? 'text-black/30' : 'text-white/20')}`}>
+                            <Icon size={11} />
                           </button>
                         ))}
                       </div>
@@ -3608,13 +3458,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
               {/* MAIN CONTENT CONTAINER */}
               <div className={`w-full ${uiVersion === 'v2' ? 'max-w-[1600px] px-2 md:px-6 lg:px-8 focus-visible:outline-none' : 'max-w-4xl lg:max-w-7xl px-4 sm:px-6 lg:px-8'} ${isSmallScreen ? '!px-0' : ''} flex flex-col items-center flex-1 min-h-0 h-full relative z-10`}>
-                <Suspense fallback={<div className="h-[200px] flex items-center justify-center animate-pulse">Loading Rounds Access...</div>}>
-                  <RoundsAccessGate
-                    theme={theme}
-                    active={gameMode === 'rounds'}
-                    verified={hasRoundsAccess}
-                    onUnlock={handleRoundsUnlock}
-                  >
               {/* MOBILE: vertical layout matching reference screenshot */}
               {isSmallScreen ? (
                 <div className="flex-1 w-full min-h-0 overflow-hidden flex flex-col">
@@ -3636,11 +3479,10 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                     liveOdds={liveOdds}
                     minStake={platformSettings.minBet}
                     maintenanceMode={platformSettings.maintenanceMode || platformSettings.tradingHalted}
-                    tradeHistory={gameMode === 'rounds' ? roundsTradeHistory : tradeHistory}
+                    tradeHistory={tradeHistory}
                     showFullHistory={showFullHistory}
                     setShowFullHistory={setShowFullHistory}
                     onViewReceipt={handleViewReceipt}
-                    gameMode={gameMode}
                     onCountdownEnd={(livePrice) => {
                       setActiveTrades(prev => prev.map(t => {
                         if (['PENDING', 'RESOLVING'].includes(t.status)) {
@@ -3750,7 +3592,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                       } : {})
                     }}>
                     <TradeHistoryTable
-                      tradeHistory={gameMode === 'rounds' ? roundsTradeHistory : tradeHistory}
+                      tradeHistory={tradeHistory}
                       activeTrades={activeTrades}
                       theme={theme}
                       onViewReceipt={handleViewReceipt}
@@ -3766,8 +3608,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               )}
 
 
-                </RoundsAccessGate>
-                </Suspense>
 
               </div>
             </div>

@@ -14,7 +14,6 @@ export const ARC_RPCS = [
 export const ARC_RPC = ARC_RPCS[0];
 export const ARC_EXPLORER = "https://testnet.arcscan.app";
 export const ARC_CONTRACT_ADDRESS = import.meta.env.VITE_ARC_CONTRACT_ADDRESS;
-export const ARC_ROUNDS_CONTRACT_ADDRESS = import.meta.env.VITE_ARC_ROUNDS_CONTRACT_ADDRESS || "0x02AE9D2a7CEca436E7B3A482772EfB74C4fE4721";
 export const ARC_USDC_ADDRESS = "0x0000000000000000000000000000000000000000"; // Native Coin
 export const ARC_RPC_BACKUP = ARC_RPCS[0];
 
@@ -178,7 +177,6 @@ const ensureAbsolute = (url) => {
 export const KEEPER_URL = ensureAbsolute(rawKeeperUrl).endsWith('/') ? ensureAbsolute(rawKeeperUrl).slice(0, -1) : ensureAbsolute(rawKeeperUrl);
 export const KEEPER_URL_ARC = ensureAbsolute(rawKeeperUrlArc).endsWith('/') ? ensureAbsolute(rawKeeperUrlArc).slice(0, -1) : ensureAbsolute(rawKeeperUrlArc);
 
-export const KEEPER_URL_ROUNDS = `${KEEPER_URL_ARC}/rounds`;
 
 const envPriceUrl = import.meta.env.VITE_PRICE_FEED_URL;
 export const PRICE_FEED_URL = envPriceUrl || (isLocal 
@@ -189,7 +187,6 @@ export const PRICE_FEED_URL = envPriceUrl || (isLocal
 
 // PRODUCTION DIAGNOSTIC - Helps find "Failed to Fetch" causes
 console.log(`🌐 [Config] API Endpoint: ${KEEPER_URL_ARC}`);
-console.log(`🎯 [Config] Rounds API: ${KEEPER_URL_ROUNDS}`);
 if (!isLocal && KEEPER_URL_ARC.includes('localhost')) {
     console.warn("⚠️ [Config] WARNING: Production frontend is trying to call a LOCAL backend. Check VITE_KEEPER_URL_ARC environment variable in Vercel.");
 }

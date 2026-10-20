@@ -251,10 +251,6 @@ function profileToRow(profile, includeTrades, includeOnboarding = true, includeC
         copy_trading_allocated: profile.copyTradingAllocated ?? 0,
         copy_trading_pnl: profile.copyTradingPnl ?? 0,
         active_copies: profile.activeCopies ?? [],
-        access_code: profile.accessCode ?? null,
-        waitlist_status: profile.waitlistStatus ?? 'pending',
-        // applied_at is a bigint column (unix ms), unlike the timestamptz audit columns.
-        applied_at: profile.appliedAt != null ? (typeof profile.appliedAt === 'number' ? profile.appliedAt : (Number.isFinite(Date.parse(profile.appliedAt)) ? Date.parse(profile.appliedAt) : profile.appliedAt)) : null,
         is_provider: profile.isProvider ?? false,
         provider_application: profile.providerApplication ?? null,
         provider_stats: profile.providerStats ?? null,
@@ -329,9 +325,6 @@ function rowToProfile(row) {
         copyTradingAllocated: row.copy_trading_allocated != null ? Number(row.copy_trading_allocated) : undefined,
         copyTradingPnl: row.copy_trading_pnl != null ? Number(row.copy_trading_pnl) : undefined,
         activeCopies: row.active_copies,
-        accessCode: row.access_code,
-        waitlistStatus: row.waitlist_status,
-        appliedAt: typeof row.applied_at === 'number' ? row.applied_at : (row.applied_at ? Date.parse(row.applied_at) : undefined),
         isProvider: row.is_provider,
         providerApplication: parseJsonField(row.provider_application),
         providerStats: parseJsonField(row.provider_stats),
@@ -1089,7 +1082,7 @@ class ProfileService {
     //   duplicate. The DB unique index (migration 008) is the final backstop.
     async isUsernameTaken(name, excludeAddr = '', { strict = false } = {}) {
         const lower = String(name || '').trim().toLowerCase();
-        if (!/^[a-z0-9_]{3,20}$/.test(lower)) return { taken: true, reason: 'format' };
+        if (!/^[a-z0-9]{6,20}$/.test(lower)) return { taken: true, reason: 'format' };
         const excl = String(excludeAddr || '').toLowerCase();
         for (const addr of Object.keys(this.profiles || {})) {
             if (addr === excl) continue;

@@ -5,6 +5,7 @@ import { useWallets } from '@privy-io/react-auth';
 import { useAccount } from 'wagmi';
 import { KEEPER_URL_ARC } from '../constants';
 import { CountrySelect } from './CountrySelect';
+import { usernameFormatError, avatarFileValid } from '../utils/validate';
 
 export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSessionWallet }) => {
     const [step, setStep] = useState(1);
@@ -34,8 +35,10 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
     const [isSaving, setIsSaving] = useState(false);
 
     const handleSave = async () => {
-        if (!username.trim()) {
-            setSaveError('Please enter a display name first.');
+        // Format gate: 6–20 letters/numbers, no special characters.
+        const nameErr = usernameFormatError(username);
+        if (nameErr) {
+            setSaveError(nameErr);
             return;
         }
         setIsSaving(true);
@@ -151,17 +154,20 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                             <input 
                                                 id="avatar-upload"
                                                 type="file" 
-                                                accept="image/*"
+                                                accept="image/png,image/jpeg,image/jpg"
                                                 className="hidden"
-                                                onChange={(e) => {
+                                                onChange={async (e) => {
                                                     const file = e.target.files[0];
-                                                    if (file) {
-                                                        const reader = new FileReader();
-                                                        reader.onloadend = () => {
-                                                            setSelectedAvatar(reader.result);
-                                                        };
-                                                        reader.readAsDataURL(file);
-                                                    }
+                                                    e.target.value = ''; // allow re-selecting the same file
+                                                    if (!file) return;
+                                                    const imgErr = await avatarFileValid(file);
+                                                    if (imgErr) { setSaveError(imgErr); return; }
+                                                    const reader = new FileReader();
+                                                    reader.onloadend = () => {
+                                                        setSelectedAvatar(reader.result);
+                                                        setSaveError('');
+                                                    };
+                                                    reader.readAsDataURL(file);
                                                 }}
                                             />
                                         </div>

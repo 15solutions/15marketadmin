@@ -3,12 +3,13 @@ import { toPng } from 'html-to-image';
 import * as ethers from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
-import { Check, Trophy, Activity, DollarSign, Award, Target, BarChart2, User, Settings, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, TrendingUp, TrendingDown, Zap, Shield, Globe, MessageSquare, AlertCircle, Copy, RotateCw, ChevronRight, ChevronLeft, Nfc, Send, ArrowDownLeft, Wallet, Bell, Megaphone, Calendar, ChevronDown, ChevronUp, Smile, Coins, RefreshCcw, BookOpen, Share2, Mail, Download, X, Menu, Bot, Gift } from "lucide-react";
+import { avatarFileValid } from "../utils/validate";
+import { Check, Trophy, Activity, DollarSign, Award, Target, BarChart2, User, Settings, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, TrendingUp, TrendingDown, Zap, Shield, Globe, MessageSquare, AlertCircle, Copy, RotateCw, ChevronRight, ChevronLeft, Nfc, Send, ArrowDownLeft, Wallet, Bell, Megaphone, Calendar, ChevronDown, ChevronUp, Smile, Coins, RefreshCcw, Share2, Mail, Download, X, Menu, Bot, Gift, LifeBuoy } from "lucide-react";
 import MessagingSystem from "./MessagingSystem";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine } from 'recharts';
 import { LatencyMeter } from "./LatencyMeter";
 import ArcABI from "../abi/ArcPrediction.json";
-import { KEEPER_URL_ARC, ARC_CONTRACT_ADDRESS, ARC_RPC, KEEPER_URL_ROUNDS, ADMIN_TOKEN } from "../constants";
+import { KEEPER_URL_ARC, ARC_CONTRACT_ADDRESS, ARC_RPC, ADMIN_TOKEN } from "../constants";
 import { socketService } from "../utils/socket";
 import { parseEther } from "viem";
 import GlobalLoader from "./GlobalLoader";
@@ -17,16 +18,6 @@ import { useCreateWallet, usePrivy, useWallets } from '@privy-io/react-auth';
 // ─── Animate-UI Style: Framer Motion Animated Icon Wrappers ──────────────────
 // Each icon has a unique, semantically-appropriate looping micro-animation.
 // Inspired by animate-ui.com's approach of wrapping Lucide icons with Framer Motion.
-
-const AnimatedBook = ({ size = 16, className = '' }) => (
-    <motion.div
-        animate={{ scale: [1, 1.12, 0.96, 1.04, 1], rotate: [0, -6, 6, -3, 0] }}
-        transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 3.5, ease: 'easeInOut' }}
-        style={{ display: 'inline-flex' }}
-    >
-        <BookOpen size={size} className={className} />
-    </motion.div>
-);
 
 const AnimatedBell = ({ size = 16, className = '' }) => (
     <motion.div
@@ -164,7 +155,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     onOpenCircleWallet,
     onTransferHub,
     onReferral,
-    onDocs
+    onHelp
 }) {
     const isLight = theme === 'light';
     const { isConnected, address, connector } = useAccount();
@@ -335,14 +326,15 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     const animVolume    = useCountUp(derivedStats.volume24h);
     const animAvgStake  = useCountUp(derivedStats.avgStake);
 
-    const handleAvatarUpload = (e) => {
+    const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
+        e.target.value = ''; // allow re-selecting the same file
         if (!file) return;
 
-        // Validate type (JPEG, JPG, PNG, GIF)
-        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-        if (!validTypes.includes(file.type)) {
-            setToast("Only JPEG, JPG, PNG, and GIF allowed");
+        // PNG/JPEG only, <=1MB, verified by magic bytes (not just MIME)
+        const imgErr = await avatarFileValid(file);
+        if (imgErr) {
+            setToast(imgErr);
             return;
         }
 
@@ -717,12 +709,12 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                             />
                         </button>
-                        <input ref={fileInputRef} type="file" className="hidden" accept="image/jpeg,image/jpg,image/png,image/gif" onChange={handleAvatarUpload}/>
+                        <input ref={fileInputRef} type="file" className="hidden" accept="image/png,image/jpeg,image/jpg" onChange={handleAvatarUpload}/>
                     </div>
                 ) : (
                     <div className="flex items-center gap-3">
-                        <button onClick={onDocs} title="Platform Documentation" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
-                            <AnimatedBook size={16} className="text-[#1A6140]"/>
+                        <button onClick={onHelp} title="Help &amp; How to Trade" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
+                            <LifeBuoy size={16} className="text-[#1A6140]"/>
                         </button>
                         <button onClick={onTransferHub || (() => onOpenCircleWallet?.(null))} title="Transfer Hub" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
                             <AnimatedSend size={15} className={isLight ? 'text-black/80' : 'text-white/80'}/>
@@ -742,7 +734,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`} title="Settings">
                             <AnimatedSettings size={16} className={isLight ? 'text-black/80' : 'text-white/80'}/>
                         </button>
-                        <input ref={fileInputRef} type="file" className="hidden" accept="image/jpeg,image/jpg,image/png,image/gif" onChange={handleAvatarUpload}/>
+                        <input ref={fileInputRef} type="file" className="hidden" accept="image/png,image/jpeg,image/jpg" onChange={handleAvatarUpload}/>
                     </div>
                 )}
             </div>
@@ -1549,8 +1541,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <X size={16} />
                             </button>
 
-                            <button onClick={() => { setIsMobileMenuOpen(false); onDocs(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
-                                <BookOpen size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Docs</span>
+                            <button onClick={() => { setIsMobileMenuOpen(false); onHelp(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                                <LifeBuoy size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Help</span>
                             </button>
                             <button onClick={() => { setIsMobileMenuOpen(false); onTransferHub?.() || onOpenCircleWallet?.(null); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Send size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Transfer Hub</span>

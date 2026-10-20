@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePrivy, useLoginWithEmail, useLoginWithOAuth, useWallets } from '@privy-io/react-auth';
 import { useConnect, useAccount } from 'wagmi';
+import { isValidUsername, usernameFormatError, USERNAME_RULES_TEXT } from '../utils/validate';
 import { injected } from 'wagmi/connectors';
 import { Mail, ArrowLeft, Loader2, Check, Wallet } from 'lucide-react';
 import { KEEPER_URL_ARC } from '../constants';
@@ -308,8 +309,8 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     // through — or past a taken name.
     const ensureNameFree = () => {
         const v = username.trim();
-        if (!/^[A-Za-z0-9_]{3,20}$/.test(v)) {
-            fail('Usernames are 3–20 letters, numbers or underscores.');
+        if (!isValidUsername(v)) {
+            fail(usernameFormatError(v) || USERNAME_RULES_TEXT);
             return false;
         }
         if (nameCheck.state === 'free' && nameCheck.forValue === v) return true;

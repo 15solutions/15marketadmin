@@ -1780,32 +1780,8 @@ app.get('/price/:key', async (req, res) => {
   res.status(404).json({ error: 'No price for asset', key });
 });
 
-// ─── ROUNDS ACCESS (WAITLIST) ─────────────────────────────────────────────────
-
-app.get('/rounds/access/check/:address', (req, res) => {
-  const addr = req.params.address.toLowerCase();
-  const profile = profiles.get(addr);
-  res.json({ authorized: !!(profile && profile.accessCode) });
-});
-
-app.post('/rounds/access/apply', async (req, res) => {
-  const { address, xHandle, discord, email } = req.body;
-  if (!address || !xHandle || !email) return res.status(400).json({ error: 'Missing required fields' });
-  profiles.upsert(address.toLowerCase(), { xHandle, discord, email, waitlistStatus: 'pending', appliedAt: Date.now() });
-  console.log(`[Waitlist] New Application: ${address} (${xHandle})`);
-  res.json({ success: true });
-});
-
-app.post('/rounds/access/redeem', async (req, res) => {
-  const { address, code } = req.body;
-  if (!address || !code) return res.status(400).json({ error: 'Missing params' });
-  const VALID_CODES = ['ALPHA15', 'NEXUS2026', 'ARC_EARLY'];
-  if (VALID_CODES.includes(code.toUpperCase())) {
-    profiles.upsert(address.toLowerCase(), { accessCode: code.toUpperCase() });
-    return res.json({ success: true });
-  }
-  res.status(400).json({ error: 'Invalid or expired access code' });
-});
+// ─── ROUNDS ACCESS (WAITLIST) — REMOVED: the rounds model was retired; the
+// Ladders product is a full-page Coming Soon with no gate codes. ──────────
 
 // ─── PROFILES ─────────────────────────────────────────────────────────────────
 
@@ -1814,7 +1790,7 @@ app.post('/rounds/access/redeem', async (req, res) => {
 // an address.
 app.get('/profiles/username/:username', async (req, res) => {
   const name = String(req.params.username || '');
-  if (!/^[A-Za-z0-9_]{3,20}$/.test(name.trim())) {
+  if (!/^[A-Za-z0-9]{6,20}$/.test(name.trim())) {
     return res.json({ available: false, reason: 'format' });
   }
   const r = await profiles.isUsernameTaken(name, req.query.address);
@@ -1891,9 +1867,36 @@ app.get('/prices/history', (req, res) => {
   res.json({ key, ms, points });
 });
 
+// ─── Input validation (security) ─────────────────────────────────────────────
+// Usernames: 6–20 chars, letters/numbers ONLY (no special characters). The
+// client validates too, but the API is the authority. Uniqueness is enforced
+// separately, fail-closed, via profiles.isUsernameTaken.
+// Avatars: PNG/JPEG data URLs (≤1MB file) or http(s) URLs; anything else is
+// dropped instead of stored.
+const USERNAME_RE = /^[A-Za-z0-9]{6,20}$/;
+const USERNAME_ERROR = 'Usernames are 6–20 letters or numbers — no special characters.';
+const AVATAR_RE = /^data:image\/(png|jpe?g);base64,[A-Za-z0-9+/=]+$/;
+const sanitizeUsernameInput = (u) => {
+  if (typeof u !== 'string') return undefined;
+  const v = u.trim();
+  return v && USERNAME_RE.test(v) ? v : undefined;
+};
+const sanitizeAvatarInput = (a) => {
+  if (typeof a !== 'string') return undefined;
+  const v = a.trim();
+  if (!v) return undefined;
+  if (/^https?:\/\//i.test(v)) return v.slice(0, 1000); // remote URL (X profile etc.)
+  if (AVATAR_RE.test(v) && v.length <= 1_400_000) return v; // 1MB file ≈ 1.37MB base64
+  return undefined;
+};
+
 app.post('/profiles', async (req, res) => {
   const { address, xHandle, avatar, onboardedAt } = req.body;
-  const username = typeof req.body.username === 'string' ? req.body.username.trim() : req.body.username;
+  const username = sanitizeUsernameInput(req.body.username);
+  // Bad explicit input is rejected loudly; absent/blank stays valid.
+  if (typeof req.body.username === 'string' && req.body.username.trim() && !username) {
+    return res.status(400).json({ error: USERNAME_ERROR, reason: 'format' });
+  }
   // Country of residence for gateway matching (ISO alpha-2). Validated and
   // normalised; anything else is ignored rather than stored.
   const country = typeof req.body.country === 'string' && /^[A-Za-z]{2}$/.test(req.body.country.trim())
@@ -1924,11 +1927,12 @@ app.post('/profiles', async (req, res) => {
   const sessionWallet = deriveSessionWallet(address.toLowerCase());
   const onboarded = req.body.onboarded === true || onboardedAt != null || !!username;
   const profileData = {
-    username,
-    xHandle,
-    avatar,
     walletAddress: sessionWallet.address
   };
+  if (username) profileData.username = username;
+  if (xHandle !== undefined) profileData.xHandle = typeof xHandle === 'string' ? xHandle.trim().slice(0, 60) : undefined;
+  const safeAvatar = sanitizeAvatarInput(avatar);
+  if (safeAvatar) profileData.avatar = safeAvatar;
   if (country) profileData.country = country;
   if (typeof req.body.firstName === 'string' && req.body.firstName.trim()) {
     profileData.firstName = req.body.firstName.trim().slice(0, 60);
@@ -2076,6 +2080,19 @@ app.patch('/profiles/:address', async (req, res) => {
   }
 
   const updates = { ...req.body };
+  // Username format gate: 6–20 letters/numbers (no special characters).
+  if (typeof updates.username === 'string') {
+    if (updates.username.trim() && !USERNAME_RE.test(updates.username.trim())) {
+      return res.status(400).json({ error: USERNAME_ERROR, reason: 'format' });
+    }
+  }
+  // Avatar gate: PNG/JPEG data URLs or http(s) URLs only — drop anything else
+  // so arbitrary payloads can never be persisted as inline profile content.
+  if (typeof updates.avatar === 'string' && updates.avatar.trim()) {
+    const safe = sanitizeAvatarInput(updates.avatar);
+    if (!safe) delete updates.avatar;
+    else updates.avatar = safe;
+  }
   if (updates.country !== undefined) {
     updates.country = (typeof updates.country === 'string' && /^[A-Za-z]{2}$/.test(updates.country.trim()))
       ? updates.country.trim().toUpperCase()

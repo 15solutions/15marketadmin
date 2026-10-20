@@ -119,14 +119,14 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
                                 <div className={`w-full border-t border-b ${isLight ? 'border-black/20' : 'border-white/20'} py-2 mb-2 flex items-center justify-center gap-3`}>
                                     <div className="w-1.5 h-1.5 rounded-full bg-[#1A6140]"></div>
                                     <h1 className="text-3xl font-black tracking-widest">
-                                        {trade.type === 'rounds' ? 'ROUNDS SETTLE' : '15MARKET'}
+                                        15MARKET
                                     </h1>
                                     <div className="w-1.5 h-1.5 rounded-full bg-[#1A6140]"></div>
                                 </div>
 
                                 
                                 <p className={`text-[10px] font-bold tracking-[0.2em] uppercase ${isLight ? 'text-black/60' : 'text-white/60'}`}>
-                                    {trade.type === 'rounds' ? 'P2P POOLED SETTLEMENT' : 'VERIFIED PREDICTION'} • ARC_NETWORK
+                                    VERIFIED PREDICTION • ARC_NETWORK
                                 </p>
                             </div>
 
@@ -168,15 +168,15 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
                             {/* Trade Info Section */}
                             <div className="w-full grid grid-cols-2 gap-y-6 relative mb-4">
                                 <div className="flex flex-col items-start text-left">
-                                    <span className={`text-[10px] font-bold uppercase mb-1 ${isLight ? 'text-black/50' : 'text-white/50'}`}>{trade.type === 'rounds' ? 'ACTIVE POOL' : 'ASSET PAIR'}</span>
+                                    <span className={`text-[10px] font-bold uppercase mb-1 ${isLight ? 'text-black/50' : 'text-white/50'}`}>ASSET PAIR</span>
                                     <span className="text-xl font-black tracking-tight">
                                         {trade.symbol ? `${trade.symbol.toUpperCase()} // USD` : 'ETH // USD'}
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-end text-right">
-                                    <span className={`text-[10px] font-bold uppercase mb-1 ${isLight ? 'text-black/50' : 'text-white/50'}`}>{trade.type === 'rounds' ? 'P2P DIRECTION' : 'EXECUTION'}</span>
+                                    <span className={`text-[10px] font-bold uppercase mb-1 ${isLight ? 'text-black/50' : 'text-white/50'}`}>EXECUTION</span>
                                     <span className={`font-black uppercase text-xl ${isUp ? 'text-[#1A6140]' : 'text-[#FF7F50]'}`}>
-                                        {trade.type === 'rounds' ? (isUp ? 'LONG POOL' : 'SHORT POOL') : (isUp ? 'LONG' : 'SHORT')}
+                                                                            {isUp ? 'LONG' : 'SHORT'}
                                     </span>
                                 </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { UnifiedWalletButton } from "./UnifiedWalletButton";
 import { 
-    BookOpen, Monitor, Smartphone, TrendingUp, TrendingDown, Clock, 
+    LifeBuoy, Monitor, Smartphone, TrendingUp, TrendingDown, Clock, 
     Menu, X, ChevronDown, ArrowUpRight
 } from "lucide-react";
 
@@ -55,7 +55,7 @@ const RisingBalance = () => {
     );
 };
 
-export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
+export function LandingPage({ theme, onToggle, onHelp, isSmallScreen }) {
     const isLight = false; // Always dark!
     const [currentTextIndex, setCurrentTextIndex] = useState(0);
     const [displayText, setDisplayText] = useState("");
@@ -115,15 +115,15 @@ export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
                 {/* Desktop Action Menu */}
                 <div className="hidden md:flex items-center gap-3">
                     <button 
-                        onClick={onDocs}
+                        onClick={onHelp}
                         className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border transition-all ${
                             isLight 
                                 ? 'bg-white border-black/5 hover:bg-black/5 text-[#0a261a]' 
                                 : 'bg-white/5 border-white/5 hover:bg-white/10 text-white'
                         }`}
                     >
-                        <BookOpen size={13} className="text-[#1A6140]" />
-                        <span>Docs</span>
+                        <LifeBuoy size={13} className="text-[#1A6140]" />
+                        <span>Help</span>
                     </button>
                     <a 
                         href="https://x.com/15_markets"
@@ -164,13 +164,13 @@ export function LandingPage({ theme, onToggle, onDocs, isSmallScreen }) {
                                 className={`absolute right-0 mt-2 w-44 rounded-2xl border p-2 flex flex-col gap-1 z-50 ${cardBg}`}
                             >
                                 <button 
-                                    onClick={() => { setMobileMenuOpen(false); onDocs(); }}
+                                    onClick={() => { setMobileMenuOpen(false); onHelp(); }}
                                     className={`w-full px-3.5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-2 text-left transition-colors ${
                                         isLight ? 'hover:bg-black/5' : 'hover:bg-white/5'
                                     }`}
                                 >
-                                    <BookOpen size={12} className="text-[#1A6140]" />
-                                    <span>Docs</span>
+                                    <LifeBuoy size={12} className="text-[#1A6140]" />
+                                    <span>Help</span>
                                 </button>
                                 <a 
                                     href="https://x.com/15_markets"

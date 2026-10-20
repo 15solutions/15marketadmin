@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { KEEPER_URL_ARC } from '../constants';
+import { usernameFormatError } from '../utils/validate';
 
 import { Zap, Shield, TrendingUp, TrendingDown, Camera, Edit3, Image as ImageIcon, Link as LinkIcon, Check, Send, ArrowDownLeft, Users, Gift, Copy } from 'lucide-react';
 
@@ -178,6 +179,12 @@ export function ProfileModal({
             notify("Username cannot be empty.", "error");
             return;
         }
+        // Format gate: 6–20 letters/numbers, no special characters.
+        const nameErr = usernameFormatError(username);
+        if (nameErr) {
+            notify(nameErr, "error");
+            return;
+        }
         setIsSaving(true);
         notify("Syncing Profile...", "pending");
         try {
@@ -300,11 +307,12 @@ export function ProfileModal({
                                             onClick={() => {
                                                 const input = document.createElement('input');
                                                 input.type = 'file';
-                                                input.accept = 'image/jpeg,image/jpg,image/png,image/gif';
-                                                input.onchange = (e) => {
+                                                input.accept = 'image/png,image/jpeg,image/jpg';
+                                                input.onchange = async (e) => {
                                                     const file = e.target.files[0];
                                                     if (!file) return;
-                                                    if (file.size > 1024 * 1024) return notify("Image too large (Max 1MB)", "error");
+                                                    const imgErr = await avatarFileValid(file);
+                                                    if (imgErr) return notify(imgErr, "error");
                                                     const reader = new FileReader();
                                                     reader.onloadend = () => {
                                                         setAvatar(reader.result);

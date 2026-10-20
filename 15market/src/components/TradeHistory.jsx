@@ -55,7 +55,6 @@ function TradeHistoryComponent({
                 ) : (
                     <div className="space-y-2">
                         {paginatedTrades.map((t) => {
-                            const isRounds = t.type === 'rounds';
                             const side = (t.direction === "UP" || t.direction === 1 || String(t.direction) === "1") ? "LONG" : "SHORT";
                             const sideColor = side === "LONG" ? '#1A6140' : '#FF7F50';
 
@@ -70,21 +69,18 @@ function TradeHistoryComponent({
                                                 color: sideColor
                                             }}>
                                                 {side}
-                                            </div>
-                                            {isRounds && (
-                                                <div className="absolute -top-2 -left-1 bg-[#1A6140] text-white text-[5px] font-black px-1 rounded uppercase tracking-tighter">Round</div>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <div className={`text-[10px] lg:text-sm font-bold ${isLight ? 'text-[#0a261a]' : 'text-white/90'}`}>
-                                                {(t.status === 'WON' || t.status === 'PAID') ? `+${Number(t.payout || (t.amount * (t.duration <= 5 ? 2.90 : t.duration <= 10 ? 2.40 : 1.90) * 0.99)).toFixed(2)}` : `${Number(t.amount).toFixed(2)}`} USDC
-                                            </div>
-                                            <div className="text-[7px] lg:text-[9px] uppercase font-black opacity-30">{t.symbol || 'ETH'} // {isRounds ? 'P2P Pool' : 'Binary'}</div>
                                         </div>
                                     </div>
+                                    <div className="flex flex-col">
+                                        <div className={`text-[10px] lg:text-sm font-bold ${isLight ? 'text-[#0a261a]' : 'text-white/90'}`}>
+                                            {(t.status === 'WON' || t.status === 'PAID') ? `+${Number(t.payout || (t.amount * (t.duration <= 5 ? 2.90 : t.duration <= 10 ? 2.40 : 1.90) * 0.99)).toFixed(2)}` : `${Number(t.amount).toFixed(2)}`} USDC
+                                        </div>
+                                        <div className="text-[7px] lg:text-[9px] uppercase font-black opacity-30">{t.symbol || 'ETH'} // Binary</div>
+                                    </div>
+                                </div>
 
-                                    <div className={`${isLight ? 'text-[#0a261a]/40' : 'text-white/40'} text-[9px] lg:text-sm hidden sm:flex flex-col`}>
-                                        <span className="font-bold">{isRounds ? 'Lock' : 'Entry'}: ${Number(t.entryPrice).toFixed(2)}</span>
+                                <div className={`${isLight ? 'text-[#0a261a]/40' : 'text-white/40'} text-[9px] lg:text-sm hidden sm:flex flex-col`}>
+                                    <span className="font-bold">Entry: ${Number(t.entryPrice).toFixed(2)}</span>
                                         {t.settlementPrice > 0 && <span className="text-[8px] lg:text-xs opacity-60">Result: ${Number(t.settlementPrice).toFixed(2)}</span>}
                                     </div>
 

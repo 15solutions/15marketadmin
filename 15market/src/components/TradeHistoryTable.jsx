@@ -349,7 +349,7 @@ export default function TradeHistoryTable({
                       </span>
                     </div>
                     <span className={`text-[10px] font-bold ${isLight ? 'text-gray-400' : 'text-white/40'}`}>
-                      {trade.type === 'rounds' ? 'Rounds Pool' : '15s Binary'}
+                      15s Binary
                     </span>
                   </div>
                 </div>

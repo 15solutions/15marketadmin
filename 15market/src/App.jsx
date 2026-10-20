@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import UserApp from "./UserApp";
 import VerifyTradePage from "./components/VerifyTradePage";
-import { DocsPage } from "./components/DocsPage";
+import HelpPage from "./components/HelpPage";
 import { useAccount } from "wagmi";
 
 // Wrapper component to access hooks
@@ -14,7 +14,7 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/" element={<UserApp />} />
-      <Route path="/docs" element={<DocsPage theme={localStorage.getItem("15market_theme") || "dark"} />} />
+      <Route path="/help" element={<HelpPage theme={localStorage.getItem("15market_theme") || "dark"} />} />
       {/* Landing page for the QR printed on every share card. Must stay outside
           every auth gate - a scanned card has to resolve for a logged-out
           visitor with no wallet. */}

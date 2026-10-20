@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Rocket } from 'lucide-react';
 
-export default function ComingSoonPage({ onBack, theme }) {
+export default function ComingSoonPage({ onBack, theme, title }) {
   const isLight = theme === 'light';
   return (
     <div className={`w-full h-screen overflow-hidden relative ${isLight ? 'text-black bg-[#CFDCD5]' : 'text-white bg-black'} flex flex-col`} style={{ fontFamily: '"Comfortaa", cursive' }}>
@@ -43,7 +43,7 @@ export default function ComingSoonPage({ onBack, theme }) {
 
       {/* Message */}
       <h1 className="text-3xl md:text-5xl font-black uppercase tracking-wider mb-4 text-center">
-        Coming Soon
+        {title ? `${title} — Coming Soon` : 'Coming Soon'}
       </h1>
       <p className={`text-center ${isLight ? 'text-black/70' : 'text-white/70'} max-w-md`}>We’re working hard to bring this feature to life. Stay tuned!</p>
       </div>
