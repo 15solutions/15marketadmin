@@ -262,6 +262,13 @@ function profileToRow(profile, includeTrades, includeOnboarding = true, includeC
         pending_portfolio_revenue: profile.pendingPortfolioRevenue ?? 0,
         trading_wallet: profile.tradingWallet ?? null,
         wallet_address: profile.walletAddress ?? null,
+        // Referral program (migration 009). Kept explicit so a profile write
+        // can never silently drop a referral link the user applied once.
+        referral_code: profile.referralCode ?? null,
+        referred_by: profile.referredBy ?? null,
+        referred_at: profile.referredAt != null ? profile.referredAt : null,
+        referral_enrolled: profile.referralEnrolled ?? false,
+        referral_enrolled_at: profile.referralEnrolledAt != null ? profile.referralEnrolledAt : null,
         updated_at: new Date().toISOString()
     };
     if (includeChainRecon) {
@@ -332,6 +339,11 @@ function rowToProfile(row) {
         pendingPortfolioRevenue: row.pending_portfolio_revenue != null ? Number(row.pending_portfolio_revenue) : undefined,
         tradingWallet: row.trading_wallet,
         walletAddress: row.wallet_address,
+        referralCode: row.referral_code || undefined,
+        referredBy: row.referred_by || undefined,
+        referredAt: typeof row.referred_at === 'number' ? row.referred_at : (row.referred_at ? Date.parse(row.referred_at) : undefined),
+        referralEnrolled: row.referral_enrolled === true ? true : undefined,
+        referralEnrolledAt: typeof row.referral_enrolled_at === 'number' ? row.referral_enrolled_at : (row.referral_enrolled_at ? Date.parse(row.referral_enrolled_at) : undefined),
         onboarded: row.onboarded === true || onboardedAt != null || !!row.username,
         onboardedAt,
         chainBaseline: row.chain_baseline != null ? Number(row.chain_baseline) : null,
@@ -353,6 +365,8 @@ class ProfileService {
         this.sbColumnsProbed = false;
         this.sbTradeTableAvailable = null;
         this.sbIdempotencyAvailable = null; // null = unprobed, false = table missing
+    this.sbReferralAvailable = null;    // same, for referral columns (009)
+    this.sbRefWithdrawalsAvailable = null; // same, for referral_withdrawals (009)
     this.sbBetIdempotencyAvailable = null; // same, for placed_bets (005)
     this.sbCountryAvailable = null; // null = unprobed, false = column missing (006 not applied)
         this.sbInitPromise = null;
@@ -514,6 +528,25 @@ class ProfileService {
         } catch (e) {
             this.sbFullPayload = true;
             console.warn('[Supabase] Column probe failed:', e.message);
+        }
+        // Referral columns (migration 009) probed separately so a missing
+        // referral column never forces the wide trade payloads off.
+        try {
+            const refRes = await supabaseRequest('/rest/v1/profiles?select=referral_code,referred_by,referred_at,referral_enrolled,referral_enrolled_at&limit=1', { timeout: 20000 });
+            this.sbReferralAvailable = refRes.ok;
+            if (!refRes.ok) console.warn('[Supabase] Referral columns NOT present — run 009_referrals.sql; referral writes are disabled until then.');
+        } catch (e) {
+            this.sbReferralAvailable = true;
+            console.warn('[Supabase] Referral column probe failed:', e.message);
+        }
+        // Withdrawal-request ledger (009) probed the same way.
+        try {
+            const wdRes = await supabaseRequest('/rest/v1/referral_withdrawals?select=id&limit=1', { timeout: 20000 });
+            this.sbRefWithdrawalsAvailable = wdRes.ok;
+            if (!wdRes.ok) console.warn('[Supabase] referral_withdrawals NOT present — run 009_referrals.sql; manual withdrawals are disabled until then.');
+        } catch (e) {
+            this.sbRefWithdrawalsAvailable = true;
+            console.warn('[Supabase] Withdrawal table probe failed:', e.message);
         }
     }
 
@@ -915,6 +948,10 @@ class ProfileService {
         if (this.sbCountryAvailable === false) {
             for (const a of attempts) { delete a.country; delete a.first_name; delete a.last_name; }
         }
+        // Same protection for the referral columns (009).
+        if (this.sbReferralAvailable === false) {
+            for (const a of attempts) { delete a.referral_code; delete a.referred_by; delete a.referred_at; }
+        }
         let lastError = '';
         for (let i = 0; i < attempts.length; i++) {
             try {
@@ -1043,6 +1080,339 @@ class ProfileService {
         } catch (e) {
             return strict ? { taken: true, reason: 'unavailable' } : { taken: false, degraded: true };
         }
+    }
+
+    // ─── Referral program ─────────────────────────────────────────────────
+    // Referral code format: 7 chars from an unambiguous alphabet (no 0/O/1/I).
+    genReferralCode() {
+        const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 7; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+        return code;
+    }
+
+    // Every profile gets a referral code lazily on first use (signup or when
+    // the settings screen asks for it). Uniqueness is guarded three ways:
+    // the in-memory cache, a Supabase existence check, and (as the backstop)
+    // the DB unique constraint — a rejected duplicate just means this attempt
+    // regenerates on the next signup touch.
+    async ensureReferralCode(address) {
+        const addr = String(address || '').toLowerCase();
+        if (!addr) return null;
+        await this.initSupabase();
+        if (!this.get(addr)) this.upsert(addr, {});
+        const existing = this.get(addr);
+        if (existing?.referralCode) return existing.referralCode;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const code = this.genReferralCode();
+            const inUseMem = Object.values(this.profiles || {}).some(p => (p.referralCode || '').toUpperCase() === code && p.address !== addr);
+            if (inUseMem) continue;
+            if (SUPABASE_ENABLED) {
+                try {
+                    const res = await supabaseRequest(`/rest/v1/profiles?select=address&referral_code=eq.${encodeURIComponent(code)}&limit=1`, { timeout: 10000 });
+                    if (res.ok) {
+                        const rows = await res.json();
+                        if (Array.isArray(rows) && rows.length > 0) continue; // taken in the durable store
+                    }
+                } catch (e) { /* fall through — the DB unique index is the backstop */ }
+            }
+            this.upsert(addr, { referralCode: code });
+            return code;
+        }
+        console.warn(`[Profiles] Referral code allocation exhausted for ${addr}`);
+        return null;
+    }
+
+    // Apply a referral code exactly once per user. Fail-closed on lookup:
+    // if we cannot prove the referrer holds the code, nothing is written.
+    async applyReferralCode(address, code) {
+        const addr = String(address || '').toLowerCase();
+        const refCode = String(code || '').trim().toUpperCase();
+        if (!refCode) return { ok: false, status: 400, error: 'Enter a referral code' };
+        await this.initSupabase();
+        const profile = this.get(addr);
+        if (!profile) return { ok: false, status: 404, error: 'Create your profile first' };
+        if (profile.referredBy) return { ok: false, status: 409, error: 'You already used a referral code' };
+        // Resolve the referrer: memory first (fresh signups live here), then
+        // the durable store.
+        let referrer = Object.values(this.profiles || {}).find(p => (p.referralCode || '').toUpperCase() === refCode && p.address !== addr);
+        if (!referrer && SUPABASE_ENABLED) {
+            try {
+                const res = await supabaseRequest(`/rest/v1/profiles?select=address,username&referral_code=eq.${encodeURIComponent(refCode)}&limit=1`, { timeout: 10000 });
+                if (!res.ok) return { ok: false, status: 503, error: 'Referral lookup failed, try again' };
+                const rows = await res.json();
+                if (Array.isArray(rows) && rows.length > 0 && String(rows[0].address || '').toLowerCase() !== addr) {
+                    referrer = { address: String(rows[0].address).toLowerCase(), username: rows[0].username || null };
+                }
+            } catch (e) {
+                return { ok: false, status: 503, error: 'Referral lookup failed, try again' };
+            }
+        }
+        if (!referrer || referrer.address === addr) return { ok: false, status: 404, error: 'Referral code not found' };
+        this.upsert(addr, { referredBy: referrer.address, referredAt: Date.now() });
+        return { ok: true, referrer: referrer.address, referrerUsername: referrer.username || null };
+    }
+
+    // Commission math: the referrer earns 10% of everything their referred
+    // users DEPOSIT and 10% of everything they TRADE (staked amount),
+    // computed on read from the two authoritative ledgers:
+    //   deposits → credited_deposits (one row per credited inflow)
+    //   volume   → placed_bets      (one row per placed bet)
+    async getReferralStats(address) {
+        const addr = String(address || '').toLowerCase();
+        await this.initSupabase();
+        const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+        const DEPOSIT_COMMISSION_RATE = 0.10;
+        const VOLUME_COMMISSION_RATE = 0.10;
+
+        // 1) Referred users (memory first, then the durable store by referred_by)
+        const referred = new Map();
+        for (const p of Object.values(this.profiles || {})) {
+            if (String(p.referredBy || '').toLowerCase() === addr) {
+                referred.set(p.address, { username: p.username || null, joinedAt: p.referredAt || null });
+            }
+        }
+        if (SUPABASE_ENABLED) {
+            try {
+                const res = await supabaseRequest(
+                    `/rest/v1/profiles?select=address,username,referred_at&referred_by=eq.${encodeURIComponent(addr)}&order=referred_at.desc&limit=200`,
+                    { timeout: 15000 }
+                );
+                if (res.ok) {
+                    for (const r of (await res.json()) || []) {
+                        const ra = String(r.address || '').toLowerCase();
+                        if (!ra) continue;
+                        referred.set(ra, {
+                            username: r.username || null,
+                            joinedAt: typeof r.referred_at === 'number' ? r.referred_at : (r.referred_at ? Date.parse(r.referred_at) : null)
+                        });
+                    }
+                }
+            } catch (e) { /* memory layer still answers */ }
+        }
+
+        const referralCode = await this.ensureReferralCode(addr);
+        const addresses = Array.from(referred.keys()).filter(Boolean);
+        const empty = {
+            referralCode,
+            count: 0,
+            totalDeposits: 0,
+            totalVolume: 0,
+            depositCommission: 0,
+            volumeCommission: 0,
+            totalCommission: 0,
+            referrals: []
+        };
+        if (addresses.length === 0) return empty;
+
+        const inList = `in.(${addresses.map(a => a.toLowerCase()).join(',')})`;
+
+        // 2) Deposits of referred users
+        let totalDeposits = 0;
+        const perUserDeposits = {};
+        if (SUPABASE_ENABLED && this.sbIdempotencyAvailable !== false) {
+            try {
+                const res = await supabaseRequest(`/rest/v1/credited_deposits?select=user_address,amount&user_address=${inList}`, { timeout: 20000 });
+                if (res.ok) {
+                    for (const r of (await res.json()) || []) {
+                        const ua = String(r.user_address || '').toLowerCase();
+                        if (!ua) continue;
+                        perUserDeposits[ua] = (perUserDeposits[ua] || 0) + Number(r.amount || 0);
+                    }
+                } else if (res.status >= 400 && res.status < 500) {
+                    this.sbIdempotencyAvailable = false;
+                }
+            } catch (e) { /* deposits stay 0 rather than failing the whole stats call */ }
+        }
+        totalDeposits = round2(Object.values(perUserDeposits).reduce((s, v) => s + v, 0));
+
+        // 3) Traded volume of referred users (staked amounts, bets only)
+        let totalVolume = 0;
+        const perUserVolume = {};
+        if (SUPABASE_ENABLED && this.sbBetIdempotencyAvailable !== false) {
+            try {
+                const res = await supabaseRequest(`/rest/v1/placed_bets?select=user_address,amount&user_address=${inList}`, { timeout: 20000 });
+                if (res.ok) {
+                    for (const r of (await res.json()) || []) {
+                        const ua = String(r.user_address || '').toLowerCase();
+                        if (!ua) continue;
+                        perUserVolume[ua] = (perUserVolume[ua] || 0) + Number(r.amount || 0);
+                    }
+                } else if (res.status >= 400 && res.status < 500) {
+                    this.sbBetIdempotencyAvailable = false;
+                }
+            } catch (e) { /* volume stays 0 rather than failing the whole stats call */ }
+        }
+        totalVolume = round2(Object.values(perUserVolume).reduce((s, v) => s + v, 0));
+
+        const depositCommission = round2(totalDeposits * DEPOSIT_COMMISSION_RATE);
+        const volumeCommission = round2(totalVolume * VOLUME_COMMISSION_RATE);
+
+        const referrals = addresses
+            .map(a => ({
+                address: a,
+                username: referred.get(a)?.username || null,
+                joinedAt: referred.get(a)?.joinedAt || null,
+                deposits: round2(perUserDeposits[a] || 0),
+                volume: round2(perUserVolume[a] || 0),
+                commission: round2((perUserDeposits[a] || 0) * DEPOSIT_COMMISSION_RATE + (perUserVolume[a] || 0) * VOLUME_COMMISSION_RATE)
+            }))
+            .sort((a, b) => (b.joinedAt || 0) - (a.joinedAt || 0));
+
+        return {
+            referralCode,
+            count: referrals.length,
+            totalDeposits,
+            totalVolume,
+            depositCommission,
+            volumeCommission,
+            totalCommission: round2(depositCommission + volumeCommission),
+            referrals
+        };
+    }
+
+    // The ref page requires an explicit enrollment. Enrolling mints the
+    // referral code (and creates a minimal profile for users who somehow
+    // reached the hub before onboarding wrote one).
+    async enrollReferral(address) {
+        const addr = String(address || '').toLowerCase();
+        if (!addr) return { ok: false, status: 400, error: 'Address required' };
+        await this.initSupabase();
+        this.upsert(addr, { referralEnrolled: true, referralEnrolledAt: Date.now() });
+        const code = await this.ensureReferralCode(addr);
+        return { ok: true, referralCode: code };
+    }
+
+    // Manual withdrawal of referral commission. NOT on-chain, NO auto payout:
+    // a request is a pending row an admin processes. The spendable balance is
+    // derived on read — total computed commission minus every non-rejected
+    // request — so approving/rejecting never double-spends.
+    static REF_MIN_WITHDRAWAL = 25;
+    async refAvailableCommission(address) {
+        const addr = String(address || '').toLowerCase();
+        const stats = await this.getReferralStats(addr);
+        let owed = stats.totalCommission || 0;
+        let paidOrPending = 0;
+        if (SUPABASE_ENABLED && this.sbRefWithdrawalsAvailable !== false) {
+            try {
+                const res = await supabaseRequest(
+                    `/rest/v1/referral_withdrawals?select=amount&user_address=eq.${encodeURIComponent(addr)}&status=in.(pending,paid)`,
+                    { timeout: 15000 }
+                );
+                if (res.ok) {
+                    for (const r of (await res.json()) || []) paidOrPending += Number(r.amount || 0);
+                } else if (res.status >= 400 && res.status < 500) {
+                    this.sbRefWithdrawalsAvailable = false;
+                }
+            } catch (e) { /* treat as 0 owed-out rather than failing */ }
+        }
+        return { stats, available: Math.max(0, Math.round((owed - paidOrPending) * 100) / 100) };
+    }
+
+    async requestRefWithdrawal(address, amount) {
+        const addr = String(address || '').toLowerCase();
+        const amt = Math.round((Number(amount) || 0) * 100) / 100;
+        if (!addr) return { ok: false, status: 400, error: 'Address required' };
+        if (!(amt > 0)) return { ok: false, status: 400, error: 'Enter an amount' };
+        await this.initSupabase();
+        const profile = this.get(addr);
+        if (!profile?.referralEnrolled) return { ok: false, status: 403, error: 'Enroll in the referral program first' };
+        const { available } = await this.refAvailableCommission(addr);
+        if (available < ProfileService.REF_MIN_WITHDRAWAL) {
+            return { ok: false, status: 400, error: `Minimum withdrawal is $${ProfileService.REF_MIN_WITHDRAWAL}.00 USDC` };
+        }
+        if (amt > available) {
+            return { ok: false, status: 400, error: `Only $${available.toFixed(2)} available to withdraw` };
+        }
+        const row = {
+            user_address: addr,
+            amount: amt,
+            status: 'pending',
+            requested_at: new Date().toISOString()
+        };
+        if (SUPABASE_ENABLED && this.sbRefWithdrawalsAvailable !== false) {
+            try {
+                const res = await supabaseRequest('/rest/v1/referral_withdrawals', {
+                    method: 'POST',
+                    body: JSON.stringify([row]),
+                    headers: { Prefer: 'return=representation,resolution=merge-duplicates' }
+                });
+                if (!res.ok) {
+                    if (res.status >= 400 && res.status < 500) this.sbRefWithdrawalsAvailable = false;
+                    throw new Error(`withdrawal insert failed: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 200));
+                }
+                const rows = await res.json().catch(() => []);
+                return { ok: true, withdrawal: Array.isArray(rows) && rows[0] ? rows[0] : row };
+            } catch (e) {
+                // Memory ledger (fresh deployments before migration) — still
+                // record server-side so the request isn't silently lost.
+                return { ok: false, status: 503, error: 'Withdrawals ledger unavailable — run migration 009' };
+            }
+        }
+        return { ok: false, status: 503, error: 'Withdrawals ledger unavailable — run migration 009' };
+    }
+
+    async getRefWithdrawals(address) {
+        const addr = String(address || '').toLowerCase();
+        if (SUPABASE_ENABLED && this.sbRefWithdrawalsAvailable !== false) {
+            try {
+                const res = await supabaseRequest(
+                    `/rest/v1/referral_withdrawals?select=*&user_address=eq.${encodeURIComponent(addr)}&order=requested_at.desc&limit=50`,
+                    { timeout: 15000 }
+                );
+                if (res.ok) return (await res.json()) || [];
+                if (res.status >= 400 && res.status < 500) this.sbRefWithdrawalsAvailable = false;
+            } catch (e) { /* fall through */ }
+        }
+        return [];
+    }
+
+    async getAdminRefWithdrawals() {
+        if (SUPABASE_ENABLED && this.sbRefWithdrawalsAvailable !== false) {
+            try {
+                const res = await supabaseRequest(
+                    '/rest/v1/referral_withdrawals?select=*&order=requested_at.desc&limit=200',
+                    { timeout: 20000 }
+                );
+                if (res.ok) {
+                    const rows = (await res.json()) || [];
+                    // Best-effort username decoration from the profile cache/DB.
+                    const withNames = await Promise.all(rows.map(async r => {
+                        let username = null;
+                        try {
+                            const p = this.get(String(r.user_address || '').toLowerCase())
+                                || await this.getAsync(String(r.user_address || '').toLowerCase());
+                            username = p?.username || null;
+                        } catch (e) {}
+                        return { ...r, username };
+                    }));
+                    return withNames;
+                }
+                if (res.status >= 400 && res.status < 500) this.sbRefWithdrawalsAvailable = false;
+            } catch (e) { /* fall through */ }
+        }
+        return [];
+    }
+
+    async setRefWithdrawalStatus(id, status) {
+        if (!['paid', 'rejected'].includes(status)) return { ok: false, status: 400, error: 'Invalid status' };
+        if (SUPABASE_ENABLED && this.sbRefWithdrawalsAvailable !== false) {
+            try {
+                const res = await supabaseRequest(
+                    `/rest/v1/referral_withdrawals?id=eq.${encodeURIComponent(id)}`,
+                    {
+                        method: 'PATCH',
+                        body: JSON.stringify({ status, processed_at: new Date().toISOString() })
+                    }
+                );
+                if (res.ok) return { ok: true };
+                if (res.status >= 400 && res.status < 500) this.sbRefWithdrawalsAvailable = false;
+                return { ok: false, status: 502, error: `update failed: ${res.status}` };
+            } catch (e) {
+                return { ok: false, status: 502, error: e.message };
+            }
+        }
+        return { ok: false, status: 503, error: 'Withdrawals ledger unavailable — run migration 009' };
     }
 
     async getHistoryAsync(address) {

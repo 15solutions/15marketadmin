@@ -3,9 +3,8 @@ import { toPng } from 'html-to-image';
 import * as ethers from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
-import { Check, Trophy, Activity, DollarSign, Award, Target, BarChart2, User, Settings, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, TrendingUp, TrendingDown, Zap, Shield, Globe, MessageSquare, AlertCircle, Copy, RotateCw, ChevronRight, ChevronLeft, Nfc, Send, ArrowDownLeft, Wallet, Bell, Megaphone, Calendar, ChevronDown, ChevronUp, Smile, Coins, RefreshCcw, BookOpen, Share2, Mail, Download, X, Menu, Bot } from "lucide-react";
+import { Check, Trophy, Activity, DollarSign, Award, Target, BarChart2, User, Settings, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, TrendingUp, TrendingDown, Zap, Shield, Globe, MessageSquare, AlertCircle, Copy, RotateCw, ChevronRight, ChevronLeft, Nfc, Send, ArrowDownLeft, Wallet, Bell, Megaphone, Calendar, ChevronDown, ChevronUp, Smile, Coins, RefreshCcw, BookOpen, Share2, Mail, Download, X, Menu, Bot, Gift } from "lucide-react";
 import MessagingSystem from "./MessagingSystem";
-import CampaignLeaderboardPane from "./CampaignLeaderboardPane";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine } from 'recharts';
 import { LatencyMeter } from "./LatencyMeter";
 import ArcABI from "../abi/ArcPrediction.json";
@@ -36,17 +35,6 @@ const AnimatedBell = ({ size = 16, className = '' }) => (
         style={{ display: 'inline-flex', transformOrigin: 'top center' }}
     >
         <Bell size={size} className={className} />
-    </motion.div>
-);
-
-const AnimatedTrophy = ({ size = 16, className = '' }) => (
-    <motion.div
-        initial={{ y: 0, scale: 1 }}
-        animate={{ y: [0, -4, 0, -2, 0], scale: [1, 1.08, 1, 1.04, 1] }}
-        transition={{ duration: 2.2, repeat: 0, ease: 'easeInOut' }}
-        style={{ display: 'inline-flex' }}
-    >
-        <Trophy size={size} className={className} />
     </motion.div>
 );
 
@@ -174,8 +162,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     uiVersion,
     setUiVersion,
     onOpenCircleWallet,
-    onCampaign,
     onTransferHub,
+    onReferral,
     onDocs
 }) {
     const isLight = theme === 'light';
@@ -209,12 +197,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     const [promptValue, setPromptValue] = useState("");
 
     const [isSyncing, setIsSyncing] = useState(false);
-    const [campaigns, setCampaigns] = useState([]);
-    const [activeCampaignLeaderboard, setActiveCampaignLeaderboard] = useState([]);
-    const [selectedCampaignId, setSelectedCampaignId] = useState(null);
     const [toast, setToast] = useState(null);
-    const [enrolling, setEnrolling] = useState(false);
-    const [enrollments, setEnrollments] = useState({});
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -227,6 +210,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     const touchStartXRef = useRef(null); // swipe navigation for the card deck
     const deckRef = useRef(null); // wallet card deck box (for fit-to-screen scaling)
     const [deckScale, setDeckScale] = useState(1);
+    const flipDashDirRef = useRef(1); // 3D flip direction: -1 = forward to Main, 1 = back to Trading
+    const showCard = (side) => { flipDashDirRef.current = side === 'main' ? -1 : 1; setWalletCardSide(side); };
 
     // The deck is designed on a fixed 448 × 260 canvas; measure its box and
     // scale the whole canvas down uniformly so it always fits the screen.
@@ -392,20 +377,6 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
 
     const totalPages = Math.ceil(userHistory.length / ITEMS_PER_PAGE);
 
-    const hasActiveCampaign = useMemo(() => {
-        return campaigns.some(c => enrollments[c.id] && Date.now() >= c.startTime);
-    }, [campaigns, enrollments]);
-
-    // Auto-select active enrolled campaign
-    useEffect(() => {
-        if (!selectedCampaignId && campaigns.length > 0) {
-            const activeEnrolled = campaigns.find(c => enrollments[c.id] && Date.now() >= c.startTime);
-            if (activeEnrolled) {
-                setSelectedCampaignId(activeEnrolled.id);
-            }
-        }
-    }, [campaigns, enrollments, selectedCampaignId]);
-
     // Fetch Data
     useEffect(() => {
         fetchMetrics();
@@ -484,75 +455,6 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         }
     };
 
-    const fetchCampaigns = async () => {
-        try {
-            const res = await fetch(`${KEEPER_URL_ARC}/campaigns`);
-            if (!res.ok) return;
-            const data = await res.json();
-            setCampaigns(data);
-
-            if (address && data.length > 0) {
-                const newEnrollments = {};
-                for (const c of data) {
-                   const eRes = await fetch(`${KEEPER_URL_ARC}/enroll?campaignId=${c.id}&address=${address}`);
-                   if (eRes.ok) {
-                       const eData = await eRes.json();
-                       newEnrollments[c.id] = eData.enrolled;
-                   }
-                }
-                setEnrollments(newEnrollments);
-            }
-        } catch (e) {}
-    };
-
-    const fetchActiveLeaderboard = async () => {
-        if (!selectedCampaignId) return;
-        try {
-            const res = await fetch(`${KEEPER_URL_ARC}/leaderboard?campaignId=${selectedCampaignId}`);
-            if (!res.ok) return;
-            const data = await res.json();
-            setActiveCampaignLeaderboard(data);
-        } catch (e) {}
-    };
-
-    useEffect(() => {
-        fetchCampaigns();
-        const interval = setInterval(fetchCampaigns, 15000);
-        
-        const handleNewCampaign = () => fetchCampaigns();
-        socketService.on('new_campaign', handleNewCampaign);
-        
-        return () => {
-            clearInterval(interval);
-            socketService.off('new_campaign', handleNewCampaign);
-        };
-    }, [address]);
-
-    useEffect(() => {
-        if (selectedCampaignId) {
-            fetchActiveLeaderboard();
-            const interval = setInterval(fetchActiveLeaderboard, 5000);
-            return () => clearInterval(interval);
-        }
-    }, [selectedCampaignId]);
-
-    const handleEnroll = async (cid) => {
-        if (!address) return;
-        setEnrolling(true);
-        try {
-            const res = await fetch(`${KEEPER_URL_ARC}/enroll`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ campaignId: cid, address })
-            });
-
-            if (res.ok) {
-                setEnrollments(prev => ({ ...prev, [cid]: true }));
-                if (!selectedCampaignId) setSelectedCampaignId(cid);
-            }
-        } catch (e) {} finally { setEnrolling(false); }
-    };
-
     // Cumulative PnL stats derived from authoritative backend trade history
     const pnlStats = useMemo(() => {
         const trades = [...userHistory]
@@ -626,7 +528,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         const cardBalance = isTrading ? sessionBalance : evmBalance;
         return (
         <div
-            className="w-[448px] h-[260px] flex-none relative overflow-hidden group text-white"
+            className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] group text-white"
             style={{
                 fontFamily: '"Comfortaa", cursive',
                 background: 'linear-gradient(145deg, #1a6140 0%, #123f28 55%, #0b3220 100%)',
@@ -712,62 +614,45 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             <div className="absolute top-0 left-0 origin-top-left"
                 style={{ width: '448px', height: '260px', transform: `scale(${deckScale})`, transition: 'transform 0.25s ease' }}>
                 {/* Carousel chevrons — outside the card, desktop only */}
-                <button onClick={() => setWalletCardSide(walletCardSide === 'trading' ? 'main' : 'trading')} title="Main Wallet card"
+                <button onClick={() => showCard(walletCardSide === 'trading' ? 'main' : 'trading')} title="Main Wallet card"
                     className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
                     style={{ left: '-46px', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
                     <ChevronLeft size={18} />
                 </button>
-                <button onClick={() => setWalletCardSide(walletCardSide === 'trading' ? 'main' : 'trading')} title="Trading Wallet card"
+                <button onClick={() => showCard(walletCardSide === 'trading' ? 'main' : 'trading')} title="Trading Wallet card"
                     className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
                     style={{ right: '-46px', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
                     <ChevronRight size={18} />
                 </button>
 
-                {/* Static clip window over the sliding cards — carries the outer glow */}
-                <div className="w-[448px] h-[260px] rounded-[40px] relative overflow-hidden"
-                    style={{ boxShadow: '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20, 241, 149, 0.13)' }}
-                    onTouchStart={(e) => { touchStartXRef.current = e.touches[0].clientX; }}
-                    onTouchEnd={(e) => {
-                        const startX = touchStartXRef.current;
-                        touchStartXRef.current = null;
-                        if (startX === null) return;
-                        const dx = e.changedTouches[0].clientX - startX;
-                        if (dx < -60 && walletCardSide === 'trading') setWalletCardSide('main');
-                        else if (dx > 60 && walletCardSide === 'main') setWalletCardSide('trading');
-                    }}>
-                    <div
-                        className="flex h-full will-change-transform transition-transform duration-700"
-                        style={{
-                            transform: walletCardSide === 'trading' ? 'translateX(0px)' : 'translateX(-448px)',
-                            transitionTimingFunction: 'cubic-bezier(0.25, 1, 0.35, 1)'
-                        }}>
-                        {renderWalletCard('trading')}
-                        {renderWalletCard('main')}
-                    </div>
+                {/* Transition host + 3D flip — identical to the Transfer Hub card switch */}
+                <div className="w-[448px] h-[260px] relative">
+                    <AnimatePresence mode="wait" initial={false}>
+                        <motion.div
+                            key={walletCardSide}
+                            drag="x"
+                            dragConstraints={{ left: 0, right: 0 }}
+                            onDragEnd={(e, info) => {
+                                if (info.offset.x < -100) showCard('main');
+                                else if (info.offset.x > 100) showCard('trading');
+                            }}
+                            initial={{ rotateY: -90 * (flipDashDirRef.current || 1), scale: 0.94 }}
+                            animate={{ rotateY: 0, scale: 1 }}
+                            exit={{ rotateY: 90 * (flipDashDirRef.current || 1), scale: 0.94 }}
+                            transition={{ rotateY: { duration: 0.34, ease: 'easeInOut' }, scale: { duration: 0.34, ease: 'easeInOut' } }}
+                            style={{ transformPerspective: 1100, backfaceVisibility: 'hidden', boxShadow: '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20, 241, 149, 0.13)' }}
+                            className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
+                        >
+                            {renderWalletCard(walletCardSide)}
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
             </div>
         </div>
     );
 
-    // Compact action row that sits directly under the wallet card, mirroring the
-    // Transfer Hub 'Primary Actions' row. Withdraw is hidden for accounts with
-    // no external wallet (trading wallet only).
-    const walletActions = (
-        <div className={`grid ${hasExternalWallet ? 'grid-cols-2' : 'grid-cols-1'} gap-3 md:gap-4 shrink-0`}>
-            <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Deposit to Trading Wallet", placeholder: "USDC Amount", onConfirm: (val) => onDeposit(parseFloat(val)) }); }}
-                className="flex items-center justify-center gap-2 bg-[#1A6140] text-white font-black py-3 md:py-5 rounded-[20px] text-[9px] md:text-[11px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all"
-                style={{ boxShadow: '0 10px 24px rgba(0,0,0,0.50), 0 12px 34px rgba(20, 241, 149, 0.14)' }}>
-                <ArrowUp size={13} /> Deposit
-            </button>
-            {hasExternalWallet && (
-                <button onClick={() => { setPromptValue(""); setPromptConfig({ title: "Withdraw to Main Wallet", placeholder: "Amount", onConfirm: (val) => onWithdraw(val) }); }}
-                    className="flex items-center justify-center gap-2 border border-[#1A6140]/40 bg-[#1A6140]/10 text-[#1A6140] font-black py-3 md:py-5 rounded-[20px] text-[9px] md:text-[11px] uppercase tracking-widest hover:bg-[#1A6140]/20 active:scale-[0.95] transition-all"
-                    style={{ boxShadow: '0 10px 24px rgba(0,0,0,0.50), 0 12px 34px rgba(20, 241, 149, 0.14)' }}>
-                    <ArrowDown size={13} /> Withdraw
-                </button>
-            )}
-        </div>
-    );
+    // All funding actions (Deposit / Withdraw) live in the Transfer Hub so the
+    // dashboard card stays a clean, non-fragmented display only.
 
     return (
         <div className={`h-screen w-full flex flex-col overflow-hidden relative ${isLight ? 'text-black bg-white' : 'text-white bg-black'}`} style={{ fontFamily: '"Comfortaa", cursive' }}>
@@ -820,11 +705,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <button onClick={onDocs} title="Platform Documentation" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
                             <AnimatedBook size={16} className="text-[#1A6140]"/>
                         </button>
-                        <button onClick={onCampaign} title="Campaign" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
-                            <AnimatedTrophy size={16} className="text-[#1A6140]"/>
-                        </button>
                         <button onClick={onTransferHub || (() => onOpenCircleWallet?.(null))} title="Transfer Hub" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
                             <AnimatedSend size={15} className={isLight ? 'text-black/80' : 'text-white/80'}/>
+                        </button>
+                        <button onClick={onReferral} title="Referral Program" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
+                            <Gift size={16} className="text-[#1A6140]"/>
                         </button>
                         <button onClick={() => setIsNotificationsOpen(true)} className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`} title="Notifications">
                             <AnimatedBell size={16} className={isLight ? 'text-black/80' : 'text-white/80'}/>
@@ -853,7 +738,6 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <div className="flex justify-center">
                             {walletCard}
                         </div>
-                        {walletCardSide === 'trading' && walletActions}
                     </div>
 
                     {/* LINE UNDER WALLET */}
@@ -977,7 +861,6 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         {/* WALLET CARD — Transfer-Hub credit-card format (desktop) */}
                         <div className="flex flex-col gap-4">
                             {walletCard}
-                            {walletCardSide === 'trading' && walletActions}
                         </div>
                     </div>
 
@@ -1650,11 +1533,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             <button onClick={() => { setIsMobileMenuOpen(false); onDocs(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <BookOpen size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Docs</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); onCampaign(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
-                                <Trophy size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Campaign</span>
-                            </button>
                             <button onClick={() => { setIsMobileMenuOpen(false); onTransferHub?.() || onOpenCircleWallet?.(null); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Send size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Transfer Hub</span>
+                            </button>
+                            <button onClick={() => { setIsMobileMenuOpen(false); onReferral?.(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                                <Gift size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Referral Program</span>
                             </button>
                             <button onClick={() => { setIsMobileMenuOpen(false); setIsNotificationsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Bell size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Notifications</span>

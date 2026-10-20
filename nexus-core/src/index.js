@@ -1942,8 +1942,115 @@ app.post('/profiles', async (req, res) => {
   }
   const profile = profiles.upsert(address, profileData);
   await profiles.syncToSupabase(address.toLowerCase());
+  // Referral program: every signup gets a code, and if the wizard carried a
+  // referralCode payload we apply it immediately (owner of the code earns on
+  // this user's deposits + traded volume). Applied-linked is once-only and
+  // failures are non-fatal to signup itself.
+  try {
+    await profiles.ensureReferralCode(address);
+    if (typeof req.body.referralCode === 'string' && req.body.referralCode.trim()) {
+      await profiles.applyReferralCode(address, req.body.referralCode.trim());
+    }
+  } catch (e) {
+    console.warn('[Profiles] referral post-processing failed:', e.message);
+  }
   emitAdminStats();
   res.json({ success: true, profile, walletAddress: sessionWallet.address });
+});
+
+// ─── Referral program ─────────────────────────────────────────────────────
+// The referrer's code (7 chars) is what gets shared; the link form embeds it
+// as ?ref=CODE on the site URL.
+app.get('/referral/info/:address', async (req, res) => {
+  try {
+    const profile = await profiles.getAsync((req.params.address || '').toLowerCase());
+    res.json({
+      referralCode: profile?.referralCode || await profiles.ensureReferralCode(req.params.address),
+      referredBy: profile?.referredBy || null,
+      referredAt: profile?.referredAt || null,
+      referralEnrolled: profile?.referralEnrolled === true,
+      referralEnrolledAt: profile?.referralEnrolledAt || null
+    });
+  } catch (e) {
+    console.error('[Referral] info failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/referral/apply/:address', async (req, res) => {
+  try {
+    const result = await profiles.applyReferralCode(req.params.address, req.body?.code);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    res.json({ ok: true, referrer: result.referrer, referrerUsername: result.referrerUsername });
+  } catch (e) {
+    console.error('[Referral] apply failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/referral/stats/:address', async (req, res) => {
+  try {
+    res.json(await profiles.getReferralStats(req.params.address));
+  } catch (e) {
+    console.error('[Referral] stats failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Enroll into the referral program — mints the user's referral code. The hub
+// requires this explicit step before a code/link/dashboard is shown.
+app.post('/referral/enroll/:address', async (req, res) => {
+  try {
+    const result = await profiles.enrollReferral(req.params.address);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    await profiles.syncToSupabase((req.params.address || '').toLowerCase()).catch(() => {});
+    res.json(result);
+  } catch (e) {
+    console.error('[Referral] enroll failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Manual commission payouts: the program is off-chain and has NO auto
+// withdrawal. A request is a pending ledger row an admin processes.
+app.post('/referral/withdraw/:address', async (req, res) => {
+  try {
+    const result = await profiles.requestRefWithdrawal(req.params.address, req.body?.amount);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    res.json(result);
+  } catch (e) {
+    console.error('[Referral] withdraw failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/referral/withdrawals/:address', async (req, res) => {
+  try {
+    res.json(await profiles.getRefWithdrawals(req.params.address));
+  } catch (e) {
+    console.error('[Referral] withdrawals list failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/admin/referral/withdrawals', requireAdminAuth, async (req, res) => {
+  try {
+    res.json(await profiles.getAdminRefWithdrawals());
+  } catch (e) {
+    console.error('[Referral] admin list failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/admin/referral/withdrawals/:id', requireAdminAuth, async (req, res) => {
+  try {
+    const result = await profiles.setRefWithdrawalStatus(req.params.id, req.body?.status);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[Referral] admin status failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // NOTE: Native email/password auth was removed. Privy owns authentication

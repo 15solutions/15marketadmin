@@ -22,7 +22,7 @@ import {
     TrendingUp,
     DollarSign,
     Users,
-    Trophy,
+    Gift,
     Calendar
 } from "lucide-react";
 import { KEEPER_URL_ARC, ADMIN_TOKEN } from "../constants";
@@ -44,9 +44,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const [isSaving, setIsSaving] = useState(false);
     const [isConnected, setIsConnected] = useState(true);
     const [syncProgress, setSyncProgress] = useState(0);
-    const [campaignTitle, setCampaignTitle] = useState("");
-    const [campaignPrize, setCampaignPrize] = useState("$1,000 USDC");
-    const [campaignDelayMinutes, setCampaignDelayMinutes] = useState(0);
 
     const [stats, setStats] = useState({
         totalVolume: "0.00",
@@ -58,6 +55,36 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const [recentActivity, setRecentActivity] = useState([]);
     const [liveUsers, setLiveUsers] = useState([]); // { lat, lng, id } for map
     const [userProfiles, setUserProfiles] = useState({});
+    // Referral commission withdrawal requests (manual payouts — not on-chain).
+    const [refWithdrawals, setRefWithdrawals] = useState([]);
+
+    const fetchRefWithdrawals = async () => {
+        try {
+            const res = await fetch(`${KEEPER_URL_ARC}/admin/referral/withdrawals`, {
+                headers: { 'Authorization': ADMIN_TOKEN }
+            });
+            if (res.ok) setRefWithdrawals(await res.json());
+        } catch (e) { /* list stays empty; the card shows a retry button */ }
+    };
+
+    useEffect(() => {
+        fetchRefWithdrawals();
+    }, []);
+
+    const setRefWithdrawalStatus = async (id, status) => {
+        try {
+            const res = await fetch(`${KEEPER_URL_ARC}/admin/referral/withdrawals/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_TOKEN },
+                body: JSON.stringify({ status })
+            });
+            if (!res.ok) throw new Error('Update failed');
+            notify(status === 'paid' ? 'Withdrawal marked paid' : 'Withdrawal rejected', 'success');
+            fetchRefWithdrawals();
+        } catch (e) {
+            notify(e.message, 'error');
+        }
+    };
 
     const fetchProfile = async (addr) => {
         if (!addr) return;
@@ -226,26 +253,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             setBroadcastText("");
         } catch (e) {
             notify("Broadcast Error: " + e.message, "error");
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleLaunchCampaign = async () => {
-        if (!campaignTitle.trim() || !campaignPrize.trim()) return notify("Enter campaign details", "error");
-        setIsSaving(true);
-        try {
-            const startTime = Date.now() + campaignDelayMinutes * 60000;
-            const res = await fetch(`${KEEPER_URL_ARC}/admin/campaigns`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_TOKEN },
-                body: JSON.stringify({ title: campaignTitle, prize: campaignPrize, startTime })
-            });
-            if (!res.ok) throw new Error("Failed to launch campaign");
-            notify("Campaign Launched Successfully", "success");
-            setCampaignTitle("");
-        } catch (e) {
-            notify("Campaign Error: " + e.message, "error");
         } finally {
             setIsSaving(false);
         }
@@ -497,58 +504,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         </AdminCard>
 
-                        <AdminCard title="Campaign Launcher" icon={Trophy} accent="#a855f7">
-                            <div className="flex flex-col gap-5">
-                                <div>
-                                    <label className="text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-2 ml-1">Campaign Title</label>
-                                    <input 
-                                        type="text"
-                                        value={campaignTitle}
-                                        onChange={(e) => setCampaignTitle(e.target.value)}
-                                        placeholder="e.g. Genesis Trading Pool"
-                                        className={`w-full p-4 rounded-2xl border text-sm font-bold outline-none transition-all ${isLight ? 'bg-white border-[#1A6140]/10 focus:border-[#a855f7]/40' : 'bg-black/40 border-white/10 focus:border-[#a855f7]/40'}`}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-2 ml-1">Prize Pool</label>
-                                        <input 
-                                            type="text"
-                                            value={campaignPrize}
-                                            onChange={(e) => setCampaignPrize(e.target.value)}
-                                            placeholder="$1,000 USDC"
-                                            className={`w-full p-4 rounded-2xl border text-sm font-bold outline-none transition-all ${isLight ? 'bg-white border-[#1A6140]/10 focus:border-[#a855f7]/40' : 'bg-black/40 border-white/10 focus:border-[#a855f7]/40'}`}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-2 ml-1">Launch Timing</label>
-                                        <div className={`flex items-center gap-2 p-2 rounded-2xl border ${isLight ? 'bg-white border-[#1A6140]/10' : 'bg-black/40 border-white/10'}`}>
-                                            <button 
-                                                onClick={() => setCampaignDelayMinutes(0)}
-                                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${campaignDelayMinutes === 0 ? 'bg-[#a855f7] text-white' : 'hover:bg-white/5 opacity-50'}`}
-                                            >
-                                                Instant
-                                            </button>
-                                            <button 
-                                                onClick={() => setCampaignDelayMinutes(60)}
-                                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${campaignDelayMinutes > 0 ? 'bg-[#a855f7] text-white' : 'hover:bg-white/5 opacity-50'}`}
-                                            >
-                                                Scheduled
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={handleLaunchCampaign}
-                                    disabled={isSaving || !campaignTitle}
-                                    className="w-full py-4 mt-2 bg-[#a855f7] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-[0_15px_30px_-10px_rgba(168,85,247,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-                                >
-                                    <Trophy size={14} />
-                                    <span>Launch Campaign</span>
-                                </button>
-                            </div>
-                        </AdminCard>
-
                         <AdminCard title="Recent Activity" icon={Clock} accent="#f59e0b">
                             <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto no-scrollbar">
                                 {recentActivity.length === 0 ? (
@@ -596,6 +551,55 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </AdminCard>
                     </div>
                 </div>
+
+                {/* Referral Withdrawals — manual payout approvals */}
+                <AdminCard title="Referral Withdrawals" icon={Gift} accent="#1A6140">
+                    <div className="flex flex-col gap-2 max-h-[360px] overflow-y-auto no-scrollbar">
+                        <div className="flex items-center justify-between mb-2">
+                            <p className={`text-[8px] font-black uppercase tracking-widest opacity-40`}>Commission payout requests (manual — pay off-chain)</p>
+                            <button onClick={fetchRefWithdrawals} className="p-2 rounded-xl bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20 transition-all">
+                                <RefreshCw size={13} />
+                            </button>
+                        </div>
+                        {refWithdrawals.length === 0 ? (
+                            <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
+                                No withdrawal requests
+                            </div>
+                        ) : (
+                            refWithdrawals.map(w => (
+                                <motion.div
+                                    key={w.id}
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={`p-3 rounded-2xl border flex items-center justify-between gap-3 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}
+                                >
+                                    <div className="min-w-0">
+                                        <div className="text-[10px] font-black uppercase">
+                                            {w.username ? `@${w.username}` : `${(w.user_address || '').slice(0, 6)}…${(w.user_address || '').slice(-4)}`}
+                                        </div>
+                                        <div className="text-[8px] opacity-40 font-bold uppercase font-mono">
+                                            ${(Number(w.amount) || 0).toFixed(2)} • {w.status} • {w.requested_at ? new Date(w.requested_at).toLocaleDateString() : ''}
+                                        </div>
+                                    </div>
+                                    {w.status === 'pending' ? (
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <button onClick={() => setRefWithdrawalStatus(w.id, 'paid')} className="px-3 py-2 rounded-xl bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 transition-all">
+                                                Mark paid
+                                            </button>
+                                            <button onClick={() => setRefWithdrawalStatus(w.id, 'rejected')} className="px-3 py-2 rounded-xl bg-red-500/10 text-red-500 text-[8px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">
+                                                Reject
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <span className={`shrink-0 px-3 py-1.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${w.status === 'paid' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                                            {w.status}
+                                        </span>
+                                    )}
+                                </motion.div>
+                            ))
+                        )}
+                    </div>
+                </AdminCard>
             </main>
 
             {/* Persistence Layer Status */}

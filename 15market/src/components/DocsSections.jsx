@@ -125,7 +125,6 @@ export function RenderTrading({
 export function RenderNavbar({ isLight, body }) {
     const navItems = [
         { icon: BookOpen, title: "Docs Icon", desc: "Opens this platform guide. Keeps rules and tools handy at any point." },
-        { icon: Trophy, title: "Campaigns & Leaderboards", desc: "Access live trading tournaments, enroll, track rank, and view prize distributions." },
         { icon: Send, title: "Transfer Hub", desc: "Dedicated funding portal for cross-chain and Circle USDC deposits/withdrawals." },
         { icon: Bell, title: "Notifications Panel", desc: "Tracks platform announcements, round results, and bridge execution events." }
     ];

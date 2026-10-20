@@ -96,8 +96,8 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
         if (initialStep === 'login') return 'login';
         if (initialStep !== 'signup') return 'entry';
         const s = readProgress().step;
-        return ['country', 'methods', 'code', 'bio', 'username', 'names'].includes(s) ? s : 'country';
-    }); // entry|login|country|methods|code|bio|username|finale
+        return ['country', 'methods', 'code', 'bio', 'username', 'names', 'referral'].includes(s) ? s : 'country';
+    }); // entry|login|country|methods|code|bio|username|names|referral|finale
     const [method, setMethod] = useState(() => readProgress().method || null); // email|google|discord|wallet
     const [country, setCountry] = useState(() => readProgress().country || '');
     const [email, setEmail] = useState(() => readProgress().email || '');
@@ -105,16 +105,28 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     const [firstName, setFirstName] = useState(() => readProgress().firstName || '');
     const [lastName, setLastName] = useState(() => readProgress().lastName || '');
     const [username, setUsername] = useState(() => readProgress().username || '');
+    const [referralCode, setReferralCode] = useState(() => readProgress().referralCode || '');
+    // A link like 15market.online/?ref=X4K9QP2 pre-fills the referral step.
+    useEffect(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const ref = (params.get('ref') || params.get('r') || '').trim().toUpperCase();
+            if (ref) {
+                setReferralCode(ref);
+                localStorage.setItem('15market_ref_code', ref);
+            }
+        } catch {}
+    }, []);
     useEffect(() => {
         // Persist non-secret progress for redirect survival.
         try {
             if (step === 'entry' || step === 'login' || step === 'finale') {
                 sessionStorage.removeItem(PROGRESS_KEY);
             } else {
-                sessionStorage.setItem(PROGRESS_KEY, JSON.stringify({ step, method, country, email, firstName, lastName, username }));
+                sessionStorage.setItem(PROGRESS_KEY, JSON.stringify({ step, method, country, email, firstName, lastName, username, referralCode }));
             }
         } catch {}
-    }, [step, method, country, email, firstName, lastName, username]);
+    }, [step, method, country, email, firstName, lastName, username, referralCode]);
     const [loginEmail, setLoginEmail] = useState('');
     const [busy, setBusy] = useState(null);
     const [error, setError] = useState('');
@@ -141,16 +153,19 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     // chosen path: email 6 screens, OAuth 4, wallet 3. Entry, login and
     // finale show none.
     const getMarkers = () => {
-        if (step === 'country') return { index: 0, total: 5 };
-        if (step === 'methods') return { index: 1, total: 5 };
-        if (step === 'code') return { index: 2, total: 5 };
+        if (step === 'country') return { index: 0, total: 6 };
+        if (step === 'methods') return { index: 1, total: 6 };
+        if (step === 'code') return { index: 2, total: 6 };
         if (step === 'bio') return method === 'email'
-            ? { index: 3, total: 5 }
-            : { index: 2, total: 4 };
+            ? { index: 3, total: 6 }
+            : { index: 2, total: 5 };
         if (step === 'username') return method === 'email'
-            ? { index: 4, total: 5 }
-            : { index: 3, total: 4 };
-        if (step === 'names') return { index: 2, total: 3 };
+            ? { index: 4, total: 6 }
+            : { index: 3, total: 5 };
+        if (step === 'names') return { index: 2, total: 4 };
+        if (step === 'referral') return method === 'wallet'
+            ? { index: 3, total: 4 }
+            : (method === 'email' ? { index: 5, total: 6 } : { index: 4, total: 5 });
         return null;
     };
     const markers = getMarkers();
@@ -163,6 +178,7 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
         if (step === 'code') { setStep('methods'); return; }
         if (step === 'bio' || step === 'names') { setStep('methods'); return; }
         if (step === 'username') { setStep('bio'); return; }
+        if (step === 'referral') { setStep(method === 'wallet' ? 'names' : 'username'); return; }
     };
 
     // A completed PRIVY identity hands off — but ONLY from terminal states.
@@ -319,6 +335,8 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                 country: country || undefined,
                 onboarded: true,
                 onboardedAt: Date.now(),
+                // One-time referral link (+ one-time ?ref= capture from the URL).
+                referralCode: referralCode.trim().toUpperCase() || undefined,
                 ...extra.fields,
             }),
         });
@@ -723,11 +741,11 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                     <input value={username} onChange={(e) => { setUsername(e.target.value); clearErr(); checkUsername(e.target.value, wagmiAddress); }} placeholder="Username" maxLength={20} className={`${inputCls(isLight)} !tracking-normal !text-base`} />
                                     <UsernameStatus value={username} check={nameCheck} isLight={isLight} />
                                     <button
-                                        onClick={() => { if (ensureNameFree()) finishWalletSignup(); }}
+                                        onClick={() => { if (ensureNameFree()) { clearErr(); setStep('referral'); } }}
                                         disabled={busy !== null}
                                         className={`${btnPrimary} mt-1`}
                                     >
-                                        {busy === 'finale' ? <Loader2 size={18} className="animate-spin" /> : 'Create account'}
+                                        Continue
                                     </button>
                                 </div>
                             </motion.div>
@@ -741,11 +759,41 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                 <input value={username} onChange={(e) => { setUsername(e.target.value); clearErr(); checkUsername(e.target.value); }} placeholder="Username" maxLength={20} className={`${inputCls(isLight)} !tracking-normal !text-base`} />
                                 <UsernameStatus value={username} check={nameCheck} isLight={isLight} />
                                 <button
-                                    onClick={() => { clearErr(); finishSignup(); }}
+                                    onClick={() => { clearErr(); setStep('referral'); }}
                                     disabled={busy !== null}
                                     className={`${btnPrimary} mt-4`}
                                 >
-                                    {busy === 'finale' ? <Loader2 size={18} className="animate-spin" /> : 'Continue'}
+                                    Continue
+                                </button>
+                            </motion.div>
+                        )}
+
+                        {/* ── Referral: optional code (prefilled from ?ref=) ── */}
+                        {step === 'referral' && (
+                            <motion.div key="referral" {...stepAnim} className="w-full flex flex-col items-center">
+                                <h1 className={`text-2xl font-black uppercase tracking-tighter ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Got a referral?</h1>
+                                <p className={`text-xs font-bold uppercase tracking-widest mt-2 mb-6 ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>Enter a friend's code — or skip</p>
+                                <input
+                                    value={referralCode}
+                                    onChange={(e) => { setReferralCode(e.target.value.toUpperCase().slice(0, 7)); clearErr(); }}
+                                    placeholder="REFERRAL CODE"
+                                    maxLength={7}
+                                    className={`${inputCls(isLight)} !tracking-[0.3em] !text-base text-center uppercase`}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { clearErr(); (method === 'wallet' ? finishWalletSignup() : finishSignup()); } }}
+                                />
+                                <button
+                                    onClick={() => { clearErr(); (method === 'wallet' ? finishWalletSignup() : finishSignup()); }}
+                                    disabled={busy !== null}
+                                    className={`${btnPrimary} mt-4`}
+                                >
+                                    {busy === 'finale' ? <Loader2 size={18} className="animate-spin" /> : (referralCode.trim() ? 'Create account' : 'Create account')}
+                                </button>
+                                <button
+                                    onClick={() => { setReferralCode(''); clearErr(); (method === 'wallet' ? finishWalletSignup() : finishSignup()); }}
+                                    disabled={busy !== null}
+                                    className={`text-[11px] font-black uppercase tracking-widest mt-3 ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}
+                                >
+                                    Skip
                                 </button>
                             </motion.div>
                         )}

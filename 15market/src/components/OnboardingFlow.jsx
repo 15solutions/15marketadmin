@@ -13,6 +13,15 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
     // Country of residence (ISO alpha-2) — decides which fiat gateways the
     // funding UI offers. Optional: unset means default gateways.
     const [country, setCountry] = useState(userProfile?.country || '');
+    // One-time referral code — prefilled from ?ref= landings, applied with the
+    // profile save.
+    const [referralCode, setReferralCode] = useState(() => {
+        try {
+            const ref = (new URLSearchParams(window.location.search).get('ref') || '').trim().toUpperCase();
+            if (ref) localStorage.setItem('15market_ref_code', ref);
+            return ref || localStorage.getItem('15market_ref_code') || '';
+        } catch { return ''; }
+    });
     // Wallet model: a main wallet is shown ONLY for external connections.
     const { isConnected: wagmiConnected, address: wagmiAddress, connector } = useAccount();
     const { wallets } = useWallets();
@@ -39,6 +48,8 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                     username: username.trim(),
                     avatar: selectedAvatar.trim(),
                     country: country || undefined,
+                    // One-time referral link, applied with the profile save.
+                    referralCode: (referralCode || '').trim().toUpperCase() || undefined,
                     onboarded: true,
                     onboardedAt: Date.now()
                 })
@@ -182,6 +193,23 @@ export const OnboardingFlow = ({ address, onComplete, theme, userProfile, evmSes
                                         }}
                                         placeholder="Country of residence"
                                     />
+
+                                    <div className="relative">
+                                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20">
+                                            <Sparkles size={18} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            maxLength={7}
+                                            value={referralCode}
+                                            onChange={(e) => {
+                                                setReferralCode(e.target.value.toUpperCase().slice(0, 7));
+                                                setSaveError('');
+                                            }}
+                                            placeholder="Referral code (optional)"
+                                            className={`w-full py-5 pl-14 pr-8 rounded-2xl ${isLight ? 'bg-gray-50 border-gray-200 text-black' : 'bg-white/5 border-white/10 text-white'} border focus:border-[#1A6140] outline-none text-lg font-black tracking-[0.25em] uppercase transition-all placeholder:tracking-normal placeholder:opacity-30 shadow-inner`}
+                                        />
+                                    </div>
                                 </div>
 
 

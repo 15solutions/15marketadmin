@@ -203,6 +203,7 @@ export function CircleWalletPage({
     const [fundingType, setFundingType] = useState(null); // null | 'native' | 'usdc'
     const [showSendModal, setShowSendModal] = useState(initialMode === 'send');
     const [showReceiveModal, setShowReceiveModal] = useState(initialMode === 'receive');
+    const [showChainGuide, setShowChainGuide] = useState(false);
     const [showUnifiedFunding, setShowUnifiedFunding] = useState(false);
     const [fundingStep, setFundingStep] = useState('selection'); // selection, loading, input, confirming, success
     const [fundingAmount, setFundingAmount] = useState('');
@@ -2406,6 +2407,37 @@ export function CircleWalletPage({
                                         <Save size={16} /> Save
                                     </button>
                                 </div>
+
+                                {/* Cross-chain funding guide — how to deposit USDC
+                                    held on another chain into this wallet. */}
+                                <button
+                                    onClick={() => setShowChainGuide(v => !v)}
+                                    className={`mt-6 w-full flex items-center justify-center gap-2 ${isLight ? 'text-black/50' : 'text-white/40'} hover:opacity-80 transition-all`}
+                                >
+                                    <Globe size={13} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Depositing USDC from another chain?</span>
+                                    <ChevronDown size={13} className={`transition-transform ${showChainGuide ? 'rotate-180' : ''}`} />
+                                </button>
+                                {showChainGuide && (
+                                    <div className={`w-full mt-3 p-5 rounded-3xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border border-[#1A6140]/25 text-left`}>
+                                        <p className={`text-[9px] font-black uppercase tracking-widest text-[#1A6140] mb-3`}>Step by step</p>
+                                        <ol className="flex flex-col gap-3">
+                                            {[
+                                                <>Open a cross-chain swap/bridge that supports <b>USDC</b> — native Circle <b>CCTP-enabled</b> bridges (e.g. Circle's own tools) or any DEX aggregator with a CCTP route are safest, since the USDC moves as native value with no wrapped middle hop.</>,
+                                                <>Set <b>this wallet's address</b> (the one shown above) as the <b>destination / recipient</b>, and copy the 0x address exactly — cross-chain transfers cannot be reversed.</>,
+                                                <>Choose the chain your USDC is on as the source and <b>this platform's chain (Arc)</b> as the destination, pick the amount, and pick <b>10 USDC or more</b> so the bridge fee doesn't eat the deposit.</>,
+                                                <>Send. CCTP transfers usually settle in <b>1–15 minutes</b>; funds then arrive directly on the Arc side and are credited to your trading balance automatically.</>,
+                                                <>If your funds sit on a chain without USDC support, swap to USDC first on that chain, then bridge — never send non-USDC tokens to this address.</>
+                                            ].map((step, i) => (
+                                                <li key={i} className="flex gap-3">
+                                                    <span className="shrink-0 w-5 h-5 rounded-full bg-[#1A6140] text-white text-[9px] font-black flex items-center justify-center mt-0.5">{i + 1}</span>
+                                                    <span className={`text-[10px] font-bold leading-relaxed ${isLight ? 'text-black/60' : 'text-white/50'}`}>{step}</span>
+                                                </li>
+                                            ))}
+                                        </ol>
+                                        <p className={`text-[8px] font-bold mt-3 opacity-40 ${isLight ? 'text-black' : 'text-white'}`}>Only send native USDC. Other tokens sent to this address are lost.</p>
+                                    </div>
+                                )}
                             </motion.div>
                         </div>
                     )}

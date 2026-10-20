@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { KEEPER_URL_ARC } from '../constants';
 
-import { Zap, Shield, TrendingUp, TrendingDown, Camera, Edit3, Image as ImageIcon, Link as LinkIcon, Check, Send, ArrowDownLeft } from 'lucide-react';
+import { Zap, Shield, TrendingUp, TrendingDown, Camera, Edit3, Image as ImageIcon, Link as LinkIcon, Check, Send, ArrowDownLeft, Users, Gift, Copy } from 'lucide-react';
 
 const PRESET_AVATARS = [
     "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
@@ -52,6 +52,13 @@ export function ProfileModal({
     const [isSaving, setIsSaving] = useState(false);
     const [isVerifyingX, setIsVerifyingX] = useState(false);
     const [actionAmount, setActionAmount] = useState("");
+    // Referral program state — own code/share link, one-time code application,
+    // and commission stats from the backend.
+    const [referralInfo, setReferralInfo] = useState(null);   // { referralCode, referredBy }
+    const [referralStats, setReferralStats] = useState(null); // { count, totalDeposits, totalVolume, totalCommission, referrals[] }
+    const [referralInput, setReferralInput] = useState("");
+    const [referralBusy, setReferralBusy] = useState(false);
+    const [referralMsg, setReferralMsg] = useState(null);
 
     const isLight = theme === 'light';
 
@@ -79,7 +86,13 @@ export function ProfileModal({
             // Fetch metrics from backend if address is available
             if (address) {
                 fetchMetrics();
+                fetchReferral();
+            } else {
+                setReferralInfo(null);
+                setReferralStats(null);
             }
+            setReferralInput("");
+            setReferralMsg(null);
         }
     }, [isOpen, address, userProfile]);
 
@@ -104,6 +117,57 @@ export function ProfileModal({
             console.error("Fetch profile metrics error:", err);
         }
     };
+
+    const fetchReferral = async () => {
+        if (!address) return;
+        try {
+            const [infoRes, statsRes] = await Promise.all([
+                fetch(`${KEEPER_URL_ARC}/referral/info/${address.toLowerCase()}`),
+                fetch(`${KEEPER_URL_ARC}/referral/stats/${address.toLowerCase()}`)
+            ]);
+            if (infoRes.ok) setReferralInfo(await infoRes.json());
+            if (statsRes.ok) setReferralStats(await statsRes.json());
+        } catch (err) {
+            console.error("Fetch referral error:", err);
+        }
+    };
+
+    const applyReferralCode = async () => {
+        const code = (referralInput || '').trim().toUpperCase();
+        if (!code) { setReferralMsg({ type: 'error', text: 'Enter a referral code first.' }); return; }
+        if (!address) { setReferralMsg({ type: 'error', text: 'Connect your wallet first.' }); return; }
+        setReferralBusy(true);
+        setReferralMsg(null);
+        try {
+            const res = await fetch(`${KEEPER_URL_ARC}/referral/apply/${address.toLowerCase()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                setReferralMsg({ type: 'success', text: data.referrerUsername ? `Referral applied — you were invited by @${data.referrerUsername}!` : 'Referral code applied!' });
+                setReferralInput("");
+                await fetchReferral();
+            } else {
+                setReferralMsg({ type: 'error', text: data.error || 'Could not apply that code.' });
+            }
+        } catch (err) {
+            setReferralMsg({ type: 'error', text: 'Network error — try again.' });
+        } finally {
+            setReferralBusy(false);
+        }
+    };
+
+    const copyReferralLink = () => {
+        const code = referralInfo?.referralCode;
+        if (!code) return;
+        const link = `${window.location.origin}/?ref=${code}`;
+        navigator.clipboard.writeText(referralInputForLink(code));
+        notify("Referral link copied!", "success");
+    };
+    // Keep a single source of truth for the shareable link format.
+    const referralInputForLink = (code) => `${window.location.origin}/?ref=${code}`;
 
     const handleSave = async () => {
         if (!address) {
@@ -283,6 +347,88 @@ export function ProfileModal({
                             </div>
                         </div>
                     )}
+
+                    {/* ── REFERRAL PROGRAM ─────────────────────────────── */}
+                    <div className="mb-6">
+                        <div className={`p-4 rounded-[24px] ${isLight ? 'bg-white border-black/5' : 'bg-[#151515] border-white/5'} border shadow-xl`}>
+                            <div className="flex items-center gap-2 mb-3">
+                                <Gift size={14} className="text-[#1A6140]" />
+                                <h4 className={`text-[10px] font-black uppercase tracking-[0.3em] ${isLight ? 'text-black/40' : 'text-white/40'}`}>Referral Program</h4>
+                            </div>
+                            <p className={`text-[10px] font-bold leading-relaxed mb-4 ${isLight ? 'text-black/40' : 'text-white/30'}`}>
+                                Share your code and earn <span className="text-[#1A6140]">10%</span> of everything your referrals deposit plus <span className="text-[#1A6140]">10%</span> of everything they trade.
+                            </p>
+
+                            {/* Own code + share link */}
+                            {referralInfo?.referralCode && (
+                                <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-[#1A6140]/10 border border-[#1A6140]/25 mb-3">
+                                    <div className="min-w-0">
+                                        <p className="text-[7px] font-black uppercase tracking-widest text-[#1A6140] mb-0.5">Your referral code</p>
+                                        <p className="text-base font-black tracking-[0.25em] text-[#1A6140]">{referralInfo.referralCode}</p>
+                                        <p className={`text-[8px] font-mono truncate mt-1 ${isLight ? 'text-black/30' : 'text-white/25'}`}>
+                                            {referralInputForLink(referralInfo.referralCode)}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={copyReferralLink}
+                                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest shrink-0 hover:brightness-110 active:scale-95 transition-all"
+                                    >
+                                        <Copy size={12} /> Link
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Commission stats */}
+                            {referralStats && referralStats.count > 0 && (
+                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                    <div className={`p-2.5 rounded-xl text-center ${isLight ? 'bg-black/5' : 'bg-white/5'}`}>
+                                        <p className="text-[6px] font-black uppercase tracking-widest opacity-40 mb-0.5">Referred</p>
+                                        <p className={`text-sm font-black ${isLight ? 'text-black' : 'text-white'}`}>{referralStats.count}</p>
+                                    </div>
+                                    <div className={`p-2.5 rounded-xl text-center ${isLight ? 'bg-black/5' : 'bg-white/5'}`}>
+                                        <p className="text-[6px] font-black uppercase tracking-widest opacity-40 mb-0.5">Their Volume</p>
+                                        <p className={`text-sm font-black ${isLight ? 'text-black' : 'text-white'}`}>${Number(referralStats.totalVolume || 0).toFixed(0)}</p>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl text-center bg-[#1A6140]/10">
+                                        <p className="text-[6px] font-black uppercase tracking-widest text-[#1A6140] mb-0.5">Earned</p>
+                                        <p className="text-sm font-black text-[#1A6140]">${Number(referralStats.totalCommission || 0).toFixed(2)}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* One-time code application */}
+                            {referralInfo?.referredBy ? (
+                                <p className={`text-[9px] font-bold ${isLight ? 'text-black/40' : 'text-white/30'}`}>
+                                    ✓ Referred by <span className="font-mono">{`${referralInfo.referredBy.slice(0, 6)}…${referralInfo.referredBy.slice(-4)}`}</span>
+                                </p>
+                            ) : (
+                                <div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            maxLength={7}
+                                            value={referralInput}
+                                            onChange={(e) => { setReferralInput(e.target.value.toUpperCase().slice(0, 7)); setReferralMsg(null); }}
+                                            placeholder="HAVE A CODE? ENTER IT"
+                                            className={`flex-1 min-w-0 px-4 py-3 rounded-xl border text-[10px] font-black tracking-[0.2em] uppercase outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-[#1A6140]' : 'bg-white/5 border-white/10 focus:border-[#1A6140]'}`}
+                                        />
+                                        <button
+                                            onClick={applyReferralCode}
+                                            disabled={referralBusy}
+                                            className="px-4 rounded-xl bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest shrink-0 hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
+                                        >
+                                            {referralBusy ? '…' : 'Apply'}
+                                        </button>
+                                    </div>
+                                    {referralMsg && (
+                                        <p className={`text-[9px] font-bold mt-2 ${referralMsg.type === 'error' ? 'text-red-400' : 'text-[#1A6140]'}`}>
+                                            {referralMsg.text}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
                     <div className="mb-6">
                         <div className={`p-4 rounded-[24px] ${isLight ? 'bg-white border-black/5' : 'bg-[#151515] border-white/5'} border shadow-xl`}>

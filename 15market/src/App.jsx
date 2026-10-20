@@ -1,7 +1,6 @@
 import React, { useMemo } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import UserApp from "./UserApp";
-import CampaignPage from "./components/CampaignPage";
 import VerifyTradePage from "./components/VerifyTradePage";
 import { DocsPage } from "./components/DocsPage";
 import { useAccount } from "wagmi";
@@ -16,7 +15,6 @@ function AppContent() {
     <Routes>
       <Route path="/" element={<UserApp />} />
       <Route path="/docs" element={<DocsPage theme={localStorage.getItem("15market_theme") || "dark"} />} />
-      <Route path="/campaign/:campaignId" element={<CampaignPage address={address} network={network} />} />
       {/* Landing page for the QR printed on every share card. Must stay outside
           every auth gate - a scanned card has to resolve for a logged-out
           visitor with no wallet. */}

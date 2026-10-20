@@ -25,9 +25,9 @@ import { LandingPage } from "./components/LandingPage";
 import { DashboardPage } from "./components/DashboardPage";
 import ComingSoonPage from "./components/ComingSoonPage";
 import { CircleWalletPage } from "./components/CircleWalletPage";
+import { ReferralHub } from "./components/ReferralHub";
 
 import { DocsPage } from "./components/DocsPage";
-import CampaignsHub from "./components/CampaignsHub";
 
 // Lazy load conditionally rendered components
 const ProfileModal = lazy(() => import("./components/ProfileModal").then(m => ({ default: m.ProfileModal })));
@@ -532,9 +532,6 @@ export default function UserApp() {
     };
   }, [showMobileHistory]);
 
-  const [campaigns, setCampaigns] = useState([]);
-  const [winnerBanner, setWinnerBanner] = useState(null);
-  const [enrollments, setEnrollments] = useState({}); // { campaignId: boolean }
   const [userLocation, setUserLocation] = useState(null); // { country, countryCode, lat, lng }
 
   // Main Network State
@@ -2731,41 +2728,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     // Trigger price fetch for new market (now handled by embedded service)
   }, [activeMarket.id, mergeMarketWithDefault]);
 
-  const fetchCampaigns = useCallback(async () => {
-    try {
-      const targetUrl = KEEPER_URL_ARC;
-      const res = await fetch(`${targetUrl}/campaigns`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setCampaigns(data);
-
-      const wbRes = await fetch(`${targetUrl}/winner-banner`);
-      if (wbRes.ok) {
-        const wbData = await wbRes.json();
-        setWinnerBanner(wbData);
-      }
-
-      if (address && data.length > 0) {
-        // Check enrollments for all active campaigns
-        const active = data.filter(c => Date.now() < c.endTime);
-        const newEnrollments = { ...enrollments };
-        let changed = false;
-
-        for (const c of active) {
-          if (newEnrollments[c.id] === undefined) {
-            const eRes = await fetch(`${KEEPER_URL_ARC}/enroll?campaignId=${c.id}&address=${address}`);
-            if (eRes.ok) {
-              const eData = await eRes.json();
-              newEnrollments[c.id] = eData.enrolled;
-              changed = true;
-            }
-          }
-        }
-        if (changed) setEnrollments(newEnrollments);
-      }
-    } catch (e) { }
-  }, [address, enrollments]);
-
   useEffect(() => {
     const detectLocation = async () => {
       try {
@@ -2782,30 +2744,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     };
     detectLocation();
   }, []);
-
-  useEffect(() => {
-    fetchCampaigns();
-    const interval = setInterval(fetchCampaigns, 10000);
-    return () => clearInterval(interval);
-  }, [fetchCampaigns]);
-
-  const handleEnroll = async (campaignId) => {
-    if (!address) {
-      notify("Please connect wallet to enroll", "error");
-      return;
-    }
-    try {
-      const res = await fetch(`${KEEPER_URL_ARC}/enroll`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignId, address })
-      });
-      if (res.ok) {
-        setEnrollments(prev => ({ ...prev, [campaignId]: true }));
-        notify("Successfully enrolled in campaign!", "success");
-      }
-    } catch (e) { notify("Enrollment failed", "error"); }
-  };
 
   const minStake = useMemo(() => {
     return "0.1"; // 0.1 USDC min stake on Arc
@@ -3532,7 +3470,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                 setView("circle_wallet");
               }}
               onDocs={() => setView("docs")}
-              onCampaign={() => setView("campaigns")}
+              onReferral={() => setView("referral")}
               onSelect={(type) => setView("comingsoon")}
             />
           ) : view === "comingsoon" ? (
@@ -3559,14 +3497,13 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               onWithdraw={handleWithdraw}
               triggerGlobalRefresh={triggerGlobalRefresh}
             />
-          ) : view === "campaigns" ? (
-            <CampaignsHub
-              campaigns={campaigns}
-              enrollments={enrollments}
+          ) : view === "referral" ? (
+            <ReferralHub
               address={address}
+              userProfile={userProfile}
+              notify={notify}
               theme={theme}
               onBack={() => setView("dashboard")}
-              handleEnroll={handleEnroll}
             />
           ) : view === "docs" ? (
             <DocsPage
@@ -3668,32 +3605,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                   </div>
                 </div>
               </header>
-
-              {/* Winner/Campaign Banner (Authoritative UX) */}
-              <AnimatePresence>
-                {winnerBanner && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className={`w-full overflow-hidden relative z-[101] border-b ${theme === 'light' ? 'bg-yellow-500/10 border-[#1A6140]/20' : 'bg-gradient-to-r from-yellow-500/10 via-[#1A6140]/5 to-yellow-500/10 border-white/5'}`}
-                  >
-                    <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-2 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <Trophy className="w-3 h-3 md:w-4 md:h-4 text-yellow-500 animate-bounce" />
-                        <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest ${theme === 'light' ? 'text-[#0a261a]' : 'text-[#1A6140]'}`}>
-                          {winnerBanner.text || "New Winner Leaderboard is Live!"}
-                        </span>
-                      </div>
-                      {winnerBanner.cta && (
-                        <button className="px-3 py-0.5 md:py-1 bg-[#1A6140] text-white text-[8px] md:text-[9px] font-black uppercase rounded-full tracking-tighter hover:scale-105 transition-transform">
-                          {winnerBanner.cta}
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               {/* MAIN CONTENT CONTAINER */}
               <div className={`w-full ${uiVersion === 'v2' ? 'max-w-[1600px] px-2 md:px-6 lg:px-8 focus-visible:outline-none' : 'max-w-4xl lg:max-w-7xl px-4 sm:px-6 lg:px-8'} ${isSmallScreen ? '!px-0' : ''} flex flex-col items-center flex-1 min-h-0 h-full relative z-10`}>
