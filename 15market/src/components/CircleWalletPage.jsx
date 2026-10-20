@@ -1675,9 +1675,9 @@ export function CircleWalletPage({
                                                     <div className="flex items-end justify-between gap-4">
                                                         <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
                                                             onClick={() => { if (currentWallet.address) handleCopy(currentWallet.address); }}>
-                                                            <p className="text-left text-xl font-black tracking-[0.22em] truncate leading-none">
+                                                            <p className="text-left text-sm font-black tracking-[0.1em] truncate leading-none">
                                                                 {currentWallet.address
-                                                                    ? `${currentWallet.address.slice(0, 6)}...${currentWallet.address.slice(-4)}`.toUpperCase()
+                                                                    ? `${currentWallet.address.slice(0, 5)}...${currentWallet.address.slice(-4)}`.toUpperCase()
                                                                     : 'XXXX...XXXX'}
                                                             </p>
                                                             {copied

@@ -215,10 +215,15 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
 
     // The deck is designed on a fixed 448 × 260 canvas; measure its box and
     // scale the whole canvas down uniformly so it always fits the screen.
+    // On desktop the card is capped 20% smaller so the outside chevrons land
+    // in the page gutter (under the navbar back button) instead of clipping.
     useEffect(() => {
         const el = deckRef.current;
         if (!el) return;
-        const applyScale = () => setDeckScale(Math.min(1, el.clientWidth / 448));
+        const applyScale = () => {
+            const desktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+            setDeckScale(Math.min(1, el.clientWidth / 448) * (desktop ? 0.8 : 1));
+        };
         applyScale();
         const ro = new ResizeObserver(applyScale);
         ro.observe(el);
@@ -587,9 +592,9 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 <div className="flex items-end justify-between gap-4">
                     <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
                         onClick={() => { if (cardAddress) { navigator.clipboard.writeText(cardAddress); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } }}>
-                        <p className="text-left text-xl font-black tracking-[0.22em] truncate leading-none">
+                        <p className="text-left text-sm font-black tracking-[0.1em] truncate leading-none">
                             {cardAddress
-                                ? truncate(cardAddress).toUpperCase()
+                                ? `${cardAddress.slice(0, 5)}...${cardAddress.slice(-4)}`.toUpperCase()
                                 : (isTrading && isSignerInitializing ? 'SYNCING...' : 'XXXX...XXXX')}
                         </p>
                         <Copy size={13} className="flex-none text-white/70" />
@@ -613,9 +618,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         users can also just swipe left/right between the two cards. */}
     const walletCard = (
         <div ref={deckRef} className="relative w-full max-w-[448px]" style={{ aspectRatio: '448 / 260' }}>
-            {/* Fixed-design canvas (448 × 260), uniformly scaled to fit the screen */}
-            <div className="absolute top-0 left-0 origin-top-left"
-                style={{ width: '448px', height: '260px', transform: `scale(${deckScale})`, transition: 'transform 0.25s ease' }}>
+            {/* Fixed-design canvas (448 × 260), uniformly scaled to fit the screen;
+                origin top-center so the 20%-shrunken desktop card stays centered
+                and its chevrons land in the gutter under the navbar back button */}
+            <div className="absolute top-0 left-0"
+                style={{ width: '448px', height: '260px', transform: `scale(${deckScale})`, transformOrigin: 'top center', transition: 'transform 0.25s ease' }}>
                 {/* Carousel chevrons — outside the card, desktop only */}
                 <button onClick={() => showCard(walletCardSide === 'trading' ? 'main' : 'trading')} title="Main Wallet card"
                     className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
