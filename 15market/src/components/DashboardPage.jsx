@@ -564,35 +564,35 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             </svg>
 
             {/* Card Face: all-white brand logo (top-left, level with the NFC icon) ·
-                wallet address on the left with a copy icon ·
-                username with the wallet label beneath (bottom-left) + balance
-                on the same bottom line (bottom-right). One font size for every
-                element — the canvas is uniformly scaled, so responsive sizes
-                made desktop and mobile cards mismatch. */}
-            <div className="h-full flex flex-col justify-between relative z-20 py-4 px-7">
+                username (+ wallet label beneath) centered on the left half ·
+                bottom line = wallet address + copy (left) with the balance on
+                its right, like a card number. One font size for every element —
+                the canvas is uniformly scaled so the card always matches
+                mobile and desktop. */}
+            <div className="h-full flex flex-col relative z-20 py-4 px-7">
 
                 {/* 15market logo — all white, top-left, shifted upward */}
                 <img src="/gowlogo.png" alt="15market" className="h-[110px] w-auto self-start -translate-y-[30%]"
                     style={{ filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
 
-                {/* Wallet address — full address on the left with a copy icon */}
-                <div className="px-1 min-w-0"
-                    onClick={() => { if (cardAddress) { navigator.clipboard.writeText(cardAddress); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } }}>
-                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                {/* Username + wallet label — vertically centered on the left */}
+                <div className="flex-1 flex items-center min-w-0">
+                    <div className="px-1 min-w-0">
+                        <span className="block text-[39px] font-black truncate leading-tight">{userProfile?.username || 'Trader'}</span>
+                        <span className="block text-[11px] font-bold tracking-[0.2em] text-white/55 mt-1">{isTrading ? 'Trading' : 'Main'}</span>
+                    </div>
+                </div>
+
+                {/* Bottom line: wallet address + copy (left) · balance (right) */}
+                <div className="flex items-end justify-between gap-4">
+                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
+                        onClick={() => { if (cardAddress) { navigator.clipboard.writeText(cardAddress); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } }}>
                         <p className="text-left text-xl font-black tracking-[0.22em] truncate leading-none">
                             {cardAddress
                                 ? truncate(cardAddress).toUpperCase()
                                 : (isTrading && isSignerInitializing ? 'SYNCING...' : 'XXXX...XXXX')}
                         </p>
                         <Copy size={13} className="flex-none text-white/70" />
-                    </div>
-                </div>
-
-                {/* Bottom line: username + wallet label beneath it (left) · balance (right) */}
-                <div className="flex items-end justify-between gap-4">
-                    <div className="min-w-0">
-                        <span className="block text-3xl font-black truncate leading-tight" style={{ fontFamily: 'Sankyu, "sankyu", cursive' }}>{userProfile?.username || 'Trader'}</span>
-                        <span className="block text-[10px] font-bold tracking-[0.2em] text-white/55 mt-0.5">{isTrading ? 'Trading' : 'Main'}</span>
                     </div>
                     <div className="text-right leading-none shrink-0">
                         <div className="text-[56px] font-black tracking-tighter tabular-nums leading-none"
