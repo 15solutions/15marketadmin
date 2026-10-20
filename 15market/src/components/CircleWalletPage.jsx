@@ -1655,19 +1655,19 @@ export function CircleWalletPage({
                                                 </svg>
 
                                                 {/* Card Face: all-white brand logo (top-left) · wallet address on the
-                                                    left with its label beneath · username (bottom-left) + balance
-                                                    with bigger numbers, USDC small on its base (bottom-right) */}
-                                                <div className="h-full flex flex-col justify-between relative z-20 py-4 px-6 md:px-7">
+                                                    left with a copy icon · username with the wallet label beneath
+                                                    (bottom-left) + balance on the same bottom line (bottom-right) */}
+                                                <div className="h-full flex flex-col justify-between relative z-20 py-4 px-7">
 
                                                     {/* 15market logo — all white, top-left, shifted upward */}
-                                                    <img src="/gowlogo.png" alt="15market" className="h-24 md:h-[120px] w-auto self-start -translate-y-[30%]"
+                                                    <img src="/gowlogo.png" alt="15market" className="h-[110px] w-auto self-start -translate-y-[30%]"
                                                         style={{ filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
 
-                                                    {/* Wallet address — on the left with a copy icon; label beneath */}
+                                                    {/* Wallet address — on the left with a copy icon */}
                                                     <div className="px-1 min-w-0"
                                                         onClick={() => { if (currentWallet.address) handleCopy(currentWallet.address); }}>
                                                         <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                                                            <p className="text-left text-lg md:text-xl font-black tracking-[0.22em] truncate leading-none">
+                                                            <p className="text-left text-xl font-black tracking-[0.22em] truncate leading-none">
                                                                 {currentWallet.address
                                                                     ? `${currentWallet.address.slice(0, 6)}...${currentWallet.address.slice(-4)}`.toUpperCase()
                                                                     : 'XXXX...XXXX'}
@@ -1676,19 +1676,19 @@ export function CircleWalletPage({
                                                                 ? <Check size={13} className="flex-none text-white/70" />
                                                                 : <Copy size={13} className="flex-none text-white/70" />}
                                                         </div>
-                                                        <p className="text-left text-[9px] md:text-[10px] italic font-black lowercase tracking-[0.25em] text-white/55 mt-1.5">
-                                                            {currentWallet.label.toLowerCase()}
-                                                        </p>
                                                     </div>
 
-                                                    {/* Bottom row: username (left) · balance with bigger numbers (right) */}
+                                                    {/* Bottom line: username + wallet label beneath it (left) · balance (right) */}
                                                     <div className="flex items-end justify-between gap-4">
-                                                        <span className="text-2xl md:text-3xl font-black truncate" style={{ fontFamily: 'Sankyu, "sankyu", cursive' }}>{username || 'Trader'}</span>
+                                                        <div className="min-w-0">
+                                                            <span className="block text-3xl font-black truncate leading-tight" style={{ fontFamily: 'Sankyu, "sankyu", cursive' }}>{username || 'Trader'}</span>
+                                                            <span className="block text-[10px] font-bold tracking-[0.2em] text-white/55 mt-0.5">{currentWallet.key === 'trading' ? 'Trading' : 'Main'}</span>
+                                                        </div>
                                                         <div className="text-right leading-none shrink-0">
-                                                            <div className="text-[45px] md:text-[72px] font-black tracking-tighter tabular-nums leading-none"
+                                                            <div className="text-[56px] font-black tracking-tighter tabular-nums leading-none"
                                                                 style={{ textShadow: '0 6px 24px rgba(0,0,0,0.40)' }}>
                                                                 ${parseFloat(currentWallet.bal || 0).toFixed(2)}
-                                                                <span className="text-[11px] md:text-base ml-1.5 font-bold text-white/70">USDC</span>
+                                                                <span className="text-[13px] ml-1.5 font-bold text-white/70">USDC</span>
                                                             </div>
                                                         </div>
                                                     </div>

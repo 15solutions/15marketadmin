@@ -564,38 +564,41 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             </svg>
 
             {/* Card Face: all-white brand logo (top-left, level with the NFC icon) ·
-                wallet address on the left with its label beneath ·
-                username (bottom-left) + balance with bigger numbers (bottom-right) */}
-            <div className="h-full flex flex-col justify-between relative z-20 py-4 px-6 md:px-7">
+                wallet address on the left with a copy icon ·
+                username with the wallet label beneath (bottom-left) + balance
+                on the same bottom line (bottom-right). One font size for every
+                element — the canvas is uniformly scaled, so responsive sizes
+                made desktop and mobile cards mismatch. */}
+            <div className="h-full flex flex-col justify-between relative z-20 py-4 px-7">
 
                 {/* 15market logo — all white, top-left, shifted upward */}
-                <img src="/gowlogo.png" alt="15market" className="h-24 md:h-[120px] w-auto self-start -translate-y-[30%]"
+                <img src="/gowlogo.png" alt="15market" className="h-[110px] w-auto self-start -translate-y-[30%]"
                     style={{ filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
 
-                {/* Wallet address — full address on the left with a copy icon; label beneath */}
+                {/* Wallet address — full address on the left with a copy icon */}
                 <div className="px-1 min-w-0"
                     onClick={() => { if (cardAddress) { navigator.clipboard.writeText(cardAddress); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } }}>
                     <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                        <p className="text-left text-lg md:text-xl font-black tracking-[0.22em] truncate leading-none">
+                        <p className="text-left text-xl font-black tracking-[0.22em] truncate leading-none">
                             {cardAddress
                                 ? truncate(cardAddress).toUpperCase()
                                 : (isTrading && isSignerInitializing ? 'SYNCING...' : 'XXXX...XXXX')}
                         </p>
                         <Copy size={13} className="flex-none text-white/70" />
                     </div>
-                    <p className="text-left text-[9px] md:text-[10px] italic font-black lowercase tracking-[0.25em] text-white/55 mt-1.5">
-                        {isTrading ? 'Trading Wallet' : 'Main Wallet'}
-                    </p>
                 </div>
 
-                {/* Bottom row: username (left) · balance with bigger numbers, USDC small on its base (right) */}
+                {/* Bottom line: username + wallet label beneath it (left) · balance (right) */}
                 <div className="flex items-end justify-between gap-4">
-                    <span className="text-2xl md:text-3xl font-black truncate" style={{ fontFamily: 'Sankyu, "sankyu", cursive' }}>{userProfile?.username || 'Trader'}</span>
+                    <div className="min-w-0">
+                        <span className="block text-3xl font-black truncate leading-tight" style={{ fontFamily: 'Sankyu, "sankyu", cursive' }}>{userProfile?.username || 'Trader'}</span>
+                        <span className="block text-[10px] font-bold tracking-[0.2em] text-white/55 mt-0.5">{isTrading ? 'Trading' : 'Main'}</span>
+                    </div>
                     <div className="text-right leading-none shrink-0">
-                        <div className="text-[45px] md:text-[72px] font-black tracking-tighter tabular-nums leading-none"
+                        <div className="text-[56px] font-black tracking-tighter tabular-nums leading-none"
                             style={{ textShadow: '0 6px 24px rgba(0,0,0,0.40)' }}>
                             ${parseFloat(cardBalance || 0).toFixed(2)}
-                            <span className="text-[11px] md:text-base ml-1.5 font-bold text-white/70">USDC</span>
+                            <span className="text-[13px] ml-1.5 font-bold text-white/70">USDC</span>
                         </div>
                     </div>
                 </div>
@@ -660,11 +663,17 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 @import url('https://fonts.cdnfonts.com/css/sankyu');
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                /* Transaction history: scrolls inside its box — scrollbar only on desktop */
-                .tx-scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(26, 97, 64, 0.55) transparent; }
-                .tx-scroll::-webkit-scrollbar { width: 4px; }
-                .tx-scroll::-webkit-scrollbar-thumb { background: rgba(26, 97, 64, 0.55); border-radius: 999px; }
-                .tx-scroll::-webkit-scrollbar-track { background: transparent; }
+                /* Transaction history: scrolls inside its box — thin scrollbar
+                   appears only while hovering the box (desktop) */
+                .tx-scroll { overflow-y: auto; }
+                @media (min-width: 768px) {
+                    .tx-scroll::-webkit-scrollbar { width: 4px; }
+                    .tx-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; transition: background 0.2s; }
+                    .tx-scroll:hover::-webkit-scrollbar-thumb { background: rgba(26, 97, 64, 0.55); }
+                    .tx-scroll::-webkit-scrollbar-track { background: transparent; }
+                    .tx-scroll { scrollbar-width: none; scrollbar-color: transparent transparent; }
+                    .tx-scroll:hover { scrollbar-width: thin; scrollbar-color: rgba(26, 97, 64, 0.55) transparent; }
+                }
                 @media (max-width: 767px) {
                     .tx-scroll { scrollbar-width: none; -ms-overflow-style: none; }
                     .tx-scroll::-webkit-scrollbar { display: none; }

@@ -113,19 +113,28 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
     const chipText = isLight ? 'text-black/40' : 'text-white/40';
 
     return (
-        <div className={`ref-hub min-h-screen w-full ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#0A0A0A]'} ${isLight ? 'text-[#0a261a]' : 'text-white'} pb-24`}
+        <div className={`ref-hub min-h-screen md:h-screen w-full flex flex-col md:overflow-hidden ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#0A0A0A]'} ${isLight ? 'text-[#0a261a]' : 'text-white'}`}
             style={{ fontFamily: "'Comfortaa', sans-serif" }}>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap');
                 .ref-hub, .ref-hub * { font-family: 'Comfortaa', sans-serif !important; letter-spacing: normal; }
                 .ref-hub .tracking-widest, .ref-hub .tracking-\\[0\\.3em\\] { letter-spacing: 0.18em; }
+                /* Desktop: page scrolls internally with a visible, thin green scrollbar */
+                @media (min-width: 768px) {
+                    .ref-scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(26,97,64,0.45) transparent; }
+                    .ref-scroll::-webkit-scrollbar { width: 10px; }
+                    .ref-scroll::-webkit-scrollbar-track { background: transparent; }
+                    .ref-scroll::-webkit-scrollbar-thumb { background: rgba(26,97,64,0.35); border-radius: 8px; }
+                    .ref-scroll::-webkit-scrollbar-thumb:hover { background: rgba(26,97,64,0.6); }
+                    .ref-scroll::-webkit-scrollbar-corner { background: transparent; }
+                }
             `}</style>
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 md:px-8 pt-6 pb-2 max-w-[1200px] mx-auto w-full">
-                <button
-                    onClick={onBack}
-                    className={`p-2.5 rounded-2xl border flex items-center justify-center ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'} hover:scale-105 active:scale-95 transition-all`}
-                >
+            {/* Header — aligned with the dashboard navbar (same padding, safe-area
+                handling and 40px icon buttons). Logo centered between them. */}
+            <div className="flex items-center justify-between px-4 md:px-10 pb-0 flex-none relative z-10 w-full"
+                style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.25rem)' }}>
+                <button onClick={onBack}
+                    className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.12)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center hover:-translate-x-1 transition-transform`}>
                     <ArrowLeft size={16} className="text-[#1A6140]" />
                 </button>
                 <div className="flex items-center gap-2">
@@ -134,19 +143,21 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                     <img
                         src={isLight ? '/goblogo.png' : '/gowlogo.png'}
                         alt="15market"
-                        className="h-[54px] md:h-[66px] object-contain"
+                        className="h-10 md:h-12 object-contain"
                     />
                 </div>
                 <div className="w-10" />
             </div>
 
             {/* Page title */}
-            <div className="flex items-center justify-center gap-2 max-w-[1200px] mx-auto w-full px-4 mt-1">
+            <div className="flex items-center justify-center gap-2 max-w-[1200px] mx-auto w-full px-4 mt-1 shrink-0">
                 <Gift size={16} className="text-[#1A6140]" />
                 <h1 className="text-lg md:text-xl font-bold tracking-wide">Referral Program</h1>
             </div>
 
-            <div className="max-w-[1200px] mx-auto px-4 md:px-8 mt-4 flex flex-col gap-5">
+            {/* Scrollable page body — desktop shows a thin green scrollbar */}
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar ref-scroll">
+                <div className="max-w-[1200px] mx-auto px-4 md:px-8 mt-4 mb-12 flex flex-col gap-5">
                 {error && (
                     <div className={`p-4 rounded-2xl border text-xs font-bold text-red-400 ${isLight ? 'bg-red-500/10 border-red-500/20' : 'bg-red-500/10 border-red-500/30'}`}>
                         ⚠️ {error}
@@ -363,6 +374,7 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                         )}
                     </motion.div>
                 )}
+                </div>
             </div>
         </div>
     );
