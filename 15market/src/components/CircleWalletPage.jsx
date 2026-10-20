@@ -1675,8 +1675,8 @@ export function CircleWalletPage({
                                                     <div className="flex items-end justify-between gap-4">
                                                         <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
                                                             onClick={() => { if (currentWallet.address) handleCopy(currentWallet.address); }}>
-                                                            <p className="text-left text-[16px] font-bold text-white/70 truncate leading-none"
-                                                                style={{ transform: 'translateY(-5%)' }}>
+                                                            <p className="text-left text-[19.2px] font-bold text-white/70 truncate leading-none"
+                                                                style={{ transform: 'translateY(-5%)', fontFamily: '"Comfortaa", cursive' }}>
                                                                 {currentWallet.address
                                                                     ? `${currentWallet.address.slice(0, 5)}...${currentWallet.address.slice(-4)}`.toUpperCase()
                                                                     : 'XXXX...XXXX'}

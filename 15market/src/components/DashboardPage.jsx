@@ -594,8 +594,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 <div className="flex items-end justify-between gap-4">
                     <div className="flex items-end gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
                         onClick={() => { if (cardAddress) { navigator.clipboard.writeText(cardAddress); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } }}>
-                        <p className="text-left text-[16px] font-bold text-white/70 truncate leading-none"
-                            style={{ transform: 'translateY(-5%)' }}>
+                        <p className="text-left text-[19.2px] font-bold text-white/70 truncate leading-none"
+                            style={{ transform: 'translateY(-5%)', fontFamily: '"Comfortaa", cursive' }}>
                             {cardAddress
                                 ? `${cardAddress.slice(0, 5)}...${cardAddress.slice(-4)}`.toUpperCase()
                                 : (isTrading && isSignerInitializing ? 'SYNCING...' : 'XXXX...XXXX')}
