@@ -339,11 +339,24 @@ function rowToProfile(row) {
         pendingPortfolioRevenue: row.pending_portfolio_revenue != null ? Number(row.pending_portfolio_revenue) : undefined,
         tradingWallet: row.trading_wallet,
         walletAddress: row.wallet_address,
-        referralCode: row.referral_code || undefined,
-        referredBy: row.referred_by || undefined,
-        referredAt: typeof row.referred_at === 'number' ? row.referred_at : (row.referred_at ? Date.parse(row.referred_at) : undefined),
-        referralEnrolled: row.referral_enrolled === true ? true : undefined,
-        referralEnrolledAt: typeof row.referral_enrolled_at === 'number' ? row.referral_enrolled_at : (row.referral_enrolled_at ? Date.parse(row.referral_enrolled_at) : undefined),
+        // Referral keys are only SET when the row actually carries them. Emitting
+        // them as literal `undefined` keys made the remote merge in
+        // loadAllSupabase wipe a locally-persisted enrollment whenever the row
+        // was written before the 009 columns existed (or the sync was stripped)
+        // — enrolled users bounced back to the briefing page after restarts.
+        ...(row.referral_code ? { referralCode: row.referral_code } : {}),
+        ...(row.referred_by ? { referredBy: row.referred_by } : {}),
+        ...(row.referred_at
+            ? { referredAt: typeof row.referred_at === 'number' ? row.referred_at : Date.parse(row.referred_at) }
+            : {}),
+        ...(row.referral_enrolled === true ? { referralEnrolled: true } : {}),
+        ...(row.referral_enrolled_at
+            ? {
+                referralEnrolledAt: typeof row.referral_enrolled_at === 'number'
+                    ? row.referral_enrolled_at
+                    : Date.parse(row.referral_enrolled_at)
+            }
+            : {}),
         onboarded: row.onboarded === true || onboardedAt != null || !!row.username,
         onboardedAt,
         chainBaseline: row.chain_baseline != null ? Number(row.chain_baseline) : null,
@@ -1017,8 +1030,31 @@ class ProfileService {
     }
 
     async getAsync(address) {
+        const addr = String(address || '').toLowerCase();
         await this.initSupabase();
-        return this.get(address);
+        let profile = this.get(addr);
+        if (!profile && SUPABASE_ENABLED) {
+            // Memory miss: the server may have restarted since this user was
+            // last active. Pull the row from the durable store and hydrate the
+            // cache so enrollment/referral state reads are always correct.
+            try {
+                const res = await supabaseRequest(
+                    `/rest/v1/profiles?select=*&address=eq.${encodeURIComponent(addr)}&limit=1`,
+                    { timeout: 15000 }
+                );
+                if (res.ok) {
+                    const rows = await res.json();
+                    if (Array.isArray(rows) && rows[0]) {
+                        const remote = rowToProfile(rows[0]);
+                        this.profiles[addr] = { ...(this.profiles[addr] || {}), ...remote, address: addr };
+                        profile = this.profiles[addr];
+                    }
+                }
+            } catch (e) {
+                console.warn(`[Profiles] durable read for ${addr} failed:`, e.message);
+            }
+        }
+        return profile;
     }
 
     getAll() {
