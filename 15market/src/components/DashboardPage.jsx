@@ -588,11 +588,14 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                     </div>
                 </div>
 
-                {/* Bottom line: wallet address + copy (left) · balance (right) */}
+                {/* Bottom line: wallet address + copy (left) · balance (right).
+                    Address slightly bigger than the USDC tag and nudged 5% up
+                    off the baseline so it reads as its own element. */}
                 <div className="flex items-end justify-between gap-4">
-                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
+                    <div className="flex items-end gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
                         onClick={() => { if (cardAddress) { navigator.clipboard.writeText(cardAddress); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } }}>
-                        <p className="text-left text-[13px] font-bold text-white/70 truncate leading-none">
+                        <p className="text-left text-[16px] font-bold text-white/70 truncate leading-none"
+                            style={{ transform: 'translateY(-5%)' }}>
                             {cardAddress
                                 ? `${cardAddress.slice(0, 5)}...${cardAddress.slice(-4)}`.toUpperCase()
                                 : (isTrading && isSignerInitializing ? 'SYNCING...' : 'XXXX...XXXX')}
