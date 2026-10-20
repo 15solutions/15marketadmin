@@ -113,21 +113,38 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
     const chipText = isLight ? 'text-black/40' : 'text-white/40';
 
     return (
-        <div className={`min-h-screen w-full ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#0A0A0A]'} ${isLight ? 'text-[#0a261a]' : 'text-white'} pb-24`}>
+        <div className={`ref-hub min-h-screen w-full ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#0A0A0A]'} ${isLight ? 'text-[#0a261a]' : 'text-white'} pb-24`}
+            style={{ fontFamily: "'Comfortaa', sans-serif" }}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap');
+                .ref-hub, .ref-hub * { font-family: 'Comfortaa', sans-serif !important; letter-spacing: normal; }
+                .ref-hub .tracking-widest, .ref-hub .tracking-\\[0\\.3em\\] { letter-spacing: 0.18em; }
+            `}</style>
             {/* Header */}
             <div className="flex items-center justify-between px-4 md:px-8 pt-6 pb-2 max-w-[1200px] mx-auto w-full">
                 <button
                     onClick={onBack}
-                    className={`p-2.5 rounded-2xl border flex items-center gap-2 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'} hover:scale-105 active:scale-95 transition-all`}
+                    className={`p-2.5 px-4 rounded-2xl border flex items-center gap-2 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'} hover:scale-105 active:scale-95 transition-all`}
                 >
                     <ArrowLeft size={16} className="text-[#1A6140]" />
-                    <span className="text-[9px] font-black uppercase tracking-widest hidden md:inline">Back</span>
+                    <span className="text-[10px] font-bold tracking-widest">Back</span>
                 </button>
                 <div className="flex items-center gap-2">
-                    <Gift size={18} className="text-[#1A6140]" />
-                    <h1 className="text-xl md:text-2xl font-black uppercase tracking-tighter">Referral Program</h1>
+                    {/* Asset recolored in place: glyph is now ~#19784D — brighter than the
+                        #1A6140 brand green without going neon. Used by the trading area too. */}
+                    <img
+                        src={isLight ? '/goblogo.png' : '/gowlogo.png'}
+                        alt="15market"
+                        className="h-[54px] md:h-[66px] object-contain"
+                    />
                 </div>
                 <div className="w-10" />
+            </div>
+
+            {/* Page title */}
+            <div className="flex items-center justify-center gap-2 max-w-[1200px] mx-auto w-full px-4 mt-1">
+                <Gift size={16} className="text-[#1A6140]" />
+                <h1 className="text-lg md:text-xl font-bold tracking-wide">Referral Program</h1>
             </div>
 
             <div className="max-w-[1200px] mx-auto px-4 md:px-8 mt-4 flex flex-col gap-5">
