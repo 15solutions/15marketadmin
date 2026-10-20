@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { Shield, Zap, Send, ArrowDownLeft, Copy, ExternalLink, RefreshCw, X, Check, ArrowLeft, History, Wallet, Globe, Info, ChevronDown, Download, Save, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Shield, Zap, Send, ArrowDownLeft, Copy, ExternalLink, RefreshCw, X, Check, ArrowLeft, History, Wallet, Globe, Info, ChevronDown, Download, Save, CreditCard, ChevronLeft, ChevronRight, Nfc } from 'lucide-react';
 import { KEEPER_URL_ARC } from '../constants';
 import { SUPPORTED_TOKENS } from '../tokens';
 import QRCode from 'qrcode';
@@ -72,6 +72,7 @@ export function CircleWalletPage({
     notify,
     onBack,
     initialMode,
+    username,
     evmBalance = '0',
     sessionBalance = 0,
     sessionAddress = '',
@@ -179,10 +180,25 @@ export function CircleWalletPage({
     const [multiChainBalances, setMultiChainBalances] = useState({});
     const [isFetchingBalances, setIsFetchingBalances] = useState(false);
     const [mainWalletArcBalance, setMainWalletArcBalance] = useState(0);
-    const [copyTradingWallet, setCopyTradingWallet] = useState(null);
 
     // UI State
     const [activeWalletIdx, setActiveWalletIdx] = useState(0); // 0: Trading, 1: Main
+    const hubDeckRef = useRef(null); // wallet card deck box (for fit-to-screen scaling)
+    const flipDirRef = useRef(1); // 3D flip direction: -1 = flip forward, 1 = flip back
+    const [hubScale, setHubScale] = useState(1);
+
+    // The card is designed on a fixed 448 × 260 canvas (same as the dashboard
+    // card); measure its box and scale the whole canvas down uniformly so it
+    // always fits the screen.
+    useEffect(() => {
+        const el = hubDeckRef.current;
+        if (!el) return;
+        const applyScale = () => setHubScale(Math.min(1, el.clientWidth / 448));
+        applyScale();
+        const ro = new ResizeObserver(applyScale);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
     const [activeTokenIdx, setActiveTokenIdx] = useState(0); // For Main Wallet token funding
     const [fundingType, setFundingType] = useState(null); // null | 'native' | 'usdc'
     const [showSendModal, setShowSendModal] = useState(initialMode === 'send');
@@ -262,23 +278,6 @@ export function CircleWalletPage({
         return () => clearInterval(interval);
     }, [mainWalletAddress]);
 
-    const fetchCopyTradingWallet = async () => {
-        if (!fundingSourceAddress) return;
-        try {
-            const res = await fetch(`${KEEPER_URL_ARC}/copy-trading/wallet/${fundingSourceAddress}`);
-            if (res.ok) {
-                const data = await res.json();
-                setCopyTradingWallet(data.wallet);
-            }
-        } catch (e) {
-            console.error("Failed to fetch copy trading wallet:", e);
-        }
-    };
-
-    useEffect(() => {
-        fetchCopyTradingWallet();
-    }, [fundingSourceAddress]);
-
     const walletOptions = [
         {
             key: 'trading',
@@ -293,18 +292,12 @@ export function CircleWalletPage({
             address: mainWalletAddress
         },
         {
-            key: 'copy',
-            label: 'Copy Trading Wallet',
-            bal: copyTradingWallet?.balance || 0,
-            address: copyTradingWallet?.address || ''
-        },
-        {
             key: 'solana',
             label: 'Solana Wallet',
             bal: multiChainBalances['sol']?.usdc || 0,
             address: wallets?.find(w => w.address && !w.address.startsWith('0x'))?.address || ''
         }
-    ].filter(w => (w.key !== 'solana' || w.address) && (w.key !== 'copy' || w.address));
+    ].filter(w => (w.key !== 'solana' || w.address));
 
     const currentWallet = walletOptions[activeWalletIdx];
     const selectedToken = SUPPORTED_TOKENS[activeTokenIdx];
@@ -982,6 +975,8 @@ export function CircleWalletPage({
     };
 
     const handleSwipeWallet = (direction) => {
+        // Record which way the 3D card flip should rotate
+        flipDirRef.current = direction === 'left' ? -1 : 1;
         if (direction === 'left') {
             setActiveWalletIdx(prev => (prev + 1) % walletOptions.length);
         } else if (direction === 'right') {
@@ -1574,167 +1569,142 @@ export function CircleWalletPage({
                     {/* LEFT SIDE: WALLETS & PRIMARY ACTIONS */}
                     <div className={`flex flex-col gap-4 md:gap-8 w-full lg:max-w-md shrink-0 transition-all duration-500 mt-2 md:mt-0`}>
                         {/* Swipeable Wallet Card */}
-                        <div className="relative h-[220px] md:h-[260px] w-full mt-4 md:mt-0 group">
-                            {/* Static Navigation Buttons (Shifted Outside) - Hidden on Mobile */}
-                            <button
-                                onClick={() => handleSwipeWallet('right')}
-                                className="hidden md:block absolute left-[-45px] top-1/2 -translate-y-1/2 z-20 p-2 transition-all active:scale-90 text-[#1A6140]"
-                            >
-                                <ChevronLeft size={32} strokeWidth={2.5} />
-                            </button>
-                            <button
-                                onClick={() => handleSwipeWallet('left')}
-                                className="hidden md:block absolute right-[-45px] top-1/2 -translate-y-1/2 z-20 p-2 transition-all active:scale-90 text-[#1A6140]"
-                            >
-                                <ChevronRight size={32} strokeWidth={2.5} />
-                            </button>
-
-                            <AnimatePresence mode="wait">
-                                <motion.div
-                                    key={activeWalletIdx}
-                                    drag="x"
-                                    dragConstraints={{ left: 0, right: 0 }}
-                                    onDragEnd={(e, info) => {
-                                        if (info.offset.x < -100) handleSwipeWallet('left');
-                                        else if (info.offset.x > 100) handleSwipeWallet('right');
-                                    }}
-                                    initial={{ opacity: 0, scale: 0.9, x: 100 }}
-                                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9, x: -100 }}
-                                    className={`w-full h-full p-8 md:p-10 rounded-[40px] relative overflow-hidden flex flex-col justify-between cursor-grab active:cursor-grabbing ${isLight ? 'bg-white' : 'bg-[#0a0a0a]'} ${isLight ? 'border-2 border-[#1A6140] shadow-[0_40px_100px_rgba(0,0,0,0.25)]' : 'border-2 border-[#1A6140] shadow-[0_40px_100px_rgba(26, 97, 64,0.25)]'}`}
+                        {/* Wallet Card — identical design to the dashboard card.
+                            Fixed 448 × 260 canvas, uniformly scaled to fit the screen. */}
+                        <style>{`
+                            @import url('https://fonts.cdnfonts.com/css/sankyu');
+                            @keyframes aurora-slide { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+                            .aurora-dash { animation: aurora-slide 5.5s linear infinite; }
+                        `}</style>
+                        <div ref={hubDeckRef} className="relative w-full max-w-[448px] mt-4 md:mt-0" style={{ aspectRatio: '448 / 260' }}>
+                            {/* Fixed-design canvas (448 × 260), uniformly scaled to fit
+                                and always centered in its box */}
+                            <div className="absolute top-0 origin-top-left"
+                                style={{ left: '50%', width: '448px', height: '260px', transform: `translateX(${-224 * hubScale}px) scale(${hubScale})`, transition: 'transform 0.25s ease' }}>
+                                {/* Carousel chevrons — outside the card, desktop only */}
+                                <button
+                                    onClick={() => handleSwipeWallet('right')}
+                                    title="Previous card"
+                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
+                                    style={{ left: '-46px', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}
                                 >
-                                    {/* Immersive Nature-Series Layer (Behind Texture) */}
-                                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                                        {/* Complex Topographic Texture */}
-                                        <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                            <path d="M0,20 Q20,10 40,20 T80,20 T100,10" fill="none" stroke="white" strokeWidth="0.2" />
-                                            <path d="M0,40 Q20,30 40,40 T80,40 T100,30" fill="none" stroke="white" strokeWidth="0.2" />
-                                            <path d="M0,60 Q20,50 40,60 T80,60 T100,50" fill="none" stroke="white" strokeWidth="0.2" />
-                                            <path d="M0,80 Q20,70 40,80 T80,80 T100,70" fill="none" stroke="white" strokeWidth="0.2" />
-                                        </svg>
+                                    <ChevronLeft size={18} />
+                                </button>
+                                <button
+                                    onClick={() => handleSwipeWallet('left')}
+                                    title="Next card"
+                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
+                                    style={{ right: '-46px', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}
+                                >
+                                    <ChevronRight size={18} />
+                                </button>
 
-                                        {/* Winding Road with Dashed Lines */}
-                                        <svg className="absolute top-0 right-[-10%] w-[120%] h-full opacity-60" viewBox="0 0 200 100" preserveAspectRatio="none">
-                                            <path
-                                                d="M0,20 C50,10 80,60 130,50 C180,40 200,90 250,80"
-                                                fill="none"
-                                                stroke="white"
-                                                strokeWidth="12"
-                                                className="opacity-20"
-                                            />
-                                            <path
-                                                d="M0,20 C50,10 80,60 130,50 C180,40 200,90 250,80"
-                                                fill="none"
-                                                stroke="white"
-                                                strokeWidth="0.8"
-                                                strokeDasharray="4 6"
-                                                className="opacity-60"
-                                            />
-                                        </svg>
-
-                                        {/* Detailed Pine Tree Clusters */}
-                                        <div className="absolute bottom-[10%] right-[10%] flex items-end gap-1 opacity-50">
-                                            <svg width="24" height="32" viewBox="0 0 24 32" fill="white">
-                                                <path d="M12,0 L24,24 L16,24 L20,32 L4,32 L8,24 L0,24 Z" />
-                                            </svg>
-                                            <svg width="18" height="24" viewBox="0 0 24 32" fill="white" className="opacity-70">
-                                                <path d="M12,0 L24,24 L16,24 L20,32 L4,32 L8,24 L0,24 Z" />
-                                            </svg>
-                                            <svg width="14" height="18" viewBox="0 0 24 32" fill="white" className="opacity-40">
-                                                <path d="M12,0 L24,24 L16,24 L20,32 L4,32 L8,24 L0,24 Z" />
-                                            </svg>
-                                        </div>
-
-                                        {/* Geometric Accents (Dots & Plus) */}
-                                        <div className="absolute top-[15%] left-[40%] w-1.5 h-[1px] bg-white opacity-40 rotate-45" />
-                                        <div className="absolute top-[15%] left-[40%] h-1.5 w-[1px] bg-white opacity-40 rotate-45" />
-
-                                        <div className="absolute bottom-[40%] right-[20%] grid grid-cols-3 gap-1.5 opacity-20">
-                                            <div className="w-0.5 h-0.5 bg-white rounded-full" />
-                                            <div className="w-0.5 h-0.5 bg-white rounded-full" />
-                                            <div className="w-0.5 h-0.5 bg-white rounded-full" />
-                                            <div className="w-0.5 h-0.5 bg-white rounded-full" />
-                                            <div className="w-0.5 h-0.5 bg-white rounded-full" />
-                                            <div className="w-0.5 h-0.5 bg-white rounded-full" />
-                                        </div>
-                                    </div>
-
-                                    {/* Platform Standard Texture Layer (On Top) */}
-                                    <div className="absolute inset-0 z-0">
-                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#2E8B57_0%,transparent_60%)] opacity-60" />
-                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_70%,#1E5D3B_0%,transparent_60%)] opacity-40" />
-                                        <div
-                                            className="absolute inset-0 opacity-[0.07] mix-blend-overlay"
-                                            style={{
-                                                backgroundImage: `url('https://www.transparenttextures.com/patterns/carbon-fibre.png')`
+                                {/* Transition host — the static window no longer clips the flip;
+                                    the card itself carries its rounded outline while rotating */}
+                                <div className="w-[448px] h-[260px] relative">
+                                    <AnimatePresence mode="wait" initial={false}>
+                                        <motion.div
+                                            key={activeWalletIdx}
+                                            drag="x"
+                                            dragConstraints={{ left: 0, right: 0 }}
+                                            onDragEnd={(e, info) => {
+                                                if (info.offset.x < -100) handleSwipeWallet('left');
+                                                else if (info.offset.x > 100) handleSwipeWallet('right');
                                             }}
-                                        />
-                                        {/* Subtle Glass Ripple */}
-                                        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent opacity-30" />
-                                    </div>
+                                            initial={{ rotateY: -90 * (flipDirRef.current || 1), scale: 0.94 }}
+                                            animate={{ rotateY: 0, scale: 1 }}
+                                            exit={{ rotateY: 90 * (flipDirRef.current || 1), scale: 0.94 }}
+                                            transition={{ rotateY: { duration: 0.34, ease: 'easeInOut' }, scale: { duration: 0.34, ease: 'easeInOut' } }}
+                                            style={{ transformPerspective: 1100, backfaceVisibility: 'hidden', boxShadow: '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20, 241, 149, 0.13)' }}
+                                            className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
+                                        >
+                                            <div
+                                                className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] text-white"
+                                                style={{
+                                                    fontFamily: '"Comfortaa", cursive',
+                                                    background: 'linear-gradient(145deg, #1a6140 0%, #123f28 55%, #0b3220 100%)',
+                                                    border: '1.5px solid rgba(99,194,141,0.45)',
+                                                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), inset 0 0 46px rgba(0,0,0,0.28)'
+                                                }}
+                                            >
+                                                {/* World-Map Background */}
+                                                <img src="/worldmap.svg" alt="" aria-hidden="true"
+                                                    className="absolute inset-0 w-full h-full object-cover brightness-0 invert opacity-[0.14] pointer-events-none" />
+                                                {/* Brand sheen (keeps the dark green from reading flat) */}
+                                                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 via-transparent to-black/15 pointer-events-none" />
 
-                                    {/* Credit Card Chip (Metallic Gold) - Moved to Right */}
-                                    <div className="absolute top-1/2 right-10 -translate-y-1/2 w-14 h-11 rounded-xl bg-gradient-to-br from-[#E6BE8A] via-[#C5A059] to-[#8B7355] shadow-[0_4px_12px_rgba(0,0,0,0.5)] border border-black/20 z-10">
-                                        <div className="absolute inset-0 grid grid-cols-2 grid-rows-3 gap-[1.5px] p-2.5 opacity-30">
-                                            {[...Array(6)].map((_, i) => (
-                                                <div key={i} className="border border-black/40 rounded-[3px]" />
-                                            ))}
-                                        </div>
-                                        <div className="absolute top-1/2 left-0 w-full h-[1px] bg-black/20" />
-                                    </div>
+                                                {/* NFC icon, top right — level with the brand logo */}
+                                                <Nfc size={24} className="absolute top-4 right-6 text-white/65 pointer-events-none" />
 
-                                    <motion.div className="flex-1 flex flex-col justify-between relative z-20"
-                                        animate={{ y: '-15%' }}
-                                        transition={{ type: 'spring', damping: 20, stiffness: 100 }}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <p className={`text-[11px] font-black uppercase tracking-[0.2em] ${isLight ? 'text-black' : 'text-white'}`}>{currentWallet.label}</p>
-                                            <img
-                                                src="/boblogo.png"
-                                                alt="Logo"
-                                                className="h-16 md:h-20 object-contain brightness-0 invert mix-blend-overlay opacity-80"
-                                            />
-                                        </div>
+                                                {/* Aurora beam — thin, glowing, hugging the card outline */}
+                                                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 448 260" fill="none" style={{ overflow: 'visible' }}>
+                                                    <defs>
+                                                        <linearGradient id="aurora-stroke-hub" x1="0" y1="0" x2="1" y2="0">
+                                                            <stop offset="0%" stopColor="rgba(126,255,199,0)" />
+                                                            <stop offset="50%" stopColor="rgba(126,255,199,0.9)" />
+                                                            <stop offset="100%" stopColor="rgba(255,255,255,0.95)" />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <rect x="2" y="2" width="444" height="256" rx="39" pathLength="100"
+                                                        stroke="url(#aurora-stroke-hub)" strokeWidth="4.5" strokeDasharray="12 88" className="aurora-dash"
+                                                        style={{ filter: 'blur(3.5px)', opacity: 0.55, strokeLinecap: 'round' }} />
+                                                    <rect x="2" y="2" width="444" height="256" rx="39" pathLength="100"
+                                                        stroke="url(#aurora-stroke-hub)" strokeWidth="1.5" strokeDasharray="12 88" className="aurora-dash"
+                                                        style={{ strokeLinecap: 'round' }} />
+                                                </svg>
 
-                                        {/* Card Number (Wallet Address) */}
-                                        <div className="py-2">
-                                            <div className="flex items-center gap-3 group/copy cursor-pointer" onClick={(e) => { e.stopPropagation(); handleCopy(currentWallet.address); }}>
-                                                <p className={`text-[18px] md:text-[22px] font-mono tracking-[0.2em] ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>
-                                                    {currentWallet.address
-                                                        ? `${currentWallet.address.slice(0, 6)}...${currentWallet.address.slice(-4)}`.toUpperCase()
-                                                        : "xxxx...xxxx"}
-                                                </p>
-                                                <div className="p-1.5 rounded-lg bg-white/5 opacity-0 group-hover/copy:opacity-100 transition-all hover:bg-white/10 active:scale-90">
-                                                    {copied ? <Check size={14} className="text-[#1A6140]" /> : <Copy size={14} className={isLight ? 'text-black/40' : 'text-white/40'} />}
+                                                {/* Card Face: all-white brand logo (top-left) · wallet address on the
+                                                    left with its label beneath · username (bottom-left) + balance
+                                                    with bigger numbers, USDC small on its base (bottom-right) */}
+                                                <div className="h-full flex flex-col justify-between relative z-20 py-4 px-6 md:px-7">
+
+                                                    {/* 15market logo — all white, top-left, shifted upward */}
+                                                    <img src="/gowlogo.png" alt="15market" className="h-24 md:h-[120px] w-auto self-start -translate-y-[30%]"
+                                                        style={{ filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
+
+                                                    {/* Wallet address — on the left with a copy icon; label beneath */}
+                                                    <div className="px-1 min-w-0"
+                                                        onClick={() => { if (currentWallet.address) handleCopy(currentWallet.address); }}>
+                                                        <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                                                            <p className="text-left text-lg md:text-xl font-black tracking-[0.22em] truncate leading-none">
+                                                                {currentWallet.address
+                                                                    ? `${currentWallet.address.slice(0, 6)}...${currentWallet.address.slice(-4)}`.toUpperCase()
+                                                                    : 'XXXX...XXXX'}
+                                                            </p>
+                                                            {copied
+                                                                ? <Check size={13} className="flex-none text-white/70" />
+                                                                : <Copy size={13} className="flex-none text-white/70" />}
+                                                        </div>
+                                                        <p className="text-left text-[9px] md:text-[10px] italic font-black lowercase tracking-[0.25em] text-white/55 mt-1.5">
+                                                            {currentWallet.label.toLowerCase()}
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Bottom row: username (left) · balance with bigger numbers (right) */}
+                                                    <div className="flex items-end justify-between gap-4">
+                                                        <span className="text-2xl md:text-3xl font-black truncate" style={{ fontFamily: 'Sankyu, "sankyu", cursive' }}>{username || 'Trader'}</span>
+                                                        <div className="text-right leading-none shrink-0">
+                                                            <div className="text-[45px] md:text-[72px] font-black tracking-tighter tabular-nums leading-none"
+                                                                style={{ textShadow: '0 6px 24px rgba(0,0,0,0.40)' }}>
+                                                                ${parseFloat(currentWallet.bal || 0).toFixed(2)}
+                                                                <span className="text-[11px] md:text-base ml-1.5 font-bold text-white/70">USDC</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-1.5 mt-4">
-                                                {walletOptions.map((_, i) => (
-                                                    <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${activeWalletIdx === i ? 'w-4 bg-white' : 'bg-white/10'}`} />
-                                                ))}
-                                            </div>
-                                        </div>
+                                        </motion.div>
+                                    </AnimatePresence>
+                                </div>
 
-                                        <div className="flex items-end justify-between relative">
-                                            <div>
-                                                <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#0a261a]/60' : 'text-white'}`}>Available Balance</p>
-                                                <h1 className={`text-4xl md:text-5xl font-black tracking-tighter ${isLight ? 'text-[#0a261a]' : 'text-white'} flex items-baseline gap-2`}>
-                                                    {currentWallet.bal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                    <span className={`text-xl ${isLight ? 'text-[#1A6140]' : 'text-white/60'}`}>USDC</span>
-                                                </h1>
-                                            </div>
-
-                                        </div>
-
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <Shield size={10} className={isLight ? 'text-[#1A6140] opacity-50' : 'text-white opacity-40'} />
-                                            <p className={`text-[9px] font-bold uppercase tracking-widest ${isLight ? 'text-[#0a261a]/50' : 'text-white opacity-40'}`}>
-                                                Secured
-                                            </p>
-                                        </div>
-                                    </motion.div>
-                                </motion.div>
-                            </AnimatePresence>
+                                {/* Wallet page indicator (below the card) */}
+                                <div className="flex justify-center gap-1.5 mt-3">
+                                    {walletOptions.map((_, i) => (
+                                        <button key={i} onClick={() => { flipDirRef.current = i < activeWalletIdx ? 1 : -1; setActiveWalletIdx(i); }} aria-label={`Wallet ${i + 1}`}
+                                            className={`h-1.5 rounded-full transition-all duration-300 ${activeWalletIdx === i ? 'w-4 bg-white' : 'w-1.5 bg-white/25 hover:bg-white/40'}`} />
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
                         {/* Primary Actions */}

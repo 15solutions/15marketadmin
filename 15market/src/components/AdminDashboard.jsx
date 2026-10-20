@@ -58,7 +58,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const [recentActivity, setRecentActivity] = useState([]);
     const [liveUsers, setLiveUsers] = useState([]); // { lat, lng, id } for map
     const [userProfiles, setUserProfiles] = useState({});
-    const [copyApplications, setCopyApplications] = useState([]);
 
     const fetchProfile = async (addr) => {
         if (!addr) return;
@@ -71,54 +70,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 setUserProfiles(prev => ({ ...prev, [lowAddr]: data }));
             }
         } catch (e) {}
-    };
-
-    const fetchCopyApplications = async () => {
-        try {
-            const res = await fetch(`${KEEPER_URL_ARC}/admin/copy-trading/applications`);
-            if (res.ok) {
-                const data = await res.json();
-                setCopyApplications(data.applications || []);
-            }
-        } catch (e) {
-            console.error("Failed to fetch copy trading applications", e);
-        }
-    };
-
-    const handleCopyApprove = async (providerAddr, approved) => {
-        try {
-            const res = await fetch(`${KEEPER_URL_ARC}/admin/copy-trading/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ADMIN_TOKEN}` },
-                body: JSON.stringify({ address: providerAddr, approved })
-            });
-            if (res.ok) {
-                notify(approved ? "Provider Approved!" : "Provider Rejected", "success");
-                fetchCopyApplications();
-            } else {
-                throw new Error("Action failed");
-            }
-        } catch (e) {
-            notify(e.message, "error");
-        }
-    };
-
-    const handlePruneMocks = async () => {
-        try {
-            const res = await fetch(`${KEEPER_URL_ARC}/admin/copy-trading/prune-mocks`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ADMIN_TOKEN}` },
-                body: JSON.stringify({ percentage: 20 }) // removes 20% at a time
-            });
-            if (res.ok) {
-                const data = await res.json();
-                notify(`Pruned mocks! ${data.remaining} remaining`, "success");
-            } else {
-                throw new Error("Action failed");
-            }
-        } catch (e) {
-            notify(e.message, "error");
-        }
     };
 
     // Real-time Event Subscriptions
@@ -180,7 +131,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             } catch (e) {}
         };
         fetchStats();
-        fetchCopyApplications();
 
         return () => {
             unbindMetrics();
@@ -597,52 +547,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     <span>Launch Campaign</span>
                                 </button>
                             </div>
-                        </AdminCard>
-
-                        <AdminCard title="Copy Trading Apps" icon={Users} accent="#ec4899">
-                            <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto no-scrollbar">
-                                {copyApplications.length === 0 ? (
-                                    <div className="py-10 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
-                                        No pending applications
-                                    </div>
-                                ) : (
-                                    copyApplications.map((app, i) => (
-                                        <div key={i} className={`p-3 rounded-2xl border flex items-center justify-between ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-[#ec4899]/10 text-[#ec4899] flex items-center justify-center">
-                                                    <Users size={16} />
-                                                </div>
-                                                <div>
-                                                    <div className="text-[11px] font-black">{app.username}</div>
-                                                    <div className="text-[8px] opacity-50 font-bold uppercase mt-0.5">
-                                                        WR: {app.metrics?.totalTrades > 0 ? ((app.metrics.totalWins / app.metrics.totalTrades) * 100).toFixed(0) : 0}% • Vol: ${app.metrics?.totalVolume?.toLocaleString() || 0}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button 
-                                                    onClick={() => handleCopyApprove(app.address, false)}
-                                                    className="w-8 h-8 rounded-full border border-red-500/20 text-red-500 flex items-center justify-center hover:bg-red-500/10 transition-all"
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleCopyApprove(app.address, true)}
-                                                    className="w-8 h-8 rounded-full border border-[#1A6140]/20 text-[#1A6140] flex items-center justify-center hover:bg-[#1A6140]/10 transition-all"
-                                                >
-                                                    <Check size={14} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                            <button 
-                                onClick={handlePruneMocks}
-                                className="w-full mt-4 py-3 bg-[#ec4899]/10 text-[#ec4899] border border-[#ec4899]/20 rounded-2xl font-black uppercase tracking-widest text-[9px] hover:bg-[#ec4899]/20 active:scale-95 transition-all"
-                            >
-                                Prune 20% Mock Traders
-                            </button>
                         </AdminCard>
 
                         <AdminCard title="Recent Activity" icon={Clock} accent="#f59e0b">

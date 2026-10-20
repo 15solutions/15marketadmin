@@ -25,9 +25,8 @@ import { LandingPage } from "./components/LandingPage";
 import { DashboardPage } from "./components/DashboardPage";
 import ComingSoonPage from "./components/ComingSoonPage";
 import { CircleWalletPage } from "./components/CircleWalletPage";
-import { CopyTradingPage } from "./components/CopyTradingPage";
+
 import { DocsPage } from "./components/DocsPage";
-import AssistedTradingPage from "./components/AssistedTradingPage";
 import CampaignsHub from "./components/CampaignsHub";
 
 // Lazy load conditionally rendered components
@@ -3534,8 +3533,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               }}
               onDocs={() => setView("docs")}
               onCampaign={() => setView("campaigns")}
-              onAssistedTrading={() => setView("assisted")}
-              onCopyTrading={() => setView("copyTrading")}
               onSelect={(type) => setView("comingsoon")}
             />
           ) : view === "comingsoon" ? (
@@ -3554,22 +3551,13 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               evmBalance={evmBalance}
               sessionBalance={sessionBalance}
               sessionAddress={evmSessionWallet?.address}
+              username={userProfile?.username}
               wallets={wallets || []}
               walletClient={walletClient}
               switchChainAsync={switchChainAsync}
               smartWalletAddress={smartWalletAddress}
               onWithdraw={handleWithdraw}
               triggerGlobalRefresh={triggerGlobalRefresh}
-            />
-          ) : view === "copyTrading" ? (
-            <CopyTradingPage
-              address={address}
-              isLight={theme === 'light'}
-              notify={notify}
-              onBack={() => setView("dashboard")}
-              profile={userProfile}
-              user={user}
-              tradeHistory={tradeHistory}
             />
           ) : view === "campaigns" ? (
             <CampaignsHub
@@ -3585,13 +3573,6 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               theme={theme}
               onBack={() => setView("dashboard")}
               onToggleTheme={toggleTheme}
-              isSmallScreen={isSmallScreen}
-            />
-          ) : view === "assisted" ? (
-            <AssistedTradingPage
-              theme={theme}
-              onBack={() => setView("dashboard")}
-              onSelect={(type) => type === 'copytrading' ? setView("copyTrading") : setView("comingsoon")}
               isSmallScreen={isSmallScreen}
             />
           ) : (
