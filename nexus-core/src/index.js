@@ -211,6 +211,8 @@ async function emitAdminStats() {
       treasuryBalance: realTreasuryBal,
       pendingDisputes: 0,
       platformRevenue: platformRevenue,
+      userCountries: stats.userCountries || {},
+      totalTrades: stats.totalTrades || 0,
       timestamp: Date.now()
     };
 

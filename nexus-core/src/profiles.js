@@ -2075,9 +2075,14 @@ class ProfileService {
         let allTrades = [];
 
         let totalRevenue = 0;
+        // Users per country (ISO alpha-2) — powers the admin geo globe.
+        const userCountries = {};
         for (const addr in this.profiles) {
             const history = this.profiles[addr].trades || [];
             totalTrades += history.length;
+
+            const ctry = String(this.profiles[addr].country || "").toUpperCase();
+            if (/^[A-Z]{2}$/.test(ctry)) userCountries[ctry] = (userCountries[ctry] || 0) + 1;
 
             for (const trade of history) {
                 const amt = parseFloat(trade.amount || 0);
@@ -2109,7 +2114,8 @@ class ProfileService {
             totalTrades,
             recentTrades: allTrades.slice(0, 50),
             bullsInfo: bulls,
-            bearsInfo: bears
+            bearsInfo: bears,
+            userCountries
         };
     }
 }

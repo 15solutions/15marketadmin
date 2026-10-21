@@ -33,20 +33,26 @@ import {
     Mail,
     Landmark,
     ChevronDown,
-    LogOut
+    LogOut,
+    LayoutDashboard,
+    ChevronsLeft,
+    ChevronsRight,
+    Flame,
+    BarChart3
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
 import { GlobalTradeScroller } from "./GlobalTradeScroller";
 import { socketService } from "../utils/socket";
+import { AdminGlobe, COUNTRY_CENTER } from "./AdminGlobe";
 
-// Admin tabs. Even mobile widths keep every tool reachable — the tab row
-// scrolls horizontally as a chip strip instead of collapsing.
-const ADMIN_TABS = [
-    { key: 'overview', label: 'Overview', icon: Activity },
-    { key: 'referral', label: 'Referral Program', icon: Gift },
-    { key: 'requests', label: 'Withdrawal Requests', icon: Landmark },
-    { key: 'admins', label: 'Admins & Mods', icon: Shield }
+// Sidebar navigation: collapsible icon rail ↔ full menu. "Withdrawal
+// Management" hosts the request queue and the referral controls as
+// sub-tabs; "Security" hosts protocols, broadcasts and the admin roster.
+const NAV = [
+    { key: 'overview', label: 'Overview', hint: 'Metrics · Global reach', icon: LayoutDashboard },
+    { key: 'withdrawals', label: 'Withdrawal Management', hint: 'Requests · Referral', icon: Landmark },
+    { key: 'security', label: 'Security', hint: 'Protocols · Broadcast · Team', icon: Shield }
 ];
 
 export function AdminDashboard({ onBack, theme, notify, platformSettings: initialSettings, auth }) {
@@ -66,15 +72,21 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const [isConnected, setIsConnected] = useState(true);
     const [syncProgress, setSyncProgress] = useState(0);
 
+    // Live metrics pushed by the keeper over the socket (every 10s, plus an
+    // immediate burst on connect under `dashboard_stats`).
     const [stats, setStats] = useState({
         totalVolume: "0.00",
-        totalTrades: "0",
-        activeUsers: "0",
-        treasuryBalance: "0.00"
+        platformRevenue: "0.00",
+        totalWallets: 0,
+        activeCount: 0,
+        activeStakesTotal: "0.00",
+        treasuryBalance: "0.00",
+        totalTrades: 0,
+        userCountries: {}
     });
-    
+    const [pulse, setPulse] = useState([]); // transient globe flashes {id, lat, lng}
+
     const [recentActivity, setRecentActivity] = useState([]);
-    const [liveUsers, setLiveUsers] = useState([]); // { lat, lng, id } for map
     const [userProfiles, setUserProfiles] = useState({});
     // Referral commission withdrawal requests (manual payouts — not on-chain).
     const [refWithdrawals, setRefWithdrawals] = useState([]);
@@ -109,8 +121,28 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         }
     };
 
-    // ── Referral Program Management (migration 010) ──────────────────────
-    const [adminTab, setAdminTab] = useState('overview');
+    // Sidebar section + Withdrawal Management sub-section. Persisted so the
+    // console reopens where the operator left it.
+    const [adminTab, setAdminTab] = useState(() => {
+        try { return localStorage.getItem('15m_admin_section') || 'overview'; } catch (e) { return 'overview'; }
+    });
+    const [wdSection, setWdSection] = useState('requests');
+
+    const selectSection = (key) => {
+        setAdminTab(key);
+        try { localStorage.setItem('15m_admin_section', key); } catch (e) {}
+    };
+
+    // Sidebar expanded (full menu) ↔ collapsed (icon rail).
+    const [sidebarOpen, setSidebarOpen] = useState(() => {
+        try { return localStorage.getItem('15m_admin_sidebar') !== 'collapsed'; } catch (e) { return true; }
+    });
+    const toggleSidebar = () => {
+        setSidebarOpen(prev => {
+            try { localStorage.setItem('15m_admin_sidebar', prev ? 'collapsed' : 'open'); } catch (e) {}
+            return !prev;
+        });
+    };
     const [refUsers, setRefUsers] = useState([]);
     const [refUsersQ, setRefUsersQ] = useState('');
     const [openRefUser, setOpenRefUser] = useState(null);
@@ -176,8 +208,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     };
 
     useEffect(() => {
-        if (adminTab === 'referral') fetchRefUsers();
-    }, [adminTab]);
+        if (adminTab === 'withdrawals' && wdSection === 'referral') fetchRefUsers();
+    }, [adminTab, wdSection]);
 
     const fetchProfile = async (addr) => {
         if (!addr) return;
@@ -196,53 +228,62 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     useEffect(() => {
         socketService.connect();
 
-        // 1. Metrics Pulse
-        const unbindMetrics = socketService.on('admin_metrics_update', (data) => {
-            setStats(prev => ({
-                ...prev,
-                totalVolume: data.totalVolume,
-                totalTrades: data.totalTrades,
-                activeUsers: data.activeUsers,
-                treasuryBalance: data.treasuryBalance
-            }));
+        // 1. Metrics pulse — keeper broadcasts the ops payload every 10s and
+        //    once on connect (dashboard_stats).
+        const applyStats = (data) => {
+            if (!data) return;
+            setStats(prev => ({ ...prev, ...data }));
             setIsConnected(true);
-        });
+        };
+        const unbindMetrics = socketService.on('admin_stats_update', applyStats);
+        const unbindMetrics2 = socketService.on('dashboard_stats', applyStats);
+
+        // Globe flash: drop a temporary pin at the actor's country center.
+        const flashCountry = (country) => {
+            const center = COUNTRY_CENTER[String(country || '').toUpperCase()];
+            if (!center) return;
+            const id = `${Date.now()}:${Math.random()}`;
+            setPulse(prev => [...prev.slice(-5), { id, lat: center[0], lng: center[1] }]);
+            setTimeout(() => setPulse(prev => prev.filter(p => p.id !== id)), 9000);
+        };
+
+        // Resolve a user's country from the (possibly uncached) profile.
+        const pingUserCountry = (addr) => {
+            if (!addr) return;
+            const low = addr.toLowerCase();
+            const cached = userProfiles[low];
+            if (cached?.country) return flashCountry(cached.country);
+            fetch(`${KEEPER_URL_ARC}/profile?address=${low}`)
+                .then(r => (r.ok ? r.json() : null))
+                .then(p => {
+                    if (p?.country) {
+                        setUserProfiles(prev => ({ ...prev, [low]: p }));
+                        flashCountry(p.country);
+                    }
+                })
+                .catch(() => {});
+        };
 
         // 2. New Trade (Sub-second Indexing)
         const unbindTrades = socketService.on('new_trade', (trade) => {
             setRecentActivity(prev => [trade, ...prev].slice(0, 50));
             if (trade.userAddr) fetchProfile(trade.userAddr);
+            pingUserCountry(trade.userAddr || trade.owner);
         });
 
         // 3. User Onboarding (Geo Pin)
         const unbindUsers = socketService.on('user_onboarded', (user) => {
-            const newPin = {
-                id: Date.now(),
-                x: Math.random() * 80 + 10, // Randomish for demo, could use IP geo
-                y: Math.random() * 60 + 20
-            };
-            setLiveUsers(prev => [...prev, newPin]);
             if (user.address) fetchProfile(user.address);
-            setTimeout(() => {
-                setLiveUsers(prev => prev.filter(p => p.id !== newPin.id));
-            }, 5000);
+            pingUserCountry(user.address);
         });
 
-        // 4. Initial Fetch
-        const fetchStats = async () => {
+        // 4. Recent activity history for the Overview feed.
+        const fetchHistory = async () => {
             try {
-                const res = await fetch(`${KEEPER_URL_ARC}/protocol-stats`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setStats(data);
-                }
-                
-                // Also fetch recent activity history
                 const histRes = await fetch(`${KEEPER_URL_ARC}/history`);
                 if (histRes.ok) {
                     const histData = await histRes.json();
                     setRecentActivity(histData.slice(0, 50));
-                    // Prefetch profiles for history
                     histData.slice(0, 20).forEach(h => {
                         if (h.owner) fetchProfile(h.owner);
                         if (h.userAddr) fetchProfile(h.userAddr);
@@ -250,10 +291,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 }
             } catch (e) {}
         };
-        fetchStats();
+        fetchHistory();
 
         return () => {
             unbindMetrics();
+            unbindMetrics2();
             unbindTrades();
             unbindUsers();
         };
@@ -352,13 +394,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const canSettings = hasPerm('platform.settings');
     const canBroadcast = hasPerm('broadcast.send');
 
-    // Row-based tabs: only ones the signed-in admin is allowed to open.
-    const visibleTabs = ADMIN_TABS.filter(t => {
-        if (t.key === 'requests') return canRequests;
-        if (t.key === 'referral') return canReferral;
-        if (t.key === 'admins') return isRoot;
-        return true;
-    });
+    // Sidebar: only sections the signed-in admin is allowed to open.
+    const canWithdrawals = canRequests || canReferral;
+    const visibleNav = NAV.filter(t => (t.key === 'withdrawals' ? canWithdrawals : true));
+    // Fall back to Overview if a permission change hid the saved section.
+    const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : 'overview';
 
     // ── Admins & Moderators (root-only, migration 011) ───────────────────
     const [adminRoster, setAdminRoster] = useState([]);
@@ -380,7 +420,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     };
 
     useEffect(() => {
-        if (adminTab === 'admins' && auth?.isRoot) fetchAdminRoster();
+        if (adminTab === 'security' && auth?.isRoot) fetchAdminRoster();
     }, [adminTab, auth]);
 
     const createAdmin = async () => {
@@ -487,169 +527,119 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     );
 
     return (
-        <div className={`h-screen w-full flex flex-col overflow-hidden ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'} relative`}>
+        <div className={`h-screen w-full flex overflow-hidden ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'} relative`}>
             {/* Background Flair */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#1A6140]/5 rounded-full blur-[120px]" />
                 <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#1A6140]/3 rounded-full blur-[120px]" />
             </div>
 
-            {/* Header */}
-            <header className={`flex-none ${isLight ? 'bg-white/50 border-[#1A6140]/20' : 'bg-[#0D0D0D]/50 border-white/5'} border-b backdrop-blur-3xl z-50`}>
-                <div className="max-w-[1600px] mx-auto px-8 py-5 flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                        <button 
-                            onClick={onBack}
-                            className={`p-3 rounded-full border transition-all ${isLight ? 'bg-white border-[#1A6140]/20 hover:bg-[#1A6140]/10 text-black' : 'bg-white/5 border-white/5 hover:bg-white/10 text-white'} active:scale-95`}
-                        >
-                            <ArrowLeft size={18} />
-                        </button>
-                        <div className="flex flex-col">
-                            <h1 className={`text-xl font-black uppercase tracking-tighter flex items-center gap-3 ${isLight ? 'text-black' : 'text-white'}`}>
-                                Admin Citadel
-                            </h1>
-                            <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest mt-0.5">Platform Security & Broadcast Center</p>
+            {/* Sidebar — the extendable operations menu */}
+            <nav className={`relative z-50 flex-none flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-white/60 border-[#1A6140]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
+                {/* Brand head */}
+                <div className="flex-none px-5 pt-5 pb-4 flex items-center gap-3 overflow-hidden">
+                    <img src="/logo.png" alt="15market" className="w-10 h-10 rounded-2xl object-contain flex-none" />
+                    {sidebarOpen && (
+                        <div className="flex flex-col min-w-0">
+                            <span className={`text-base font-black uppercase tracking-tighter truncate ${isLight ? 'text-black' : 'text-white'}`}>15market</span>
+                            <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#1A6140]">Operations</span>
                         </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <div className={`flex items-center gap-3 px-4 py-2 rounded-2xl border ${isLight ? 'bg-[#1A6140]/5 border-[#1A6140]/10' : 'bg-white/5 border-white/5'}`}>
-                            {isConnected ? <Wifi size={14} className="text-[#1A6140]" /> : <WifiOff size={14} className="text-red-500" />}
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${isConnected ? 'text-[#1A6140]' : 'text-red-500'}`}>
-                                Latency: 42ms
-                            </span>
-                        </div>
-                        {auth?.email && (
-                            <div className={`hidden md:flex items-center gap-3 px-4 py-2 rounded-2xl border ${isLight ? 'bg-white border-[#1A6140]/20' : 'bg-white/5 border-white/5'}`}>
-                                <div className="w-7 h-7 rounded-full bg-[#1A6140] flex items-center justify-center text-white text-[9px] font-black uppercase">
-                                    {auth.email.slice(0, 2)}
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black' : 'text-white'}`}>{auth.email}</span>
-                                    <span className="text-[7px] font-black uppercase tracking-widest text-[#1A6140]">{auth.isRoot ? 'Root Admin' : auth.role || 'Admin'}</span>
-                                </div>
-                                <button
-                                    onClick={auth.signOut || auth.onSignOut}
-                                    title="Sign out"
-                                    className={`p-2 rounded-xl transition-all active:scale-95 ${isLight ? 'bg-black/[0.04] hover:bg-red-500/10 text-black/40 hover:text-red-500' : 'bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-500'}`}
-                                >
-                                    <LogOut size={13} />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </header>
-
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-10 z-10">
-                {/* MARKET SCROLLER (Marquee) — same participation feed as the user side */}
-                <div className="max-w-[1400px] mx-auto w-full overflow-hidden relative rounded-[10px] mb-5">
-                    <GlobalTradeScroller theme={theme} />
+                    )}
                 </div>
 
-                {/* Tab bar — chip strip that scrolls horizontally on narrow screens */}
-                <div className="max-w-[1400px] mx-auto flex items-center gap-2 mb-6 md:mb-8 overflow-x-auto no-scrollbar">
-                    {visibleTabs.map(t => {
+                {/* Sections */}
+                <div className="flex-1 flex flex-col gap-1.5 px-3 pt-2 overflow-y-auto no-scrollbar min-h-0">
+                    {visibleNav.map(t => {
                         const Icon = t.icon;
-                        const active = adminTab === t.key;
-                        const badge = t.key === 'requests' ? refWithdrawals.filter(w => w.status === 'pending').length : 0;
+                        const active = activeNav === t.key;
+                        const badge = t.key === 'withdrawals' ? refWithdrawals.filter(w => w.status === 'pending').length : 0;
                         return (
                             <button
                                 key={t.key}
-                                onClick={() => setAdminTab(t.key)}
-                                className={`flex items-center gap-2 px-4 md:px-5 py-3 rounded-2xl border text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${active ? 'bg-[#1A6140] text-white border-[#1A6140] shadow-lg shadow-[#1A6140]/20' : isLight ? 'bg-white/60 border-black/10 text-black/50 hover:text-black' : 'bg-white/5 border-white/10 text-white/40 hover:text-white'}`}
+                                onClick={() => selectSection(t.key)}
+                                title={sidebarOpen ? undefined : t.label}
+                                className={`flex items-center gap-3 px-3.5 py-3.5 rounded-2xl text-left transition-all active:scale-[0.98] ${active
+                                    ? 'bg-[#1A6140] text-white shadow-lg shadow-[#1A6140]/25'
+                                    : isLight ? 'text-black/50 hover:text-black hover:bg-black/[0.04]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                             >
-                                <Icon size={13} />
-                                {t.label}
+                                <Icon size={17} className="flex-none" />
+                                {sidebarOpen && (
+                                    <span className="flex-1 min-w-0">
+                                        <span className="block text-[10px] font-black uppercase tracking-widest truncate">{t.label}</span>
+                                        <span className={`block text-[7px] font-bold uppercase tracking-widest mt-0.5 truncate ${active ? 'text-white/60' : 'opacity-30'}`}>{t.hint}</span>
+                                    </span>
+                                )}
                                 {badge > 0 && (
-                                    <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[8px] font-black leading-none">{badge}</span>
+                                    <span className="flex-none px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[8px] font-black leading-none">{badge}</span>
                                 )}
                             </button>
                         );
                     })}
                 </div>
 
-                {adminTab === 'overview' && (
+                {/* Bottom rail: identity + collapse toggle */}
+                <div className={`flex-none p-3 flex flex-col gap-1.5 border-t ${isLight ? 'border-black/5' : 'border-white/5'}`}>
+                    <button
+                        onClick={toggleSidebar}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/30 hover:text-white hover:bg-white/5'}`}
+                    >
+                        {sidebarOpen ? <ChevronsLeft size={15} /> : <ChevronsRight size={15} />}
+                        {sidebarOpen && <span>Collapse menu</span>}
+                    </button>
+                    {auth?.email && (
+                        <div
+                            title={auth.email}
+                            className={`flex items-center gap-3 px-2 py-2 rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-[#1A6140]/20' : 'bg-white/5 border-white/5'}`}
+                        >
+                            <div className="w-8 h-8 rounded-xl bg-[#1A6140] flex items-center justify-center text-white text-[10px] font-black uppercase flex-none">
+                                {auth.email.slice(0, 2)}
+                            </div>
+                            {sidebarOpen && (
+                                <div className="flex-1 flex flex-col min-w-0">
+                                    <span className={`text-[9px] font-black uppercase tracking-widest truncate ${isLight ? 'text-black' : 'text-white'}`}>{auth.email}</span>
+                                    <span className="text-[7px] font-black uppercase tracking-widest text-[#1A6140]">{auth.isRoot ? 'Root' : auth.role || 'Admin'}</span>
+                                </div>
+                            )}
+                            <button
+                                onClick={auth.signOut || auth.onSignOut}
+                                title="Sign out"
+                                className={`flex-none p-2 rounded-xl transition-all active:scale-95 ${isLight ? 'bg-black/[0.04] hover:bg-red-500/10 text-black/40 hover:text-red-500' : 'bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-500'}`}
+                            >
+                                <LogOut size={13} />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </nav>
+
+            {/* Main column */}
+            <div className="flex-1 flex flex-col min-w-0">
+
+            {/* Market scroller strip — same participation feed as the user side */}
+            <div className="flex-none px-4 pt-3">
+                <div className="max-w-[1400px] mx-auto w-full overflow-hidden relative rounded-[10px]">
+                    <GlobalTradeScroller theme={theme} />
+                </div>
+            </div>
+
+            <main className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-10 z-10">
+
+                {activeNav === 'overview' && (
                 <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
-                    {/* Security & Maintenance Controls (COL 1-7) */}
+                    {/* Live metrics + global reach (COL 1-7) */}
                     <div className="lg:col-span-7 flex flex-col gap-8">
-                        {canSettings && (
-                        <AdminCard title="Security Protocols" icon={Shield} accent="#1A6140">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Maintenance Toggle */}
-                                <div className={`p-6 rounded-[24px] border ${platformSettings.maintenanceMode ? 'bg-[#1A6140]/10 border-[#1A6140]/40' : 'bg-white/5 border-white/5'} transition-all`}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`p-3 rounded-2xl ${platformSettings.maintenanceMode ? 'bg-[#1A6140] text-white' : 'bg-white/5 text-white/40'}`}>
-                                                <Settings size={20} className={platformSettings.maintenanceMode ? 'animate-spin-slow' : ''} />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-[11px] font-black uppercase">Maintenance Mode</h4>
-                                                <p className="text-[9px] opacity-40 font-bold uppercase mt-1">Full System Lock</p>
-                                            </div>
-                                        </div>
-                                        <button 
-                                            onClick={() => updateSettings({ maintenanceMode: !platformSettings.maintenanceMode })}
-                                            className={`w-14 h-8 rounded-full relative p-1 transition-all ${platformSettings.maintenanceMode ? 'bg-[#1A6140]' : 'bg-white/10'}`}
-                                        >
-                                            <motion.div 
-                                                animate={{ x: platformSettings.maintenanceMode ? 24 : 0 }}
-                                                className="w-6 h-6 rounded-full bg-white shadow-lg"
-                                            />
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] opacity-50 leading-relaxed font-medium">
-                                        Redirects all users to a maintenance screen. Prevents any interactions with the protocol.
-                                    </p>
-                                </div>
-
-                                {/* Trading Halted Toggle */}
-                                <div className={`p-6 rounded-[24px] border ${platformSettings.tradingHalted ? 'bg-red-500/10 border-red-500/40' : 'bg-white/5 border-white/5'} transition-all`}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`p-3 rounded-2xl ${platformSettings.tradingHalted ? 'bg-red-500 text-white' : 'bg-white/5 text-white/40'}`}>
-                                                <Lock size={20} />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-[11px] font-black uppercase">Trading Halted</h4>
-                                                <p className="text-[9px] opacity-40 font-bold uppercase mt-1">Kill Switch</p>
-                                            </div>
-                                        </div>
-                                        <button 
-                                            onClick={() => updateSettings({ tradingHalted: !platformSettings.tradingHalted })}
-                                            className={`w-14 h-8 rounded-full relative p-1 transition-all ${platformSettings.tradingHalted ? 'bg-red-500' : 'bg-white/10'}`}
-                                        >
-                                            <motion.div 
-                                                animate={{ x: platformSettings.tradingHalted ? 24 : 0 }}
-                                                className="w-6 h-6 rounded-full bg-white shadow-lg"
-                                            />
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] opacity-50 leading-relaxed font-medium">
-                                        Freezes all trading execution. Users can browse but cannot place bets.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 p-6 bg-amber-500/5 border border-amber-500/20 rounded-[28px] flex items-center gap-6">
-                                <AlertTriangle size={32} className="text-amber-500 flex-none" />
-                                <div>
-                                    <h4 className="text-[10px] font-black uppercase text-amber-500 mb-1">Warning: Admin Authority</h4>
-                                    <p className="text-[9px] font-medium opacity-60">Changes to security protocols propagate globally in real-time. Ensure node synchronization before proceeding with major maintenance windows.</p>
-                                </div>
-                            </div>
-                        </AdminCard>
-                        )}
-
                         <AdminCard title="Platform Metrics" icon={Activity} accent="#1A6140">
                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
-                                    { label: 'Total Volume', value: `$${parseFloat(stats.totalVolume).toLocaleString()}`, icon: DollarSign, color: '#1A6140' },
-                                    { label: 'Active Users', value: stats.activeUsers, icon: Users, color: '#3b82f6' },
-                                    { label: 'Total Trades', value: stats.totalTrades, icon: TrendingUp, color: '#f59e0b' },
-                                    { label: 'Treasury', value: `${parseFloat(stats.treasuryBalance).toFixed(2)} ARC`, icon: Zap, color: '#ef4444' }
+                                    { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: DollarSign, color: '#1A6140' },
+                                    { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, icon: BarChart3, color: '#3b82f6' },
+                                    { label: 'Registered Users', value: String(stats.totalWallets | 0), icon: Users, color: '#a855f7' },
+                                    { label: 'Users Live Now', value: String(stats.activeCount | 0), icon: Flame, color: '#22c55e' },
+                                    { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Zap, color: '#f59e0b' },
+                                    { label: 'Total Trades', value: String(stats.totalTrades | 0), icon: TrendingUp, color: '#14b8a6' },
+                                    { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, icon: Landmark, color: '#1A6140' },
+                                    { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), icon: AlertTriangle, color: '#ef4444' }
                                 ].map((stat, i) => (
                                     <div key={i} className={`p-4 rounded-2xl border ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5 shadow-inner'}`}>
                                         <div className="flex items-center gap-2 mb-2 opacity-40">
@@ -662,111 +652,19 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                              </div>
                         </AdminCard>
 
-                        <AdminCard title="Global User Presence" icon={Globe} accent="#3b82f6">
-                            <div className={`relative w-full aspect-[2/1] rounded-3xl overflow-hidden border ${isLight ? 'bg-[#1A6140]/5 border-[#1A6140]/10' : 'bg-black/40 border-white/5'}`}>
-                                {/* Simplified SVG World Map */}
-                                <svg className="w-full h-full opacity-20" viewBox="0 0 800 400" fill="currentColor">
-                                    <path d="M150,100 Q200,80 250,100 T350,120 T450,100 T550,80 T650,100 T750,120 L750,300 Q650,320 550,300 T450,280 T350,300 T250,320 T150,300 Z" opacity="0.5" />
-                                    <circle cx="200" cy="150" r="40" />
-                                    <circle cx="500" cy="200" r="60" />
-                                    <circle cx="650" cy="120" r="30" />
-                                </svg>
-                                
-                                {/* Live Pulsing Pins */}
-                                <AnimatePresence>
-                                    {liveUsers.map(user => (
-                                        <motion.div
-                                            key={user.id}
-                                            initial={{ scale: 0, opacity: 0 }}
-                                            animate={{ scale: 1, opacity: 1 }}
-                                            exit={{ scale: 2, opacity: 0 }}
-                                            className="absolute w-3 h-3 bg-blue-500 rounded-full shadow-[0_0_15px_#3b82f6]"
-                                            style={{ left: `${user.x}%`, top: `${user.y}%` }}
-                                        >
-                                            <div className="absolute inset-x-[-4px] inset-y-[-4px] border-2 border-blue-500 rounded-full animate-ping" />
-                                        </motion.div>
-                                    ))}
-                                </AnimatePresence>
-                                
-                                <div className="absolute bottom-4 left-6 flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Live Incoming Traffic</span>
+                        <AdminCard title="Global Reach" icon={Globe} accent="#3b82f6">
+                            <div className={`relative w-full h-[460px] rounded-3xl overflow-hidden border ${isLight ? 'bg-[#1A6140]/[0.06] border-[#1A6140]/10' : 'bg-black/40 border-white/5'}`}>
+                                <AdminGlobe theme={theme} countries={stats.userCountries} pulse={pulse} />
+                                <div className="absolute bottom-4 left-6 flex items-center gap-2 pointer-events-none">
+                                    <div className="w-2 h-2 rounded-full bg-[#3CB371] animate-pulse" />
+                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Users by country · live trade flashes</span>
                                 </div>
                             </div>
                         </AdminCard>
                     </div>
 
-                    {/* Broadcast Center (COL 8-12) */}
+                    {/* Recent Activity (COL 8-12) */}
                     <div className="lg:col-span-5">
-                        {canBroadcast && (
-                        <AdminCard title="Broadcast Center" icon={Radio} accent="#1A6140">
-                            <div className="flex flex-col gap-6">
-                                <div>
-                                    <label className="text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1">Live Message</label>
-                                    <textarea 
-                                        value={broadcastText}
-                                        onChange={(e) => setBroadcastText(e.target.value)}
-                                        placeholder="Enter system broadcast message..."
-                                        className={`w-full min-h-[140px] p-6 rounded-3xl border text-sm font-bold resize-none transition-all outline-none ${isLight ? 'bg-white border-[#1A6140]/10 focus:border-[#1A6140]/40' : 'bg-black/40 border-white/10 focus:border-[#1A6140]/30'}`}
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1">Persistence (Min)</label>
-                                        <div className="flex items-center gap-3">
-                                            {[1, 10, 60].map(m => (
-                                                <button 
-                                                    key={m}
-                                                    onClick={() => setBroadcastDuration(m * 60)}
-                                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#1A6140] text-white border-[#1A6140]' : 'bg-white/5 border-white/5 opacity-50 hover:opacity-100'}`}
-                                                >
-                                                    {m}m
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1">Alert Level</label>
-                                        <div className="flex items-center gap-3">
-                                            {['info', 'success', 'warning', 'error'].map(level => (
-                                                <button 
-                                                    key={level}
-                                                    onClick={() => updateSettings({ bannerLevel: level })}
-                                                    className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${platformSettings.bannerLevel === level ? 'ring-2 ring-[#1A6140] border-transparent' : 'border-white/10 opacity-30 shadow-sm'}`}
-                                                    style={{ backgroundColor: level === 'info' ? '#3b82f6' : level === 'success' ? '#1A6140' : level === 'warning' ? '#f59e0b' : '#ef4444' }}
-                                                >
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button 
-                                    onClick={handleUpdateBroadcast}
-                                    disabled={isSaving || !broadcastText}
-                                    className="w-full py-5 bg-[#1A6140] text-white rounded-3xl font-black uppercase tracking-[0.3em] text-[10px] shadow-[0_20px_40px_-10px_rgba(26, 97, 64,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
-                                >
-                                    <div className="flex items-center justify-center gap-3">
-                                        <Radio size={16} />
-                                        <span>Transmit Broadcast</span>
-                                    </div>
-                                </button>
-
-                                <div className={`p-5 rounded-2xl border ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-white/[0.03] border-white/5'}`}>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <Activity size={14} className="text-[#1A6140]" />
-                                        <h4 className="text-[10px] font-black uppercase">Current Transmission</h4>
-                                    </div>
-                                    <p className="text-[11px] font-bold opacity-60 leading-relaxed italic">
-                                        {platformSettings.systemBanner || "No active manual broadcast. Platform running standard tickers."}
-                                    </p>
-                                </div>
-                            </div>
-                        </AdminCard>
-                        )}
-
                         <AdminCard title="Recent Activity" icon={Clock} accent="#f59e0b">
                             <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto no-scrollbar">
                                 {recentActivity.length === 0 ? (
@@ -816,8 +714,169 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 </div>
                 )}
 
+                {/* SECURITY — protocols & broadcasts; the roster card renders below */}
+                {activeNav === 'security' && (
+                    <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        <div className="lg:col-span-7 flex flex-col gap-8">
+                            {canSettings && (
+                        <AdminCard title="Security Protocols" icon={Shield} accent="#1A6140">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Maintenance Toggle */}
+                                <div className={`p-6 rounded-[24px] border ${platformSettings.maintenanceMode ? 'bg-[#1A6140]/10 border-[#1A6140]/40' : 'bg-white/5 border-white/5'} transition-all`}>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-3 rounded-2xl ${platformSettings.maintenanceMode ? 'bg-[#1A6140] text-white' : 'bg-white/5 text-white/40'}`}>
+                                                <Settings size={20} className={platformSettings.maintenanceMode ? 'animate-spin-slow' : ''} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-[11px] font-black uppercase">Maintenance Mode</h4>
+                                                <p className="text-[9px] opacity-40 font-bold uppercase mt-1">Full System Lock</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => updateSettings({ maintenanceMode: !platformSettings.maintenanceMode })}
+                                            className={`w-14 h-8 rounded-full relative p-1 transition-all ${platformSettings.maintenanceMode ? 'bg-[#1A6140]' : 'bg-white/10'}`}
+                                        >
+                                            <motion.div
+                                                animate={{ x: platformSettings.maintenanceMode ? 24 : 0 }}
+                                                className="w-6 h-6 rounded-full bg-white shadow-lg"
+                                            />
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] opacity-50 leading-relaxed font-medium">
+                                        Redirects all users to a maintenance screen. Prevents any interactions with the protocol.
+                                    </p>
+                                </div>
+
+                                {/* Trading Halted Toggle */}
+                                <div className={`p-6 rounded-[24px] border ${platformSettings.tradingHalted ? 'bg-red-500/10 border-red-500/40' : 'bg-white/5 border-white/5'} transition-all`}>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-3 rounded-2xl ${platformSettings.tradingHalted ? 'bg-red-500 text-white' : 'bg-white/5 text-white/40'}`}>
+                                                <Lock size={20} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-[11px] font-black uppercase">Trading Halted</h4>
+                                                <p className="text-[9px] opacity-40 font-bold uppercase mt-1">Kill Switch</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => updateSettings({ tradingHalted: !platformSettings.tradingHalted })}
+                                            className={`w-14 h-8 rounded-full relative p-1 transition-all ${platformSettings.tradingHalted ? 'bg-red-500' : 'bg-white/10'}`}
+                                        >
+                                            <motion.div
+                                                animate={{ x: platformSettings.tradingHalted ? 24 : 0 }}
+                                                className="w-6 h-6 rounded-full bg-white shadow-lg"
+                                            />
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] opacity-50 leading-relaxed font-medium">
+                                        Freezes all trading execution. Users can browse but cannot place bets.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-8 p-6 bg-amber-500/5 border border-amber-500/20 rounded-[28px] flex items-center gap-6">
+                                <AlertTriangle size={32} className="text-amber-500 flex-none" />
+                                <div>
+                                    <h4 className="text-[10px] font-black uppercase text-amber-500 mb-1">Warning: Admin Authority</h4>
+                                    <p className="text-[9px] font-medium opacity-60">Changes to security protocols propagate globally in real-time. Ensure node synchronization before proceeding with major maintenance windows.</p>
+                                </div>
+                            </div>
+                        </AdminCard>
+                            )}
+                        </div>
+
+                        <div className="lg:col-span-5 flex flex-col gap-8">
+                            {canBroadcast && (
+                        <AdminCard title="Broadcast Center" icon={Radio} accent="#1A6140">
+                            <div className="flex flex-col gap-6">
+                                <div>
+                                    <label className={`text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1 ${isLight ? 'text-black' : 'text-white'}`}>Live Message</label>
+                                    <textarea
+                                        value={broadcastText}
+                                        onChange={(e) => setBroadcastText(e.target.value)}
+                                        placeholder="Enter system broadcast message..."
+                                        className={`w-full min-h-[140px] p-6 rounded-3xl border text-sm font-bold resize-none transition-all outline-none ${isLight ? 'bg-white border-[#1A6140]/10 focus:border-[#1A6140]/40' : 'bg-black/40 border-white/10 focus:border-[#1A6140]/30'}`}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className={`text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1 ${isLight ? 'text-black' : 'text-white'}`}>Persistence (Min)</label>
+                                        <div className="flex items-center gap-3">
+                                            {[1, 10, 60].map(m => (
+                                                <button
+                                                    key={m}
+                                                    onClick={() => setBroadcastDuration(m * 60)}
+                                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#1A6140] text-white border-[#1A6140]' : 'bg-white/5 border-white/5 opacity-50 hover:opacity-100'}`}
+                                                >
+                                                    {m}m
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className={`text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1 ${isLight ? 'text-black' : 'text-white'}`}>Alert Level</label>
+                                        <div className="flex items-center gap-3">
+                                            {['info', 'success', 'warning', 'error'].map(level => (
+                                                <button
+                                                    key={level}
+                                                    onClick={() => updateSettings({ bannerLevel: level })}
+                                                    className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${platformSettings.bannerLevel === level ? 'ring-2 ring-[#1A6140] border-transparent' : 'border-white/10 opacity-30 shadow-sm'}`}
+                                                    style={{ backgroundColor: level === 'info' ? '#3b82f6' : level === 'success' ? '#1A6140' : level === 'warning' ? '#f59e0b' : '#ef4444' }}
+                                                >
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleUpdateBroadcast}
+                                    disabled={isSaving || !broadcastText}
+                                    className="w-full py-5 bg-[#1A6140] text-white rounded-3xl font-black uppercase tracking-[0.3em] text-[10px] shadow-[0_20px_40px_-10px_rgba(26, 97, 64,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                                >
+                                    <div className="flex items-center justify-center gap-3">
+                                        <Radio size={16} />
+                                        <span>Transmit Broadcast</span>
+                                    </div>
+                                </button>
+
+                                <div className={`p-5 rounded-2xl border ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-white/[0.03] border-white/5'}`}>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <Activity size={14} className="text-[#1A6140]" />
+                                        <h4 className="text-[10px] font-black uppercase">Current Transmission</h4>
+                                    </div>
+                                    <p className="text-[11px] font-bold opacity-60 leading-relaxed italic">
+                                        {platformSettings.systemBanner || "No active manual broadcast. Platform running standard tickers."}
+                                    </p>
+                                </div>
+                            </div>
+                        </AdminCard>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Withdrawal Management — sub-tab switch for the queue and referral */}
+                {activeNav === 'withdrawals' && (
+                    <div className="max-w-[1400px] mx-auto flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar">
+                        {[['requests', 'Withdrawal Requests'], ['referral', 'Referral Program']].map(([k, l]) => (
+                            <button
+                                key={k}
+                                onClick={() => setWdSection(k)}
+                                className={`px-4 md:px-5 py-3 rounded-2xl border text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${wdSection === k ? 'bg-[#1A6140] text-white border-[#1A6140] shadow-lg shadow-[#1A6140]/20' : isLight ? 'bg-white/60 border-black/10 text-black/50 hover:text-black' : 'bg-white/5 border-white/10 text-white/40 hover:text-white'}`}
+                            >
+                                {l}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {/* Withdrawal Requests tab — approve pays out, cancel emails the user */}
-                {adminTab === 'requests' && (
+                {activeNav === 'withdrawals' && wdSection === 'requests' && (
                     <AdminCard title="Withdrawal Requests" icon={Gift} accent="#1A6140">
                         <div className="flex flex-col gap-4">
                             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -903,7 +962,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 )}
 
                 {/* Referral Program Management tab — suspend/rate/slash */}
-                {adminTab === 'referral' && (
+                {activeNav === 'withdrawals' && wdSection === 'referral' && (
                     <AdminCard title="Referral Program Management" icon={Gift} accent="#1A6140">
                         <div className="flex flex-col gap-4">
                             {/* Enrolled-user search */}
@@ -1048,8 +1107,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </div>
                     </AdminCard>
                 )}
-            {/* Admins & Moderators (root-only) — Supabase Auth identity */}
-            {adminTab === 'admins' && isRoot && (
+            {/* Admins & Moderators (root-only) — inside Security section */}
+            {activeNav === 'security' && isRoot && (
                 <AdminCard title="Admins & Moderators" icon={Shield} accent="#1A6140">
                     <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1239,6 +1298,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 )}
             </AnimatePresence>
             </main>
+
+            </div>
 
             {/* Persistence Layer Status */}
             <footer className={`flex-none p-5 border-t backdrop-blur-3xl px-10 flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#050505]/50 border-white/5'}`}>

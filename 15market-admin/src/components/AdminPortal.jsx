@@ -178,7 +178,7 @@ export function AdminPortal({ onBack, notify }) {
                 <div className={`absolute bottom-[-12%] left-[-8%] w-[520px] h-[520px] rounded-full blur-[130px] ${isLight ? 'bg-[#1A6140]/6' : 'bg-[#1A6140]/5'}`} />
             </div>
 
-            {/* Top bar — same round back chip as the user auth page */}
+            {/* Top bar — back chip only; the brand shows as the logo below */}
             <div className="flex-none flex items-center justify-between px-5 z-10" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}>
                 <button
                     onClick={onBack || (() => window.location.href = '/')}
@@ -187,10 +187,7 @@ export function AdminPortal({ onBack, notify }) {
                 >
                     <ArrowLeft size={18} />
                 </button>
-                <div className="flex items-center gap-2">
-                    <div className={isLight ? 'text-[13px] font-black uppercase tracking-tighter text-[#0a261a]' : 'text-[13px] font-black uppercase tracking-tighter text-white'}>15market</div>
-                    <div className="px-2.5 py-1 rounded-full bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest shadow-[0_0_18px_-4px_rgba(26,97,64,0.7)]">Admin</div>
-                </div>
+                <div className="w-10" />
             </div>
 
             {/* Centered column — content directly on the canvas, no card.
@@ -200,15 +197,15 @@ export function AdminPortal({ onBack, notify }) {
                 <div className="w-full max-w-md flex flex-col items-center m-auto">
                     <AnimatePresence mode="wait">
                         <motion.div key={needsBootstrap ? 'bootstrap' : 'login'} {...stepAnim} className="w-full flex flex-col items-center">
-                            <div className="w-16 h-16 rounded-3xl bg-[#1A6140] flex items-center justify-center shadow-[0_0_45px_-8px_rgba(26,97,64,0.65)] mb-6">
-                                <Shield size={26} className="text-white" />
-                            </div>
+                            <img
+                                src="/logo.png"
+                                alt="15market"
+                                className="w-24 h-24 object-contain mb-5"
+                                style={{ filter: 'drop-shadow(0 0 26px rgba(26,97,64,0.45))' }}
+                            />
                             <h1 className={`text-3xl font-black uppercase tracking-tighter text-center ${ink}`}>
-                                {needsBootstrap ? '15market' : 'Admin Citadel'}
+                                15market
                             </h1>
-                            <p className={`text-xs font-bold uppercase tracking-widest mt-2 mb-8 text-center ${inkSoft}`}>
-                                {needsBootstrap ? 'One-time root admin setup' : 'Ops console — email & password'}
-                            </p>
 
                             <div className="w-full flex flex-col gap-3">
                                 {needsBootstrap ? (
@@ -233,7 +230,7 @@ export function AdminPortal({ onBack, notify }) {
                                             value={bootPassword}
                                             onChange={e => setBootPassword(e.target.value)}
                                             onKeyDown={e => e.key === 'Enter' && bootEmail && bootPassword.length >= 8 && handleBootstrap()}
-                                            placeholder="Master password (min 8)"
+                                            placeholder="Password (min 8)"
                                             className={`${inputCls} !tracking-normal !text-base`}
                                         />
                                         <button
@@ -241,10 +238,10 @@ export function AdminPortal({ onBack, notify }) {
                                             disabled={busy === 'bootstrap' || !bootEmail.trim() || bootPassword.length < 8}
                                             className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#1A6140] text-white shadow-[0_0_35px_-8px_rgba(26,97,64,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
                                         >
-                                            {busy === 'bootstrap' ? <Loader2 size={18} className="animate-spin" /> : <><UserPlus size={18} /> Create root admin</>}
+                                            {busy === 'bootstrap' ? <Loader2 size={18} className="animate-spin" /> : <><UserPlus size={18} /> Continue</>}
                                         </button>
                                         <p className={`text-[10px] font-bold text-center leading-relaxed mt-1 ${inkSoft}`}>
-                                            Shown only while no admin exists. The account created here is the permanent root — only it can mint further admins and moderators. {bootStatus?.rootEmailLocked ? 'Setup is locked to the configured root email.' : ''}
+                                            Secure your account with a password. One-time setup.
                                         </p>
                                     </>
                                 ) : (
@@ -279,20 +276,12 @@ export function AdminPortal({ onBack, notify }) {
                                         >
                                             {busy === 'login' ? <Loader2 size={18} className="animate-spin" /> : <><Lock size={18} /> Sign in</>}
                                         </button>
-                                        <p className={`text-[10px] font-bold text-center leading-relaxed mt-1 ${inkSoft}`}>
-                                            Lost access? The root admin's identity can be run from Supabase Auth (Authentication → Users) to restore entry.
-                                        </p>
                                     </>
                                 )}
                             </div>
                         </motion.div>
                     </AnimatePresence>
                 </div>
-            </div>
-
-            {/* Footer strip — like the user auth page's subtle close */}
-            <div className={`flex-none pb-6 text-center text-[9px] font-bold uppercase tracking-widest ${inkSoft}`}>
-                Supabase Auth · permission-gated ops
             </div>
         </motion.div>
     );
