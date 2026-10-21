@@ -180,9 +180,11 @@ export function AdminPortal({ onBack, notify }) {
                 </div>
             </div>
 
-            {/* Centered column — content directly on the canvas, no card */}
-            <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center px-6 py-10 relative z-10">
-                <div className="w-full max-w-md flex flex-col items-center">
+            {/* Centered column — content directly on the canvas, no card.
+                justify-start + auto margins so a tall form scrolls instead of
+                clipping its heading like justify-center would. */}
+            <div className="flex-1 overflow-y-auto flex flex-col px-6 py-10 relative z-10">
+                <div className="w-full max-w-md flex flex-col items-center m-auto">
                     <AnimatePresence mode="wait">
                         <motion.div key={needsBootstrap ? 'bootstrap' : 'login'} {...stepAnim} className="w-full flex flex-col items-center">
                             <div className="w-16 h-16 rounded-3xl bg-[#1A6140] flex items-center justify-center shadow-[0_0_45px_-8px_rgba(26,97,64,0.65)] mb-6">
