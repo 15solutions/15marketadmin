@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePrivy, useLoginWithEmail, useLoginWithOAuth, useWallets } from '@privy-io/react-auth';
+import { usePrivy, useLoginWithEmail, useLoginWithOAuth, useWallets, useCreateWallet } from '@privy-io/react-auth';
 import { useConnect, useAccount } from 'wagmi';
 import { isValidUsername, usernameFormatError, USERNAME_RULES_TEXT } from '../utils/validate';
 import { injected } from 'wagmi/connectors';
@@ -62,13 +62,19 @@ function UsernameStatus({ value, check, isLight }) {
     if (check.state === 'checking') {
         return <div className={`${base} ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>Checking availability…</div>;
     }
+    if (check.state === 'invalid') {
+        // Format problem (too short, too long, special chars) stated plainly —
+        // a format issue on the server (/profiles/username returns
+        // reason: 'format') also shows this instead of "taken".
+        return <div className={`${base} text-[#EF5350]`}>{check.reason || 'Username must be at least 6 characters.'}</div>;
+    }
     if (check.state === 'taken') {
         return <div className={`${base} text-[#EF5350]`}>That username is taken.</div>;
     }
     if (check.state === 'free') {
         return <div className={`${base} text-[#1A6140]`}>Available ✓</div>;
     }
-    return <div className={`${base} ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>3–20 letters, numbers or underscores.</div>;
+    return <div className={`${base} ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>6–20 letters or numbers — no special characters.</div>;
 }
 
 export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }) {
@@ -229,7 +235,17 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     // have no wagmi address — without this fallback their finale could never
     // save).
     const { wallets } = useWallets();
-    const embeddedAddress = (wallets || []).find(w => w.walletClientType === 'privy')?.address || null;
+    const { createWallet } = useCreateWallet();
+    // Embedded wallets are the signup authority: external (wagmi) first, then
+    // a Privy-created wallet. Detection tolerates SDK shape differences —
+    // walletClientType 'privy' OR wallet.type 'privy' — and as a last resort
+    // any connected wallet that owns an address.
+    const embeddedAddress = (wallets || []).find(w =>
+        w?.address && (w.walletClientType === 'privy' || w.type === 'privy')
+    )?.address
+        || (wallets || []).find(w => w?.address && w?.connected)?.address
+        || (wallets || []).find(w => w?.address)?.address
+        || null;
     const identityAddress = wagmiAddress || embeddedAddress || null;
     // Live refs so the waiter below always reads the newest values, not the
     // render closure it was created in.
@@ -237,20 +253,39 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     wagmiRef.current = wagmiAddress || null;
     const walletsRef = useRef([]);
     walletsRef.current = wallets || [];
-    // Embedded wallets provision a few seconds AFTER login. The finale used
-    // to fail instantly here ("wallet not ready") instead of waiting — now it
-    // polls briefly for the address to appear.
-    const resolveIdentityAddress = (timeoutMs = 20000) => new Promise((resolveAddr, rejectAddr) => {
+    const createWalletRef = useRef(null);
+    createWalletRef.current = createWallet;
+    // Embedded wallets provision a few seconds AFTER login. The finale used to
+    // fail instantly ("wallet not ready"). Now it polls for up to 60s, and if
+    // nothing has appeared after 6s it explicitly asks Privy to create the
+    // embedded wallet (covers logins where auto-creation is still queued — this
+    // guarantees "we cannot create a new 15market user account" can only happen
+    // if Privy itself is unreachable, after a very long, visible wait).
+    const resolveIdentityAddress = (timeoutMs = 60000) => new Promise((resolveAddr, rejectAddr) => {
         const started = Date.now();
+        let requested = false;
         const tick = () => {
             const w = wagmiRef.current;
-            const emb = (walletsRef.current || []).find(x => x?.walletClientType === 'privy')?.address || null;
+            const list = walletsRef.current || [];
+            const emb = list.find(x => x?.address && (x.walletClientType === 'privy' || x.type === 'privy'))?.address
+                || list.find(x => x?.address && x?.connected)?.address
+                || list.find(x => x?.address)?.address
+                || null;
             const addr = w || emb;
             if (addr) return resolveAddr(addr);
-            if (Date.now() - started >= timeoutMs) {
-                return rejectAddr(new Error('Wallet not ready yet. Check your connection and retry.'));
+            if (!requested && Date.now() - started >= 6000 && createWalletRef.current) {
+                // Nudge Privy once — the wallet may simply not have been created
+                // yet (referral-link entries, OAuth logins, cold-backed sessions).
+                requested = true;
+                try {
+                    const p = createWalletRef.current();
+                    if (p && typeof p.catch === 'function') p.catch(() => {});
+                } catch { /* hook unavailable; keep polling */ }
             }
-            setTimeout(tick, 500);
+            if (Date.now() - started >= timeoutMs) {
+                return rejectAddr(new Error('Your wallet is still syncing. Check your connection and try again in a moment.'));
+            }
+            setTimeout(tick, 300);
         };
         tick();
     });
@@ -279,8 +314,14 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
     const checkUsername = (value, addrOverride) => {
         const v = String(value || '').trim();
         if (!v) { setNameCheck({ state: 'idle', forValue: '' }); return; }
-        if (!/^[A-Za-z0-9_]{3,20}$/.test(v)) {
-            setNameCheck({ state: 'invalid', forValue: v });
+        if (!/^[A-Za-z0-9]{6,20}$/.test(v)) {
+            // Local format gate — say exactly WHY it is invalid, never "taken".
+            const reason = v.length < 6
+                ? 'Username must be at least 6 characters.'
+                : v.length > 20
+                    ? 'Username can be at most 20 characters.'
+                    : 'No special characters — letters and numbers only.';
+            setNameCheck({ state: 'invalid', forValue: v, reason });
             return;
         }
         setNameCheck({ state: 'checking', forValue: v });
