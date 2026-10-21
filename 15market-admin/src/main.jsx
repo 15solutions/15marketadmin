@@ -1,28 +1,14 @@
-import { Buffer } from 'buffer';
-
-window.Buffer = Buffer;
-window.global = window;
-
-import React from 'react';
+import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 
-import { WagmiProvider } from 'wagmi';
-import { wagmiConfig } from './wagmiConfig';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-const queryClient = new QueryClient();
-
+// Plain render — the admin portal is a standalone identity app (Supabase
+// Auth). No Privy, no wagmi, no Reown: old wallet-connect architecture
+// removed from the console entirely.
 try {
     ReactDOM.createRoot(document.getElementById('root')).render(
-        <React.StrictMode>
-            <WagmiProvider config={wagmiConfig}>
-                <QueryClientProvider client={queryClient}>
-                    <App />
-                </QueryClientProvider>
-            </WagmiProvider>
-        </React.StrictMode>
+        <App />
     );
 } catch (error) {
     console.error('FATAL RENDER ERROR:', error);

@@ -1,7 +1,9 @@
-import React, { Suspense } from 'react';
-import SimpleAdmin from './components/SimpleAdmin';
+import React, { Suspense, lazy } from 'react';
 
-const AdminPortal = React.lazy(() => import('./components/AdminPortal'));
+// The Admin Portal — Supabase Auth identity (email + password), mounted as
+// the entire app of this standalone project on port 3001. There is no user
+// side here and no route branching: this console is its own deployment.
+const AdminPortal = lazy(() => import('./components/AdminPortal'));
 
 // Simple Error Boundary for Lazy Load
 class ErrorBoundary extends React.Component {
@@ -15,10 +17,9 @@ class ErrorBoundary extends React.Component {
     render() {
         if (this.state.hasError) {
             return (
-                <div>
-                    <SimpleAdmin />
-                    <div style={{ padding: '20px', color: 'red', background: '#330000', borderTop: '1px solid #ff4444' }}>
-                        <h3 style={{ margin: 0 }}>CRITICAL ERROR:</h3>
+                <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ padding: '20px', color: 'red', background: '#330000', borderTop: '1px solid #ff4444', flex: 1, overflow: 'auto' }}>
+                        <h3 style={{ margin: 0 }}>Admin console error:</h3>
                         <pre style={{ overflow: 'auto', marginTop: '10px' }}>{this.state.error.toString()}</pre>
                     </div>
                 </div>
@@ -29,38 +30,19 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
-    const [price, setPrice] = React.useState(0);
-
-    React.useEffect(() => {
-        const fetchPrice = async () => {
-            try {
-                const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT');
-                const data = await res.json();
-                setPrice(parseFloat(data.price));
-            } catch (e) {
-                console.error("Price fetch failed", e);
-            }
-        };
-        fetchPrice();
-        const interval = setInterval(fetchPrice, 5000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const handleBack = React.useCallback(() => console.log("Back"), []);
-
     return (
         <ErrorBoundary>
             <Suspense fallback={
-                <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#09090b', color: '#fff' }}>
+                <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050505', color: '#fff' }}>
                     <div className="animate-pulse flex flex-col items-center">
-                        <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Initializing Admin Portal...</h2>
-                        <p style={{ color: '#71717a' }}>Connecting to RPC & Syncing State</p>
+                        <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', fontFamily: '"Comfortaa", sans-serif' }}>15market Admin</h2>
+                        <p style={{ color: '#71717a' }}>Mounting ops console…</p>
                     </div>
                 </div>
             }>
                 <AdminPortal
-                    onBack={handleBack}
-                    price={price}
+                    onBack={() => {}}
+                    notify={(msg) => console.log('[notify]', msg)}
                 />
             </Suspense>
         </ErrorBoundary>

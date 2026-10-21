@@ -7,9 +7,12 @@ export const ARC_RPC_OFFICIAL = "https://rpc.testnet.arc.io";
 export const ARC_RPC = ARC_RPC_DRPC_OFFICIAL;
 export const ARC_RPC_FALLBACK = ARC_RPC_DRPC_PROXY;
 
-// Project ID
-export const projectId = import.meta.env.VITE_REOWN_PROJECT_ID;
-export const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN;
+// ─── Supabase Auth (admin portal identity) ──────────────────────────────
+// Admins sign in with email+password against Supabase Auth; the browser only
+// ever needs the project URL + anon key (public by design — RLS on admin_users
+// blocks anon access, the backend verifies. Migration 011).
+export const SUPABASE_AUTH_URL = import.meta.env.VITE_SUPABASE_AUTH_URL || import.meta.env.VITE_SUPABASE_URL || 'https://cwzbdxvninfagfbaehre.supabase.co';
+export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const isLocal = typeof window !== 'undefined' && 
     (window.location.hostname === 'localhost' || 
      window.location.hostname === '127.0.0.1' || 
