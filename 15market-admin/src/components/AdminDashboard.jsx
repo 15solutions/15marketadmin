@@ -50,7 +50,8 @@ import { AdminGlobe, COUNTRY_CENTER } from "./AdminGlobe";
 // Management" hosts the request queue and the referral controls as
 // sub-tabs; "Security" hosts protocols, broadcasts and the admin roster.
 const NAV = [
-    { key: 'overview', label: 'Overview', hint: 'Metrics · Global reach', icon: LayoutDashboard },
+    { key: 'overview', label: 'Overview', hint: 'Metrics · Trade index', icon: LayoutDashboard },
+    { key: 'analytics', label: 'Analytics', hint: 'Globe · Reach · Users', icon: Globe },
     { key: 'withdrawals', label: 'Withdrawal Management', hint: 'Requests · Referral', icon: Landmark },
     { key: 'security', label: 'Security', hint: 'Protocols · Broadcast · Team', icon: Shield }
 ];
@@ -615,108 +616,149 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             {/* Main column */}
             <div className="flex-1 flex flex-col min-w-0">
 
-            {/* Market scroller strip — same participation feed as the user side */}
-            <div className="flex-none px-4 pt-3">
-                <div className="max-w-[1400px] mx-auto w-full overflow-hidden relative rounded-[10px]">
-                    <GlobalTradeScroller theme={theme} />
+                {/* Market scroller strip — same participation feed as the user side */}
+                <div className="flex-none px-4 pt-3">
+                    <div className="w-full overflow-hidden relative rounded-[10px]">
+                        <GlobalTradeScroller theme={theme} />
+                    </div>
                 </div>
-            </div>
 
-            <main className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-10 z-10">
+            <main className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-6 lg:p-8 z-10">
 
                 {activeNav === 'overview' && (
-                <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    
-                    {/* Live metrics + global reach (COL 1-7) */}
-                    <div className="lg:col-span-7 flex flex-col gap-8">
-                        <AdminCard title="Platform Metrics" icon={Activity} accent="#1A6140">
-                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {[
-                                    { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: DollarSign, color: '#1A6140' },
-                                    { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, icon: BarChart3, color: '#3b82f6' },
-                                    { label: 'Registered Users', value: String(stats.totalWallets | 0), icon: Users, color: '#a855f7' },
-                                    { label: 'Users Live Now', value: String(stats.activeCount | 0), icon: Flame, color: '#22c55e' },
-                                    { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Zap, color: '#f59e0b' },
-                                    { label: 'Total Trades', value: String(stats.totalTrades | 0), icon: TrendingUp, color: '#14b8a6' },
-                                    { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, icon: Landmark, color: '#1A6140' },
-                                    { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), icon: AlertTriangle, color: '#ef4444' }
-                                ].map((stat, i) => (
-                                    <div key={i} className={`p-4 rounded-2xl border ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5 shadow-inner'}`}>
-                                        <div className="flex items-center gap-2 mb-2 opacity-40">
-                                            <stat.icon size={12} style={{ color: stat.color }} />
-                                            <span className="text-[8px] font-black uppercase tracking-widest">{stat.label}</span>
-                                        </div>
-                                        <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
-                                    </div>
-                                ))}
-                             </div>
-                        </AdminCard>
+                <div className="w-full flex flex-col gap-6 min-w-0">
 
-                        <AdminCard title="Global Reach" icon={Globe} accent="#3b82f6">
-                            <div className={`relative w-full h-[460px] rounded-3xl overflow-hidden border ${isLight ? 'bg-[#1A6140]/[0.06] border-[#1A6140]/10' : 'bg-black/40 border-white/5'}`}>
-                                <AdminGlobe theme={theme} countries={stats.userCountries} pulse={pulse} />
-                                <div className="absolute bottom-4 left-6 flex items-center gap-2 pointer-events-none">
-                                    <div className="w-2 h-2 rounded-full bg-[#3CB371] animate-pulse" />
-                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Users by country · live trade flashes</span>
+                    {/* Headline ops metrics — full width, responsive */}
+                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                        {[
+                            { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: DollarSign, color: '#1A6140' },
+                            { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, icon: BarChart3, color: '#3b82f6' },
+                            { label: 'Users Live Now', value: String(stats.activeCount | 0), icon: Flame, color: '#22c55e' },
+                            { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Zap, color: '#f59e0b' }
+                        ].map((stat, i) => (
+                            <div key={i} className={`p-5 md:p-6 rounded-3xl border ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'} shadow-[0_0_40px_-18px_rgba(26,97,64,0.35)]`}>
+                                <div className="flex items-center gap-2 mb-3 opacity-40">
+                                    <stat.icon size={13} style={{ color: stat.color }} />
+                                    <span className="text-[8px] font-black uppercase tracking-widest">{stat.label}</span>
                                 </div>
+                                <div className={`text-2xl font-black tracking-tighter truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
                             </div>
-                        </AdminCard>
+                        ))}
                     </div>
 
-                    {/* Recent Activity (COL 8-12) */}
-                    <div className="lg:col-span-5">
-                        <AdminCard title="Recent Activity" icon={Clock} accent="#f59e0b">
-                            <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto no-scrollbar">
-                                {recentActivity.length === 0 ? (
-                                    <div className="py-10 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
-                                        No recent trades detected
-                                    </div>
-                                ) : (
-                                    recentActivity.map((act, i) => (
-                                        <motion.div 
-                                            initial={{ x: -20, opacity: 0 }}
-                                            animate={{ x: 0, opacity: 1 }}
-                                            key={act.id || i}
-                                            className={`p-3 rounded-2xl border flex items-center justify-between ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
-                                                    {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.avatar ? (
-                                                        <img 
-                                                            src={userProfiles[(act.userAddr || act.owner || "").toLowerCase()].avatar} 
-                                                            className="w-full h-full object-cover"
-                                                            alt=""
-                                                        />
-                                                    ) : (
-                                                        act.direction === 'UP' ? <TrendingUp size={14} /> : <TrendingUp size={14} className="rotate-180" />
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <div className="text-[10px] font-black uppercase flex items-center gap-2">
-                                                        {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.username || `${(act.userAddr || act.owner || "0x").slice(0, 6)}...`}
-                                                        {act.type === 'TRADE_PLACED' && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
-                                                    </div>
-                                                    <div className="text-[8px] opacity-40 font-bold uppercase">{act.symbol} • ${act.amount}</div>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className={`text-[10px] font-black ${act.won ? 'text-[#1A6140]' : (act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
-                                                    {act.type === 'TRADE_PLACED' ? 'PENDING' : (act.won ? `+$${act.payout}` : 'LOST')}
-                                                </div>
-                                                <div className="text-[8px] opacity-20 font-mono capitalize">{new Date(act.timestamp).toLocaleTimeString()}</div>
-                                            </div>
-                                        </motion.div>
-                                    ))
-                                )}
+                    {/* Platform trade index — every trade lands under the metrics */}
+                    <AdminCard title="Platform Trades" icon={TrendingUp} accent="#1A6140">
+                        <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-4">
+                                <div>
+                                    <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>{String(recentActivity.length).padStart(2, '0')}</div>
+                                    <div className="text-[8px] font-black uppercase tracking-widest opacity-40">Indexed in feed</div>
+                                </div>
+                                <div className={`h-8 w-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
+                                <div>
+                                    <div className={`text-lg font-black tracking-tighter text-[#1A6140]`}>{stats.totalTrades | 0}</div>
+                                    <div className="text-[8px] font-black uppercase tracking-widest opacity-40">Lifetime total</div>
+                                </div>
                             </div>
-                        </AdminCard>
-                     </div>
+                            <div className="flex items-center gap-2">
+                                <Clock size={12} className="opacity-40" />
+                                <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Held while this page is open</span>
+                            </div>
+                        </div>
+
+                        {/* Column legend (desktop) */}
+                        <div className={`hidden lg:grid grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] gap-3 px-3 pb-2 text-[7px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
+                            <span>#</span><span>Trader</span><span>Market</span><span>Side</span><span>Amount</span><span>Result</span><span>Time</span>
+                        </div>
+                        <div className="flex flex-col gap-2 max-h-[560px] overflow-y-auto no-scrollbar">
+                            {recentActivity.length === 0 ? (
+                                <div className="py-10 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
+                                    No trades detected yet
+                                </div>
+                            ) : (
+                                recentActivity.map((act, i) => (
+                                    <motion.div
+                                        initial={{ x: -16, opacity: 0 }}
+                                        animate={{ x: 0, opacity: 1 }}
+                                        key={act.id || `${act.timestamp}-${i}`}
+                                        className={`p-3 rounded-2xl border lg:grid lg:grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] lg:items-center lg:gap-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 justify-between min-w-0 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}
+                                    >
+                                        <span className="hidden lg:block text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <div className={`w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center flex-none ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
+                                                {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.avatar ? (
+                                                    <img
+                                                        src={userProfiles[(act.userAddr || act.owner || "").toLowerCase()].avatar}
+                                                        className="w-full h-full object-cover"
+                                                        alt=""
+                                                    />
+                                                ) : (
+                                                    <UserCheck size={13} />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="text-[10px] font-black uppercase flex items-center gap-2 truncate">
+                                                    {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.username || `${(act.userAddr || act.owner || "0x").slice(0, 6)}…`}
+                                                    {act.type === 'TRADE_PLACED' && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-none" />}
+                                                </div>
+                                                <div className="text-[8px] opacity-40 font-bold uppercase font-mono truncate lg:hidden">{act.symbol} • ${act.amount}</div>
+                                            </div>
+                                        </div>
+                                        <div className={`hidden lg:block text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black' : 'text-white'}`}>{act.symbol || '—'}</div>
+                                        <div className={`hidden lg:flex items-center justify-center px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
+                                            {act.direction === 'UP' ? '▲ Up' : '▼ Down'}
+                                        </div>
+                                        <div className={`lg:block text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</div>
+                                        <div className={`text-[10px] font-black lg:text-[10px] ${act.won ? 'text-[#1A6140]' : (act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
+                                            {act.type === 'TRADE_PLACED' ? 'PENDING' : (act.won ? `WON +$${act.payout}` : 'LOST')}
+                                        </div>
+                                        <div className="text-[8px] opacity-30 font-mono">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                    </motion.div>
+                                ))
+                            )}
+                        </div>
+                    </AdminCard>
+                </div>
+                )}
+
+                {/* ANALYTICS — globe, reach and the deeper user metrics */}
+                {activeNav === 'analytics' && (
+                <div className="w-full flex flex-col gap-6 min-w-0">
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+                        {[
+                            { label: 'Registered Users', value: String(stats.totalWallets | 0), icon: Users, color: '#a855f7' },
+                            { label: 'Total Trades', value: String(stats.totalTrades | 0), icon: TrendingUp, color: '#14b8a6' },
+                            { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, icon: Landmark, color: '#1A6140' },
+                            { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), icon: AlertTriangle, color: '#ef4444' },
+                            { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, icon: BarChart3, color: '#1A6140' },
+                            { label: 'Countries Seen', value: String(Object.keys(stats.userCountries || {}).length), icon: Globe, color: '#3b82f6' }
+                        ].map((stat, i) => (
+                            <div key={i} className={`p-4 rounded-2xl border ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5 shadow-inner'}`}>
+                                <div className="flex items-center gap-2 mb-2 opacity-40">
+                                    <stat.icon size={12} style={{ color: stat.color }} />
+                                    <span className="text-[8px] font-black uppercase tracking-widest">{stat.label}</span>
+                                </div>
+                                <div className={`text-lg font-black tracking-tighter truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <AdminCard title="Global Reach" icon={Globe} accent="#3b82f6">
+                        <div className={`relative w-full h-[520px] xl:h-[640px] rounded-3xl overflow-hidden border ${isLight ? 'bg-[#1A6140]/[0.06] border-[#1A6140]/10' : 'bg-black/40 border-white/5'}`}>
+                            <AdminGlobe theme={theme} countries={stats.userCountries} pulse={pulse} />
+                            <div className="absolute bottom-4 left-6 flex items-center gap-2 pointer-events-none">
+                                <div className="w-2 h-2 rounded-full bg-[#3CB371] animate-pulse" />
+                                <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Users by country · live trade flashes</span>
+                            </div>
+                        </div>
+                    </AdminCard>
                 </div>
                 )}
 
                 {/* SECURITY — protocols & broadcasts; the roster card renders below */}
                 {activeNav === 'security' && (
-                    <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
                         <div className="lg:col-span-7 flex flex-col gap-8">
                             {canSettings && (
                         <AdminCard title="Security Protocols" icon={Shield} accent="#1A6140">
@@ -862,7 +904,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                 {/* Withdrawal Management — sub-tab switch for the queue and referral */}
                 {activeNav === 'withdrawals' && (
-                    <div className="max-w-[1400px] mx-auto flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar">
+                    <div className="w-full flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar">
                         {[['requests', 'Withdrawal Requests'], ['referral', 'Referral Program']].map(([k, l]) => (
                             <button
                                 key={k}

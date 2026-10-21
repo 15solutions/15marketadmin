@@ -213,6 +213,7 @@ async function emitAdminStats() {
       platformRevenue: platformRevenue,
       userCountries: stats.userCountries || {},
       totalTrades: stats.totalTrades || 0,
+      bullBearRatio: stats.bullBearRatio != null ? stats.bullBearRatio : 50,
       timestamp: Date.now()
     };
 
