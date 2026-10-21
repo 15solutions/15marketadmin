@@ -1338,28 +1338,28 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </motion.div>
                     </motion.div>
                 )}
-            </AnimatePresence>
-            </main>
+             </AnimatePresence>
+             </main>
 
-            </div>
-
-            {/* Persistence Layer Status */}
-            <footer className={`flex-none p-5 border-t backdrop-blur-3xl px-10 flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#050505]/50 border-white/5'}`}>
-                <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[#1A6140]' : 'bg-red-500'} animate-pulse`} />
-                        <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Persistence Layer Stable</span>
+            {/* Persistence Layer Status — slim strip inside the main column */}
+            <footer className={`flex-none px-6 py-2.5 border-t backdrop-blur-3xl flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#0A0A0A]/60 border-white/5'}`}>
+                <div className="flex items-center gap-5 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[#1A6140]' : 'bg-red-500'} animate-pulse`} />
+                        <span className="text-[8px] font-black uppercase tracking-widest opacity-40 whitespace-nowrap">{isConnected ? 'Node Connected' : 'Node Offline'}</span>
                     </div>
-                    <div className="h-4 w-px bg-white/5" />
-                    <div className="flex items-center gap-3">
-                        <Shield size={14} className="text-[#1A6140] opacity-50" />
-                        <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Admin Token Authorized</span>
+                    <div className={`hidden sm:block h-3 w-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
+                    <div className="hidden sm:flex items-center gap-2">
+                        <Shield size={11} className="text-[#1A6140] opacity-50" />
+                        <span className="text-[8px] font-black uppercase tracking-widest opacity-30 whitespace-nowrap">Session Authorized</span>
                     </div>
                 </div>
-                <div className={`text-[9px] font-mono opacity-20 uppercase tracking-[0.5em]`}>
-                    15Market_Citadel_v2.4.0
+                <div className="text-[8px] font-mono opacity-20 uppercase tracking-[0.35em] whitespace-nowrap">
+                    15market_v2.4.0
                 </div>
             </footer>
+
+            </div>
         </div>
     );
 }
