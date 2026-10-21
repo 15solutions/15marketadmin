@@ -208,12 +208,19 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     // scale the whole canvas down uniformly so it always fits the screen.
     // On desktop the card is capped 20% smaller so the outside chevrons land
     // in the page gutter (under the navbar back button) instead of clipping.
+    // The canvas sits at top-LEFT of the box, so after it shrinks below the
+    // box width (mobile) or below canvas width (desktop 0.8 cap) an explicit
+    // translateX re-centers it — origin-center alone can't, because the
+    // unscaled canvas is wider than a mobile box (448px > e.g. 343px).
+    const [deckOffsetX, setDeckOffsetX] = useState(0);
     useEffect(() => {
         const el = deckRef.current;
         if (!el) return;
         const applyScale = () => {
             const desktop = typeof window !== 'undefined' && window.innerWidth >= 768;
-            setDeckScale(Math.min(1, el.clientWidth / 448) * (desktop ? 0.8 : 1));
+            const s = Math.min(1, el.clientWidth / 448) * (desktop ? 0.8 : 1);
+            setDeckScale(s);
+            setDeckOffsetX(Math.max(0, (el.clientWidth - 448 * s) / 2));
         };
         applyScale();
         const ro = new ResizeObserver(applyScale);
@@ -617,7 +624,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 origin top-center so the 20%-shrunken desktop card stays centered
                 and its chevrons land in the gutter under the navbar back button */}
             <div className="absolute top-0 left-0"
-                style={{ width: '448px', height: '260px', transform: `scale(${deckScale})`, transformOrigin: 'top center', transition: 'transform 0.25s ease' }}>
+                style={{ width: '448px', height: '260px', transform: `translateX(${deckOffsetX}px) scale(${deckScale})`, transformOrigin: 'top left', transition: 'transform 0.25s ease' }}>
                 {/* Carousel chevrons — outside the card, desktop only */}
                 <button onClick={() => showCard(walletCardSide === 'trading' ? 'main' : 'trading')} title="Main Wallet card"
                     className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"

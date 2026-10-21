@@ -954,35 +954,60 @@ class ProfileService {
         if (this.sbCountryAvailable === false) {
             for (const a of attempts) { delete a.country; delete a.first_name; delete a.last_name; }
         }
-        // Same protection for the referral columns (009).
+        // Same protection for the referral columns (009). Every referral
+        // field must be stripped together — leaving referral_enrolled in the
+        // payload while the other columns are gone 400s EVERY attempt, which
+        // silently stops all profile persistence and derolled enrolled users
+        // on every backend restart.
         if (this.sbReferralAvailable === false) {
-            for (const a of attempts) { delete a.referral_code; delete a.referred_by; delete a.referred_at; }
+            for (const a of attempts) {
+                delete a.referral_code; delete a.referred_by; delete a.referred_at;
+                delete a.referral_enrolled; delete a.referral_enrolled_at;
+            }
         }
+        // Self-healing column discovery: PostgREST 400s name the missing
+        // column ("Could not find the 'referral_enrolled' column of
+        // 'profiles'…"). Strip it from every attempt and retry — covers any
+        // migration drift the boot-time probes missed (e.g. a transient probe
+        // failure that latched the wrong payload shape).
+        const REFERRAL_COLUMNS = ['referral_code', 'referred_by', 'referred_at', 'referral_enrolled', 'referral_enrolled_at'];
         let lastError = '';
         for (let i = 0; i < attempts.length; i++) {
-            try {
-                const res = await supabaseRequest('/rest/v1/profiles?on_conflict=address', {
-                    method: 'POST',
-                    body: JSON.stringify(attempts[i])
-                });
-                if (res.ok) {
-                    // Remember the widest payload that worked so later upserts
-                    // stop paying for rejected round-trips.
-                    if (i === 2) this.sbFullPayload = false;
-                    else if (i === 3) this.sbChainReconAvailable = false;
-                    // Drain the body so undici can return the socket to the pool.
-                    await res.text().catch(() => {});
-                    return true;
+            for (let retry = 0; retry < 10; retry++) {
+                try {
+                    const res = await supabaseRequest('/rest/v1/profiles?on_conflict=address', {
+                        method: 'POST',
+                        body: JSON.stringify(attempts[i])
+                    });
+                    if (res.ok) {
+                        // Remember the widest payload that worked so later upserts
+                        // stop paying for rejected round-trips.
+                        if (i === 2) this.sbFullPayload = false;
+                        else if (i === 3) this.sbChainReconAvailable = false;
+                        // Drain the body so undici can return the socket to the pool.
+                        await res.text().catch(() => {});
+                        return true;
+                    }
+                    const body = await res.text().catch(() => '');
+                    lastError = `${res.status} ${body}`.slice(0, 300);
+                    if (res.status === 400) {
+                        const m = /'([a-z_][a-z0-9_]*)' column/.exec(body);
+                        if (m && m[1] in attempts[i]) {
+                            const col = m[1];
+                            for (const a of attempts) delete a[col];
+                            if (REFERRAL_COLUMNS.includes(col)) this.sbReferralAvailable = false;
+                            continue; // retry the same attempt without the dead column
+                        }
+                    }
+                    break;
+                } catch (e) {
+                    lastError = e.message;
+                    // The four payload variants exist to work around a *rejected
+                    // column* (HTTP 400). A transport failure rejects all of them
+                    // identically, so stop instead of burning 4x the timeout budget
+                    // re-sending the same dead request.
+                    return false;
                 }
-                if (i === 0 && this.sbFullPayload !== false) this.sbFullPayload = false;
-                lastError = `${res.status} ${await res.text().catch(() => '')}`.slice(0, 300);
-            } catch (e) {
-                lastError = e.message;
-                // The four payload variants exist to work around a *rejected
-                // column* (HTTP 400). A transport failure rejects all of them
-                // identically, so stop instead of burning 4x the timeout budget
-                // re-sending the same dead request.
-                break;
             }
         }
         console.warn(`[Supabase] Upsert failed for ${addr}: ${lastError}`);
@@ -1308,6 +1333,15 @@ class ProfileService {
         if (!addr) return { ok: false, status: 400, error: 'Address required' };
         await this.initSupabase();
         this.upsert(addr, { referralEnrolled: true, referralEnrolledAt: Date.now() });
+        // Enrollments must land in the durable store synchronously — a
+        // background sync could still be pending (or fail) when the process
+        // restarts and every enrolled user would "deroll" from the DB side.
+        if (SUPABASE_ENABLED) await this.syncToSupabase(addr).catch(() => false);
+        if (this.sbReferralAvailable === false) {
+            // Loud surface for a state that derolled users before: without
+            // 009 the enrollment can never reach the durable store.
+            console.warn('[Referral] WARNING: referral columns missing in Supabase — enrollment is memory/file only. Run 009_referrals.sql NOW.');
+        }
         const code = await this.ensureReferralCode(addr);
         return { ok: true, referralCode: code };
     }
