@@ -1,10 +1,12 @@
 // Admin Portal gateway — Supabase Auth edition.
 //
 // Mounted at /admin. Two states:
-//   1. Unauthenticated → branded login (email + password against Supabase
-//      Auth). When NO admin exists yet, the same page shows the one-time
-//      ROOT ADMIN BOOTSTRAP form — the first account to speckle this form is
-//      the root admin, permanently.
+//   1. Unauthenticated → full-screen branded login (identical design language
+//      to the user side's BrandedAuthPage): fixed inset-0, Comfortaa, centered
+//      max-w-md column, no card box — content sits directly on the same
+//      #050505 (dark) / #F4F7F5 (light) canvas. When NO admin exists yet, the
+//      same screen shows the one-time ROOT ADMIN BOOTSTRAP form — the first
+//      account to complete it is the root admin, permanently.
 //   2. Authenticated → loads the role/permission snapshot (/admin/auth/me)
 //      and mounts the full AdminDashboard with that context.
 import React, { useState, useEffect, useCallback } from "react";
@@ -40,8 +42,8 @@ export function AdminPortal({ onBack, notify }) {
         }
         const me = await res.json();
         setAuth(me);
-        // Hydrate the bootstrap status too, so a failed /me reveal on the next
-        // sign-out can show the right form.
+        // Hydrate the bootstrap status too, so a later sign-out reveal can
+        // show the right form (login vs one-time root setup).
         try {
             const sRes = await fetch(`${KEEPER_URL_ARC}/admin/auth/status`);
             if (sRes.ok) setBootStatus(await sRes.json());
@@ -54,7 +56,7 @@ export function AdminPortal({ onBack, notify }) {
         (async () => {
             // Rotate a stale session first so a returning admin lands straight in.
             if (!sessionValid()) {
-                try { await refreshSession(); } catch (e) { /* will fall through to login */ }
+                try { await refreshSession(); } catch (e) { /* falls through to login */ }
             }
             if (cancelled) return;
             if (sessionValid()) {
@@ -94,14 +96,13 @@ export function AdminPortal({ onBack, notify }) {
             const res = await fetch(`${KEEPER_URL_ARC}/admin/auth/bootstrap`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: bootEmail.trim(), password: bootPassword })
+                body: JSON.stringify({ email: bootEmail, password: bootPassword })
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || 'Bootstrap failed');
             // Auto sign-in right away with the fresh credentials.
-            await loginWithPassword(bootEmail.trim(), bootPassword);
+            await loginWithPassword(bootEmail, bootPassword);
             setBootPassword('');
-            setBootMsg({ type: 'ok', text: 'Root admin created. Signing you in…' });
             await loadAuthContext();
         } catch (e) {
             setBootMsg({ type: 'error', text: e.message || 'Bootstrap failed' });
@@ -113,26 +114,15 @@ export function AdminPortal({ onBack, notify }) {
     const signOut = () => {
         clearSession();
         setAuth(null);
+        setBootStatus(null);
         setStatus('login');
         notify?.('Signed out of the admin portal', 'success');
     };
 
-    const shell = `min-h-screen w-full flex items-center justify-center p-4 ${isLight ? 'bg-[#8CB09D]' : 'bg-[#050505]'}`;
-    const card = `w-full max-w-md p-8 md:p-10 rounded-[36px] border flex flex-col gap-6 ${isLight ? 'bg-white/70 border-[#1A6140]/20 shadow-xl' : 'bg-[#0D0D0D]/90 border-white/5 shadow-2xl'} backdrop-blur-xl`;
-    const text = isLight ? 'text-black' : 'text-white';
-    const field = `w-full pl-12 pr-4 py-4 rounded-2xl border text-sm font-bold outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140]' : 'bg-black/40 border-white/10 focus:border-[#1A6140]'} ${text}`;
-
-    // The dashboard mounts full-bleed on its own shell (h-screen layout).
+    // ─── Authed → full dashboard (its own full-bleed shell) ──────────────
     if (status === 'ready' && auth) {
         return (
-            <React.Suspense fallback={(
-                <div className={shell} style={{ fontFamily: '"Comfortaa", "cursive"' }}>
-                    <div className="flex flex-col items-center gap-4">
-                        <Loader2 size={30} className="animate-spin text-[#1A6140]" />
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>Mounting ops console…</p>
-                    </div>
-                </div>
-            )}>
+            <React.Suspense fallback={<FullScreenSpinner isLight={isLight} label="Mounting ops console…" />}>
                 <AdminDashboard
                     onBack={onBack || (() => window.location.href = '/')}
                     theme={localStorage.getItem("15market_theme") || "dark"}
@@ -143,111 +133,167 @@ export function AdminPortal({ onBack, notify }) {
         );
     }
     if (status !== 'login') {
-        return (
-            <div className={shell} style={{ fontFamily: '"Comfortaa", "cursive"' }}>
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 size={30} className="animate-spin text-[#1A6140]" />
-                    <p className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>Verifying session…</p>
-                </div>
-            </div>
-        );
+        return <div style={{ fontFamily: '"Comfortaa", cursive' }}><FullScreenSpinner isLight={isLight} label="Verifying session…" standalone /></div>;
     }
 
+    // ─── Login / one-time root setup — full screen, user-side design ─────
+    const needsBootstrap = bootStatus && bootStatus.initialized === false;
+    const ink = isLight ? 'text-[#0a261a]' : 'text-white';
+    const inkSoft = isLight ? 'text-[#0a261a]/50' : 'text-white/40';
+    const inputCls = `w-full py-4 px-6 rounded-2xl border outline-none text-lg font-black transition-all placeholder:opacity-30 tracking-normal ${
+        isLight ? 'bg-gray-50 border-gray-200 text-[#0a261a] focus:border-[#1A6140] focus:shadow-[0_0_20px_-6px_rgba(26,97,64,0.4)]'
+                : 'bg-white/5 border-white/10 text-white focus:border-[#1A6140] focus:shadow-[0_0_20px_-6px_rgba(26,97,64,0.45)]'
+    }`;
+    const stepAnim = { initial: { opacity: 0, x: 24 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -24 }, transition: { duration: 0.2 } };
+
     return (
-        <div className={shell} style={{ fontFamily: '"Comfortaa", "cursive"' }}>
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.25 }}
+            className={`fixed inset-0 z-[600] flex flex-col ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}
+            style={{ fontFamily: '"Comfortaa", cursive' }}
+        >
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700;900&display=swap');
                 .admin-portal, .admin-portal * { font-family: 'Comfortaa', sans-serif; }
             `}</style>
-            <AnimatePresence mode="wait">
-            {(
-                    <motion.div
-                        key="auth"
-                        initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -24 }}
-                        transition={{ duration: 0.35, ease: 'circOut' }}
-                        className="w-full max-w-md"
-                    >
-                        <div className={card}>
-                            <div className="flex items-center justify-between -mb-2">
-                                <button
-                                    onClick={onBack || (() => window.location.href = '/')}
-                                    className={`p-2.5 rounded-full border transition-all ${isLight ? 'bg-white border-black/10 text-black' : 'bg-white/5 border-white/5 text-white'} active:scale-95`}
-                                >
-                                    <ArrowLeft size={16} />
-                                </button>
-                                <div className="w-10 h-10 rounded-2xl bg-[#1A6140] flex items-center justify-center shadow-lg shadow-[#1A6140]/30">
-                                    <Shield size={18} className="text-white" />
-                                </div>
-                            </div>
-                            <div>
-                                <h1 className={`text-2xl font-black uppercase tracking-tighter ${text}`}>
-                                    {bootStatus && bootStatus.initialized === false ? (bootStatus.rootEmailLocked ? 'Root Setup' : 'Admin Setup') : 'Admin Portal'}
-                                </h1>
-                                <p className={`text-[10px] font-bold uppercase tracking-widest opacity-40 mt-1 ${text}`}>
-                                    {bootStatus && bootStatus.initialized === false ? 'One-time — this account becomes the root admin' : 'Supabase Auth · email & password'}
-                                </p>
-                            </div>
 
-                            {bootStatus && bootStatus.initialized === false ? (
-                                <>
-                                    {bootMsg && (
-                                        <div className={`flex items-start gap-2 p-3 rounded-2xl text-[10px] font-bold uppercase tracking-wide ${bootMsg.type === 'ok' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-400'}`}>
-                                            {bootMsg.type === 'ok' ? <CheckCircle2 size={13} className="mt-0.5" /> : <AlertTriangle size={13} className="mt-0.5" />}
-                                            {bootMsg.text}
-                                        </div>
-                                    )}
-                                    <div className="relative">
-                                        <Mail size={15} className={`absolute left-4 top-1/2 -translate-y-1/2 opacity-40 ${text}`} />
-                                        <input value={bootEmail} onChange={e => setBootEmail(e.target.value)} placeholder="root@15market.com" className={field} />
-                                    </div>
-                                    <div className="relative">
-                                        <Lock size={15} className={`absolute left-4 top-1/2 -translate-y-1/2 opacity-40 ${text}`} />
-                                        <input type="password" value={bootPassword} onChange={e => setBootPassword(e.target.value)} placeholder="master password — min 8 chars" className={field} />
-                                    </div>
-                                    <button
-                                        onClick={handleBootstrap}
-                                        disabled={busy === 'bootstrap' || !bootEmail.trim() || bootPassword.length < 8}
-                                        className="w-full py-4 bg-[#1A6140] text-white rounded-3xl font-black uppercase tracking-[0.25em] text-[10px] shadow-[0_20px_40px_-10px_rgba(26,97,64,0.35)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-3"
-                                    >
-                                        {busy === 'bootstrap' ? <Loader2 size={15} className="animate-spin" /> : <UserPlus size={15} />}
-                                        Create root admin
-                                    </button>
-                                    <p className={`text-[9px] font-bold opacity-30 leading-relaxed ${text}`}>
-                                        This form is only shown while no admin exists. The account created here is the permanent root — only it can mint further admins and moderators.
-                                    </p>
-                                </>
-                            ) : (
-                                <>
-                                    {loginError && (
-                                        <div className="flex items-start gap-2 p-3 rounded-2xl bg-red-500/10 text-red-400 text-[10px] font-bold uppercase tracking-wide">
-                                            <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {loginError}
-                                        </div>
-                                    )}
-                                    <div className="relative">
-                                        <Mail size={15} className={`absolute left-4 top-1/2 -translate-y-1/2 opacity-40 ${text}`} />
-                                        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="admin email" onKeyDown={e => e.key === 'Enter' && email && password && handleLogin()} className={field} />
-                                    </div>
-                                    <div className="relative">
-                                        <Lock size={15} className={`absolute left-4 top-1/2 -translate-y-1/2 opacity-40 ${text}`} />
-                                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="password" onKeyDown={e => e.key === 'Enter' && email && password && handleLogin()} className={field} />
-                                    </div>
-                                    <button
-                                        onClick={handleLogin}
-                                        disabled={busy === 'login' || !email.trim() || !password}
-                                        className="w-full py-4 bg-[#1A6140] text-white rounded-3xl font-black uppercase tracking-[0.25em] text-[10px] shadow-[0_20px_40px_-10px_rgba(26,97,64,0.35)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-3"
-                                    >
-                                        {busy === 'login' ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />}
-                                        Sign in
-                                    </button>
-                                    <p className={`text-[9px] font-bold opacity-30 leading-relaxed ${text}`}>
-                                        Lost access? The root admin can be re-approached via Supabase Auth (Authentication → Users) to add a new admin.
-                                    </p>
-                                </>
-                            )}
-                        </div>
-                    </motion.div>
-            )}
-            </AnimatePresence>
+            {/* Ambient green glow — mirrors the user app's background flair */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                <div className={`absolute top-[-12%] right-[-8%] w-[520px] h-[520px] rounded-full blur-[130px] ${isLight ? 'bg-[#1A6140]/10' : 'bg-[#1A6140]/8'}`} />
+                <div className={`absolute bottom-[-12%] left-[-8%] w-[520px] h-[520px] rounded-full blur-[130px] ${isLight ? 'bg-[#1A6140]/6' : 'bg-[#1A6140]/5'}`} />
+            </div>
+
+            {/* Top bar — same round back chip as the user auth page */}
+            <div className="flex-none flex items-center justify-between px-5 z-10" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}>
+                <button
+                    onClick={onBack || (() => window.location.href = '/')}
+                    aria-label="Back"
+                    className={`w-10 h-10 rounded-full border flex items-center justify-center active:scale-95 ${isLight ? 'border-gray-200 text-[#0a261a]/60' : 'border-white/10 text-white/60'}`}
+                >
+                    <ArrowLeft size={18} />
+                </button>
+                <div className="flex items-center gap-2">
+                    <div className={isLight ? 'text-[13px] font-black uppercase tracking-tighter text-[#0a261a]' : 'text-[13px] font-black uppercase tracking-tighter text-white'}>15market</div>
+                    <div className="px-2.5 py-1 rounded-full bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest shadow-[0_0_18px_-4px_rgba(26,97,64,0.7)]">Admin</div>
+                </div>
+            </div>
+
+            {/* Centered column — content directly on the canvas, no card */}
+            <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center px-6 py-10 relative z-10">
+                <div className="w-full max-w-md flex flex-col items-center">
+                    <AnimatePresence mode="wait">
+                        <motion.div key={needsBootstrap ? 'bootstrap' : 'login'} {...stepAnim} className="w-full flex flex-col items-center">
+                            <div className="w-16 h-16 rounded-3xl bg-[#1A6140] flex items-center justify-center shadow-[0_0_45px_-8px_rgba(26,97,64,0.65)] mb-6">
+                                <Shield size={26} className="text-white" />
+                            </div>
+                            <h1 className={`text-3xl font-black uppercase tracking-tighter text-center ${ink}`}>
+                                {needsBootstrap ? '15market' : 'Admin Citadel'}
+                            </h1>
+                            <p className={`text-xs font-bold uppercase tracking-widest mt-2 mb-8 text-center ${inkSoft}`}>
+                                {needsBootstrap ? 'One-time root admin setup' : 'Ops console — email & password'}
+                            </p>
+
+                            <div className="w-full flex flex-col gap-3">
+                                {needsBootstrap ? (
+                                    <>
+                                        {bootMsg && (
+                                            <div className={`w-full flex items-start gap-2 p-3 rounded-2xl text-xs font-bold ${bootMsg.type === 'ok' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-400'} shadow-[0_0_25px_-12px_rgba(0,0,0,0.5)]`}>
+                                                {bootMsg.type === 'ok' ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" /> : <AlertTriangle size={14} className="mt-0.5 shrink-0" />}
+                                                {bootMsg.text}
+                                            </div>
+                                        )}
+                                        <input
+                                            autoComplete="email"
+                                            value={bootEmail}
+                                            onChange={e => setBootEmail(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && bootEmail && bootPassword.length >= 8 && handleBootstrap()}
+                                            placeholder="Email address"
+                                            className={`${inputCls} !tracking-normal !text-base`}
+                                        />
+                                        <input
+                                            type="password"
+                                            autoComplete="new-password"
+                                            value={bootPassword}
+                                            onChange={e => setBootPassword(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && bootEmail && bootPassword.length >= 8 && handleBootstrap()}
+                                            placeholder="Master password (min 8)"
+                                            className={`${inputCls} !tracking-normal !text-base`}
+                                        />
+                                        <button
+                                            onClick={handleBootstrap}
+                                            disabled={busy === 'bootstrap' || !bootEmail.trim() || bootPassword.length < 8}
+                                            className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#1A6140] text-white shadow-[0_0_35px_-8px_rgba(26,97,64,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
+                                        >
+                                            {busy === 'bootstrap' ? <Loader2 size={18} className="animate-spin" /> : <><UserPlus size={18} /> Create root admin</>}
+                                        </button>
+                                        <p className={`text-[10px] font-bold text-center leading-relaxed mt-1 ${inkSoft}`}>
+                                            Shown only while no admin exists. The account created here is the permanent root — only it can mint further admins and moderators. {bootStatus?.rootEmailLocked ? 'Setup is locked to the configured root email.' : ''}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        {loginError && (
+                                            <div className="w-full flex items-start gap-2 p-3 rounded-2xl bg-red-500/10 text-red-400 text-xs font-bold shadow-[0_0_25px_-12px_rgba(0,0,0,0.5)]">
+                                                <AlertTriangle size={14} className="mt-0.5 shrink-0" /> {loginError}
+                                            </div>
+                                        )}
+                                        <input
+                                            type="email"
+                                            autoComplete="email"
+                                            value={email}
+                                            onChange={e => setEmail(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && email && password && handleLogin()}
+                                            placeholder="Email address"
+                                            className={`${inputCls} !tracking-normal !text-base`}
+                                        />
+                                        <input
+                                            type="password"
+                                            autoComplete="current-password"
+                                            value={password}
+                                            onChange={e => setPassword(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && email && password && handleLogin()}
+                                            placeholder="Password"
+                                            className={`${inputCls} !tracking-normal !text-base`}
+                                        />
+                                        <button
+                                            onClick={handleLogin}
+                                            disabled={busy === 'login' || !email.trim() || !password}
+                                            className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#1A6140] text-white shadow-[0_0_35px_-8px_rgba(26,97,64,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
+                                        >
+                                            {busy === 'login' ? <Loader2 size={18} className="animate-spin" /> : <><Lock size={18} /> Sign in</>}
+                                        </button>
+                                        <p className={`text-[10px] font-bold text-center leading-relaxed mt-1 ${inkSoft}`}>
+                                            Lost access? The root admin's identity can be run from Supabase Auth (Authentication → Users) to restore entry.
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
+            </div>
+
+            {/* Footer strip — like the user auth page's subtle close */}
+            <div className={`flex-none pb-6 text-center text-[9px] font-bold uppercase tracking-widest ${inkSoft}`}>
+                Supabase Auth · permission-gated ops
+            </div>
+        </motion.div>
+    );
+}
+
+function FullScreenSpinner({ isLight, label, standalone = false }) {
+    return (
+        <div
+            className={`${standalone ? 'fixed inset-0 z-[600]' : 'min-h-screen w-full'} flex items-center justify-center ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}
+        >
+            <div className="flex flex-col items-center gap-4">
+                <div className="w-14 h-14 rounded-3xl bg-[#1A6140] flex items-center justify-center shadow-[0_0_45px_-8px_rgba(26,97,64,0.65)]">
+                    <Loader2 size={22} className="animate-spin text-white" />
+                </div>
+                <p className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>{label}</p>
+            </div>
         </div>
     );
 }

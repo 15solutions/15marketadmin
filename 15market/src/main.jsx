@@ -56,7 +56,10 @@ function Root() {
             theme: 'dark',
             accentColor: '#1A6140',
             logo: 'https://www.15market.online/gowlogo.png',
-            walletList: ['metamask', 'rabby', 'okx_wallet', 'detected_ethereum_wallets', 'wallet_connect'],
+            // Old Reown/WalletConnect connect removed — Privy owns login
+            // (email/Google/Discord) and external wallets come through the
+            // branded page's injected connector only.
+            walletList: ['metamask', 'rabby', 'okx_wallet', 'detected_ethereum_wallets'],
           },
         }}
       >

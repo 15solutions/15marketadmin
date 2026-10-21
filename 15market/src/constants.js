@@ -205,9 +205,6 @@ export const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN;
 export const SUPABASE_AUTH_URL = import.meta.env.VITE_SUPABASE_AUTH_URL || import.meta.env.VITE_SUPABASE_URL || 'https://cwzbdxvninfagfbaehre.supabase.co';
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// 2. Project ID (Reown / WalletConnect)
-export const projectId = import.meta.env.VITE_REOWN_PROJECT_ID;
-
 // ─── Country → fiat gateway matching ─────────────────────────────────────
 // Collected once at onboarding (ISO 3166-1 alpha-2) and stored on the
 // profile. The funding UI offers exactly the rails listed for the user's

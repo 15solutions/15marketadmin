@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
+import { GlobalTradeScroller } from "./GlobalTradeScroller";
 import { socketService } from "../utils/socket";
 
 // Admin tabs. Even mobile widths keep every tool reachable — the tab row
@@ -465,7 +466,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     ];
 
     const AdminCard = ({ title, icon: Icon, children, accent = "#1A6140" }) => (
-        <div className={`p-6 border rounded-[32px] ${isLight ? 'bg-white/70 border-[#1A6140]/20 shadow-sm' : 'bg-[#0D0D0D]/80 border-white/5 shadow-2xl'} backdrop-blur-xl relative overflow-hidden group`}>
+        // Glow language copied from the user side: the card lifts off the
+        // canvas with a green bloom (dark) / layered soft shadows (light).
+        <div className={`p-6 border rounded-[32px] backdrop-blur-xl relative overflow-hidden group transition-shadow ${
+            isLight
+                ? 'bg-white/70 border-[#1A6140]/20 shadow-[0_0_40px_-12px_rgba(26,97,64,0.18),0_24px_48px_-24px_rgba(0,0,0,0.12)]'
+                : 'bg-[#0D0D0D]/80 border-white/5 shadow-[0_0_60px_-15px_rgba(26,97,64,0.22),0_30px_60px_-30px_rgba(0,0,0,0.85)]'
+        }`}>
             <div className="absolute top-0 left-0 w-1 h-full opacity-40 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: accent }} />
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -480,7 +487,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     );
 
     return (
-        <div className={`h-screen w-full flex flex-col overflow-hidden ${isLight ? 'bg-[#8CB09D]' : 'bg-[#050505]'} relative`}>
+        <div className={`h-screen w-full flex flex-col overflow-hidden ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'} relative`}>
             {/* Background Flair */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#1A6140]/5 rounded-full blur-[120px]" />
@@ -536,6 +543,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-10 z-10">
+                {/* MARKET SCROLLER (Marquee) — same participation feed as the user side */}
+                <div className="max-w-[1400px] mx-auto w-full overflow-hidden relative rounded-[10px] mb-5">
+                    <GlobalTradeScroller theme={theme} />
+                </div>
+
                 {/* Tab bar — chip strip that scrolls horizontally on narrow screens */}
                 <div className="max-w-[1400px] mx-auto flex items-center gap-2 mb-6 md:mb-8 overflow-x-auto no-scrollbar">
                     {visibleTabs.map(t => {
