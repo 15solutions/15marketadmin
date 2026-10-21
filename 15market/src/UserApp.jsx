@@ -3349,6 +3349,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               walletClient={walletClient}
               switchChainAsync={switchChainAsync}
               smartWalletAddress={smartWalletAddress}
+              onDeposit={handleDeposit}
               onWithdraw={handleWithdraw}
               triggerGlobalRefresh={triggerGlobalRefresh}
             />

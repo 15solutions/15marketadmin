@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { Shield, Zap, Send, ArrowDownLeft, Copy, ExternalLink, RefreshCw, X, Check, ArrowLeft, History, Wallet, Globe, Info, ChevronDown, Download, Save, CreditCard, ChevronLeft, ChevronRight, Nfc } from 'lucide-react';
+import { Shield, Zap, Send, ArrowDownLeft, ArrowUpRight, Copy, ExternalLink, RefreshCw, X, Check, ArrowLeft, History, Wallet, Globe, Info, ChevronDown, Download, Save, CreditCard, ChevronLeft, ChevronRight, Nfc } from 'lucide-react';
 import { KEEPER_URL_ARC } from '../constants';
 import { SUPPORTED_TOKENS } from '../tokens';
 import QRCode from 'qrcode';
@@ -80,6 +80,7 @@ export function CircleWalletPage({
     walletClient,
     smartWalletAddress, // ERC-4337 smart wallet — pays gas in USDC via Pimlico
     switchChainAsync,
+    onDeposit,
     onWithdraw,
     triggerGlobalRefresh
 }) {
@@ -203,6 +204,10 @@ export function CircleWalletPage({
     const [fundingType, setFundingType] = useState(null); // null | 'native' | 'usdc'
     const [showSendModal, setShowSendModal] = useState(initialMode === 'send');
     const [showReceiveModal, setShowReceiveModal] = useState(initialMode === 'receive');
+    // Internal main <-> trading transfer (trading wallet card actions)
+    const [transferModal, setTransferModal] = useState(null); // null | 'deposit' | 'withdraw'
+    const [transferAmount, setTransferAmount] = useState('');
+    const [isTransferring, setIsTransferring] = useState(false);
     const [showChainGuide, setShowChainGuide] = useState(false);
     const [showUnifiedFunding, setShowUnifiedFunding] = useState(false);
     const [fundingStep, setFundingStep] = useState('selection'); // selection, loading, input, confirming, success
@@ -650,8 +655,11 @@ export function CircleWalletPage({
         if (!qrCodeData) return;
         setIsDownloading(true);
         try {
-            const W = 600;
-            const H = 840;
+            // Load the brand font before painting (falls back gracefully if unavailable)
+            try { await document.fonts.load('bold 26px "Comfortaa"'); } catch (e) { /* ignore */ }
+
+            const W = 640;
+            const H = 900;
             const SCALE = 2; // Retina quality export
             
             const canvas = document.createElement('canvas');
@@ -683,133 +691,61 @@ export function CircleWalletPage({
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, W, H);
 
-            // ── PREMIUM GEOMETRIC GREEN MARGIN ART (Vividly styled left/right framing) ────
-            const greens = [
-                'rgba(26, 97, 64, 0.08)',  // light green
-                'rgba(26, 97, 64, 0.16)',  // medium vivid green
-                'rgba(18, 63, 40, 0.12)',   // deep sage green
-                'rgba(140, 176, 157, 0.25)', // pale pastel green
-                'rgba(26, 97, 64, 0.35)'   // bold branding green
-            ];
-
-            // --- LEFT MARGIN ART WORK ---
-            // Bold vertical block on left edge
-            ctx.fillStyle = greens[3];
-            drawRoundRect(-20, 40, 70, 360, 20);
-            ctx.fill();
-
-            // Intersecting deep green bar
-            ctx.fillStyle = greens[2];
-            ctx.save();
-            ctx.rotate(-8 * Math.PI / 180);
-            ctx.fillRect(-10, 160, 90, 180);
-            ctx.restore();
-
-            // Horizontal stripe patterns crossing left edge
-            ctx.strokeStyle = 'rgba(26, 97, 64, 0.28)';
-            ctx.lineWidth = 3;
-            const drawLeftParallel = (x, y, count, length, spacing) => {
-                ctx.beginPath();
-                for (let i = 0; i < count; i++) {
-                    ctx.moveTo(x, y + i * spacing);
-                    ctx.lineTo(x + length, y + i * spacing);
+            // ── BRAND WATERMARK (faint repeated logo, like the credit cards) ────
+            const wmImg = new Image();
+            await new Promise(res => { wmImg.onload = res; wmImg.onerror = res; wmImg.src = '/goblogo.png'; });
+            ctx.globalAlpha = 0.05;
+            for (let gy = -40; gy < H + 90; gy += 110) {
+                for (let gx = -60; gx < W + 90; gx += 130) {
+                    ctx.save();
+                    ctx.translate(gx, gy);
+                    ctx.rotate(-15 * Math.PI / 180);
+                    ctx.drawImage(wmImg, 0, 0, 90, 90);
+                    ctx.restore();
                 }
-                ctx.stroke();
-            };
-            drawLeftParallel(0, 100, 6, 80, 8);
-            drawLeftParallel(0, 520, 8, 90, 7);
-
-            // Bold dot grid on left edge
-            ctx.fillStyle = greens[4];
-            const drawDotGrid = (xStart, yStart, rows, cols, spacing) => {
-                for (let r = 0; r < rows; r++) {
-                    for (let c = 0; c < cols; c++) {
-                        ctx.beginPath();
-                        ctx.arc(xStart + c * spacing, yStart + r * spacing, 2.5, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                }
-            };
-            drawDotGrid(15, 340, 8, 4, 12);
-            drawDotGrid(20, 680, 6, 5, 10);
-
-            // --- RIGHT MARGIN ART WORK ---
-            // Tilted bold green panel in top right
-            ctx.fillStyle = greens[1];
-            ctx.save();
-            ctx.rotate(12 * Math.PI / 180);
-            ctx.fillRect(490, -180, 120, 300);
-            ctx.restore();
-
-            // Sage vertical capsule along right edge
-            ctx.fillStyle = greens[2];
-            drawRoundRect(W - 45, 320, 60, 280, 16);
-            ctx.fill();
-
-            // Pastel accent rectangle in bottom right
-            ctx.fillStyle = greens[3];
-            ctx.save();
-            ctx.rotate(-15 * Math.PI / 180);
-            ctx.fillRect(W - 120, 720, 160, 140);
-            ctx.restore();
-
-            // Parallel stripes crossing right edge
-            ctx.strokeStyle = 'rgba(26, 97, 64, 0.32)';
-            ctx.lineWidth = 3;
-            const drawRightParallel = (x, y, count, length, spacing) => {
-                ctx.beginPath();
-                for (let i = 0; i < count; i++) {
-                    ctx.moveTo(x, y + i * spacing);
-                    ctx.lineTo(x + length, y + i * spacing);
-                }
-                ctx.stroke();
-            };
-            drawRightParallel(W - 70, 220, 5, 70, 9);
-            drawRightParallel(W - 80, 610, 6, 80, 8);
-
-            // Dot grid on right edge
-            drawDotGrid(W - 60, 120, 5, 4, 12);
-            drawDotGrid(W - 70, 480, 7, 5, 11);
-
-            // ── GENERAL BACKGROUND FILL (Soft diagonal lines behind QR) ──
-            ctx.strokeStyle = 'rgba(26, 97, 64, 0.05)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            for (let i = 0; i < W; i += 24) {
-                ctx.moveTo(i, 0);
-                ctx.lineTo(i + H, H);
             }
-            ctx.stroke();
+            ctx.globalAlpha = 1;
 
-            // ── HEADER SECTION (LOGO) ──────────────────────────────
+            // ── GREEN GLOWS (card-style radial accents) ────
+            const glow = (cx, cy, r, a) => {
+                const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+                g.addColorStop(0, `rgba(26, 97, 64, ${a})`);
+                g.addColorStop(1, 'rgba(26, 97, 64, 0)');
+                ctx.fillStyle = g;
+                ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+            };
+            glow(W, 0, 260, 0.16);
+            glow(0, H, 220, 0.10);
+
+            // ── HEADER (BIG 15MARKET LOGO, like the credit cards) ──────────
             const logoImg = new Image();
             await new Promise((res, rej) => {
                 logoImg.onload = res;
                 logoImg.onerror = rej;
                 logoImg.src = '/goblogo.png'; // Authority dark logo for white page card
             });
-            const logoH = 54;
+            const logoH = 110;
             const logoW = (logoImg.naturalWidth / logoImg.naturalHeight) * logoH;
-            ctx.drawImage(logoImg, (W - logoW) / 2, 54, logoW, logoH);
+            ctx.drawImage(logoImg, (W - logoW) / 2, 74, logoW, logoH);
 
             // Subtle divider line
-            ctx.strokeStyle = 'rgba(26, 97, 64, 0.15)';
+            ctx.strokeStyle = 'rgba(26, 97, 64, 0.18)';
             ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(60, 134); ctx.lineTo(W - 60, 134); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(70, 214); ctx.lineTo(W - 70, 214); ctx.stroke();
 
             // ── QR CODE DISPLAY ───────────────────────────────────
             const qrImg = new Image();
             await new Promise(res => { qrImg.onload = res; qrImg.src = qrCodeData; });
 
-            const qrSize = 340;
+            const qrSize = 400;
             const qrX = (W - qrSize) / 2;
-            const qrY = 166;
-            const qrR = 24;
+            const qrY = 252;
+            const qrR = 28;
 
             // Rounded container with a soft glowing green border/shadow for QR
-            ctx.strokeStyle = 'rgba(26, 97, 64, 0.20)';
+            ctx.strokeStyle = 'rgba(26, 97, 64, 0.30)';
             ctx.lineWidth = 3;
-            drawRoundRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, qrR + 2);
+            drawRoundRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, qrR + 6);
             ctx.stroke();
 
             // Draw QR code clipped to rounded rectangle
@@ -820,32 +756,32 @@ export function CircleWalletPage({
             ctx.restore();
 
             // ── WALLET ADDRESS ────────────────────────────────────
-            const addrLabelY = qrY + qrSize + 46;
+            const addrLabelY = qrY + qrSize + 58;
             ctx.fillStyle = 'rgba(15, 15, 15, 0.45)';
-            ctx.font = 'bold 10px "Courier New", monospace';
+            ctx.font = 'bold 12px "Comfortaa", "Courier New", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText('DEPOSIT ADDRESS (' + currentWallet.label.toUpperCase() + ')', W / 2, addrLabelY);
+            ctx.fillText('SCAN TO DEPOSIT · ' + currentWallet.label.toUpperCase(), W / 2, addrLabelY);
 
             const addr = currentWallet.key === 'trading'
                 ? (sessionAddress || walletInfo?.wallet?.address || '')
                 : (mainWalletAddress || address || '');
 
             ctx.fillStyle = '#0F0F0F';
-            ctx.font = 'bold 12px "Courier New", monospace';
-            const chunk = 36;
+            ctx.font = 'bold 14px "Courier New", monospace';
+            const chunk = 34;
             const addrLines = [];
             for (let i = 0; i < addr.length; i += chunk) addrLines.push(addr.slice(i, i + chunk));
-            addrLines.forEach((line, i) => ctx.fillText(line, W / 2, addrLabelY + 20 + i * 16));
+            addrLines.forEach((line, i) => ctx.fillText(line, W / 2, addrLabelY + 26 + i * 18));
 
-            // ── WEBSITE URL IN ITALICS ────────────────────────────
-            const footerY = H - 64;
-            ctx.strokeStyle = 'rgba(26, 97, 64, 0.15)';
+            // ── FOOTER (15MARKET URL) ─────────────────────────────
+            const footerY = H - 96;
+            ctx.strokeStyle = 'rgba(26, 97, 64, 0.18)';
             ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(60, footerY); ctx.lineTo(W - 60, footerY); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(70, footerY); ctx.lineTo(W - 70, footerY); ctx.stroke();
 
             ctx.fillStyle = '#1A6140';
-            ctx.font = 'italic bold 13px "Courier New", monospace';
-            ctx.fillText('15market.com', W / 2, footerY + 26);
+            ctx.font = 'bold 26px "Comfortaa", "Courier New", monospace';
+            ctx.fillText('15market.com', W / 2, footerY + 44);
 
             // ── EXPORT AND TRIGGER DOWNLOAD ────────────────────────
             canvas.toBlob(blob => {
@@ -863,6 +799,53 @@ export function CircleWalletPage({
             notify("Failed to save image", "error");
         } finally {
             setIsDownloading(false);
+        }
+    };
+
+    // Internal transfer between the Main wallet and the Trading wallet.
+    // Deposit: main -> trading (via onDeposit). Withdraw: trading -> main
+    // (via onWithdraw, destination = main address). Send/Receive stay
+    // reserved for the Main wallet card.
+    const handleInternalTransfer = async () => {
+        const type = transferModal;
+        if (!type) return;
+        const amt = parseFloat(transferAmount);
+        if (isNaN(amt) || amt <= 0) {
+            notify("Enter a valid amount", "error");
+            return;
+        }
+        if (type === 'deposit') {
+            if (parseFloat(evmBalance || 0) < amt) {
+                notify(`Insufficient Main Wallet balance. You have ${parseFloat(evmBalance || 0).toFixed(2)} USDC`, "error");
+                return;
+            }
+        } else {
+            if (parseFloat(sessionBalance || 0) < amt) {
+                notify(`Insufficient Trading Wallet balance. You have ${parseFloat(sessionBalance || 0).toFixed(2)} USDC`, "error");
+                return;
+            }
+        }
+        if (type === 'deposit' && !onDeposit) return notify("Deposit function not available", "error");
+        if (type === 'withdraw' && !onWithdraw) return notify("Withdrawal function not available", "error");
+
+        setIsTransferring(true);
+        try {
+            if (type === 'deposit') {
+                await onDeposit(String(amt));
+                notify(`Deposited ${amt} USDC to your Trading Wallet`, "success");
+            } else {
+                await onWithdraw(amt, mainWalletAddress || address);
+                notify(`Withdrew ${amt} USDC to your Main Wallet`, "success");
+            }
+            setTransferModal(null);
+            setTransferAmount('');
+            fetchWalletInfo(true);
+            if (triggerGlobalRefresh) triggerGlobalRefresh();
+        } catch (e) {
+            const msg = (e?.shortMessage || e?.message || `${type === 'deposit' ? 'Deposit' : 'Withdrawal'} failed`);
+            notify(String(msg).slice(0, 160), "error");
+        } finally {
+            setIsTransferring(false);
         }
     };
 
@@ -1709,20 +1692,41 @@ export function CircleWalletPage({
                             </div>
                         </div>
 
-                        {/* Primary Actions */}
+                        {/* Primary Actions — Trading wallet moves funds internally
+                            (Deposit from Main / Withdraw to Main); Send/Receive are
+                            reserved for the Main wallet. */}
                         <div className="grid grid-cols-2 gap-3 md:gap-4 shrink-0 relative z-20">
-                            <button
-                                onClick={() => setShowSendModal(true)}
-                                className="flex items-center justify-center gap-2 md:gap-3 bg-[#1A6140] text-white font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-2xl shadow-[#1A6140]/20"
-                            >
-                                <Send size={16} /> Send
-                            </button>
-                            <button
-                                onClick={() => setShowReceiveModal(true)}
-                                className={`flex items-center justify-center gap-2 md:gap-3 ${isLight ? 'bg-black' : 'bg-white/10 border border-white/10'} text-[#1A6140] font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest active:scale-[0.95] transition-all shadow-2xl shadow-black/20`}
-                            >
-                                <ArrowDownLeft size={16} className="text-[#1A6140]" /> Receive
-                            </button>
+                            {currentWallet.key === 'trading' ? (
+                                <>
+                                    <button
+                                        onClick={() => { setTransferAmount(''); setTransferModal('deposit'); }}
+                                        className="flex items-center justify-center gap-2 md:gap-3 bg-[#1A6140] text-white font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-2xl shadow-[#1A6140]/20"
+                                    >
+                                        <ArrowDownLeft size={16} /> Deposit
+                                    </button>
+                                    <button
+                                        onClick={() => { setTransferAmount(''); setTransferModal('withdraw'); }}
+                                        className={`flex items-center justify-center gap-2 md:gap-3 ${isLight ? 'bg-black' : 'bg-white/10 border border-white/10'} text-[#1A6140] font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest active:scale-[0.95] transition-all shadow-2xl shadow-black/20`}
+                                    >
+                                        <ArrowUpRight size={16} className="text-[#1A6140]" /> Withdraw
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => setShowSendModal(true)}
+                                        className="flex items-center justify-center gap-2 md:gap-3 bg-[#1A6140] text-white font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-2xl shadow-[#1A6140]/20"
+                                    >
+                                        <Send size={16} /> Send
+                                    </button>
+                                    <button
+                                        onClick={() => setShowReceiveModal(true)}
+                                        className={`flex items-center justify-center gap-2 md:gap-3 ${isLight ? 'bg-black' : 'bg-white/10 border border-white/10'} text-[#1A6140] font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest active:scale-[0.95] transition-all shadow-2xl shadow-black/20`}
+                                    >
+                                        <ArrowDownLeft size={16} className="text-[#1A6140]" /> Receive
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -2366,6 +2370,68 @@ export function CircleWalletPage({
                                         {isSending ? 'Processing...' : 'Confirm Transfer'}
                                     </button>
                                 </div>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {(transferModal === 'deposit' || transferModal === 'withdraw') && (
+                        <div className="fixed inset-0 z-[400] flex items-end md:items-center justify-center p-0 md:p-6">
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (!isTransferring) setTransferModal(null); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                            <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className={`w-full md:max-w-md relative z-10 p-6 md:p-8 rounded-t-[40px] md:rounded-[40px] border-t md:border ${isLight ? 'bg-[#CFDCD5] border-black/5' : 'bg-[#0D0D0D] border-white/5 shadow-2xl'} flex flex-col max-h-[92dvh] overflow-y-auto`}>
+                                <div className="flex items-center justify-between w-full mb-8">
+                                    <h3 className="text-2xl font-black uppercase tracking-tighter text-white">{transferModal === 'deposit' ? 'Deposit' : 'Withdraw'}</h3>
+                                    <button onClick={() => { if (!isTransferring) setTransferModal(null); }} className="p-2 hover:bg-white/5 rounded-full transition-colors"><X size={24} /></button>
+                                </div>
+
+                                {/* Route: source -> destination */}
+                                <div className={`flex items-center gap-3 mb-7 p-4 rounded-3xl border border-[#1A6140]/25 bg-[#1A6140]/10`}>
+                                    <div className="flex-1 flex flex-col items-center gap-1.5 text-center">
+                                        <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 text-white`}>From</span>
+                                        <span className="text-[11px] font-black uppercase tracking-wider text-white">{transferModal === 'deposit' ? 'Main Wallet' : 'Trading Wallet'}</span>
+                                    </div>
+                                    <Send size={16} className="text-[#1A6140] rotate-[-45deg] shrink-0" />
+                                    <div className="flex-1 flex flex-col items-center gap-1.5 text-center">
+                                        <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 text-white`}>To</span>
+                                        <span className="text-[11px] font-black uppercase tracking-wider text-white">{transferModal === 'deposit' ? 'Trading Wallet' : 'Main Wallet'}</span>
+                                    </div>
+                                </div>
+
+                                {/* Amount input */}
+                                <div className="relative mb-3">
+                                    <input
+                                        type="number"
+                                        autoFocus
+                                        placeholder="0.00"
+                                        value={transferAmount}
+                                        onChange={(e) => setTransferAmount(e.target.value)}
+                                        className="w-full py-5 px-6 rounded-2xl bg-white/5 text-white border-2 border-transparent focus:border-[#1A6140]/30 outline-none text-3xl font-black transition-all"
+                                    />
+                                    <button
+                                        onClick={() => setTransferAmount(String(transferModal === 'deposit' ? (parseFloat(evmBalance || 0) || 0) : (parseFloat(sessionBalance || 0) || 0)))}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-[#1A6140] text-white text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-all"
+                                    >
+                                        Max
+                                    </button>
+                                </div>
+                                <p className={`text-[10px] font-black uppercase tracking-widest mb-8 opacity-40 text-white`}>
+                                    {transferModal === 'deposit'
+                                        ? `Main Wallet balance: ${parseFloat(evmBalance || 0).toFixed(2)} USDC`
+                                        : `Trading Wallet balance: ${parseFloat(sessionBalance || 0).toFixed(2)} USDC`}
+                                </p>
+
+                                <button
+                                    onClick={handleInternalTransfer}
+                                    disabled={isTransferring}
+                                    className="flex items-center justify-center gap-3 bg-[#1A6140] text-white font-black py-5 rounded-[24px] text-[11px] uppercase tracking-widest transition-all hover:opacity-90 active:scale-[0.97] disabled:opacity-50"
+                                >
+                                    {isTransferring ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
+                                    {isTransferring ? (transferModal === 'deposit' ? 'Depositing...' : 'Withdrawing...') : (transferModal === 'deposit' ? 'Confirm Deposit' : 'Confirm Withdrawal')}
+                                </button>
+                                <p className={`text-[8px] font-bold mt-4 opacity-40 text-white text-center`}>
+                                    {transferModal === 'deposit'
+                                        ? 'Instant internal transfer — USDC moves from your Main Wallet into your Trading Wallet.'
+                                        : 'Instant internal transfer — USDC moves from your Trading Wallet back to your Main Wallet.'}
+                                </p>
                             </motion.div>
                         </div>
                     )}
