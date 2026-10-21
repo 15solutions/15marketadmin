@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef, memo, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Radio, ArrowUp, ArrowDown, Check, X, Megaphone } from 'lucide-react';
+import { ArrowUp, ArrowDown, Megaphone } from 'lucide-react';
 import { KEEPER_URL_ARC } from '../constants';
 import { socketService } from '../utils/socket';
 
@@ -13,13 +13,9 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
     });
     const [profiles, setProfiles] = useState({});
     const [activeBroadcast, setActiveBroadcast] = useState(null);
-    const [campaignBroadcast, setCampaignBroadcast] = useState(null);
-    const [isCampaignWindow, setIsCampaignWindow] = useState(false);
     const lastFetchRef = useRef(0);
 
     const isLight = theme === 'light';
-    const WIN_COLOR = "#1A6140"; // Green
-    const LOSS_COLOR = "#FF7F50"; // Coral/Red
 
     const truncate = (str) => str ? `${str.slice(0, 4)}...${str.slice(-4)}` : "";
 
@@ -76,7 +72,6 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
         // Real-time Socket Listener for Zero-Latency Broadcasts
         const unbindBroadcast = socketService.on('new_broadcast', (msg) => {
             if (msg && msg.text && msg.expiry > Date.now()) {
-                console.log("📢 Real-time Broadcast Received:", msg);
                 setActiveBroadcast(msg);
             }
         });
@@ -114,69 +109,35 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
         fetchBroadcast();
         const bInterval = setInterval(fetchBroadcast, 30000);
 
-        // Campaign Scroller Logic
-        const fetchCampaigns = async () => {
-            try {
-                const res = await fetch(`${KEEPER_URL_ARC}/campaigns`);
-                if (res.ok) {
-                    const data = await res.json();
-                    const active = data.find(c => Date.now() >= c.startTime && Date.now() < c.endTime);
-                    if (active) {
-                        setCampaignBroadcast({
-                            text: `🏆 ACTIVE CAMPAIGN: ${active.title} — JOIN NOW TO WIN ${active.prize || ''}!`,
-                            id: active.id
-                        });
-                    } else {
-                        setCampaignBroadcast(null);
-                    }
-                }
-            } catch (e) { }
-        };
-
-        const checkTimeWindow = () => {
-            const now = new Date();
-            const minutes = now.getMinutes();
-            // Show for minute 0 of every 10-minute cycle
-            setIsCampaignWindow(minutes % 10 === 0);
-        };
-
-        fetchCampaigns();
-        const cInterval = setInterval(fetchCampaigns, 60000);
-        
-        checkTimeWindow();
-        const tInterval = setInterval(checkTimeWindow, 1000);
-
         return () => {
             clearInterval(interval);
             clearInterval(bInterval);
-            clearInterval(cInterval);
-            clearInterval(tInterval);
             unbindBroadcast();
         };
     }, []);
 
     const ghostTrades = useMemo(() => {
         const symbols = ["ETH", "BTC"];
-        const names = ["Alpha_Bot", "Pulse_V1", "Sonic_X", "Whale_88"];
         return Array.from({ length: 8 }).map((_, i) => ({
             id: `ghost-${i}`,
             owner: "0x0000000000000000000000000000000000000000",
-            username: names[i % names.length],
+            username: ["Alpha_Bot", "Pulse_V1", "Sonic_X", "Whale_88"][i % 4],
             amount: (Math.random() * 5 + 1).toFixed(2),
             symbol: symbols[i % symbols.length],
             direction: Math.random() > 0.5 ? "UP" : "DOWN",
-            status: Math.random() > 0.5 ? "WON" : "LOST",
-            payout: (Math.random() * 4 + 4).toFixed(2),
             timestamp: Date.now() - (i * 30000),
             isGhost: true
         }));
     }, []);
 
+    // Participation feed — every trade shows, whatever its status. Win/loss
+    // is never shown here: the strip indexes who traded WHAT, which way, and
+    // how many shares they bought.
     const mergedHistory = useMemo(() => {
-        const filtered = history.filter(t => ["WON", "LOST"].includes(t.status));
-        if (filtered.length === 0) return ghostTrades;
-        filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        return filtered.slice(0, 40);
+        const participants = (history || []).filter(t => t && (t.amount || t.shares));
+        if (participants.length === 0) return ghostTrades;
+        participants.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        return participants.slice(0, 40);
     }, [history, ghostTrades]);
 
     const repeatedHistory = useMemo(() => {
@@ -193,16 +154,19 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
     }, [mergedHistory]);
 
     const v1Bg = isLight ? 'bg-white zigzag-ticker shadow-sm' : 'bg-[#0a0a0a] zigzag-ticker zigzag-outline';
-    const v1TextClass = isLight ? 'text-[#0a261a]' : 'text-white';
-    const switchEffectBg = isLight
-        ? 'text-white'
-        : 'text-white';
+
+    // Theme treatment (per product spec): dark mode = BLACK-filtered asset
+    // logos and black texts; light mode = WHITE-filtered logos and white
+    // texts. The icon inverts to match the text ink.
+    const inkFilter = isLight ? 'brightness(0) invert(1)' : 'brightness(0)'; // logo paint
+    const inkClass = isLight ? 'text-white' : 'text-black';
+    const inkSoftClass = isLight ? 'text-white/70' : 'text-black/70';
 
     return (
-        <div className={`w-full ${isV1 ? 'h-5 md:h-6 lg:h-10 ' + v1Bg : 'h-7 md:h-7 lg:h-10 bg-[#1A6140] text-white zigzag-ticker'} relative z-[45] overflow-hidden`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+        <div className={`w-full ${isV1 ? 'h-5 md:h-6 lg:h-10 ' + v1Bg : 'h-7 md:h-7 lg:h-10 bg-[#1A6140]'} relative z-[45] overflow-hidden`} style={{ fontFamily: '"Comfortaa", cursive' }}>
             {/* Smooth Transition Layer for Broadcasts */}
             <AnimatePresence mode="wait">
-                {(activeBroadcast || (isCampaignWindow && campaignBroadcast)) ? (
+                {activeBroadcast ? (
                     <motion.div
                         key="broadcast-ticker"
                         initial={{ opacity: 0, y: 20 }}
@@ -217,9 +181,9 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
                         >
                             {[...Array(15)].map((_, i) => (
                                 <div key={i} className="flex items-center gap-2">
-                                    <Megaphone size={isV1 ? 14 : 12} className={`${isV1 ? 'text-amber-500' : 'text-white'}`} />
-                                    <span className={`${isV1 ? 'text-[11px] font-black' : 'text-[10px]'} uppercase tracking-[0.2em] ${isV1 ? 'text-amber-500' : 'text-white'}`}>
-                                        {isCampaignWindow && campaignBroadcast ? campaignBroadcast.text : activeBroadcast.text}
+                                    <Megaphone size={isV1 ? 14 : 12} className={`${isV1 ? 'text-amber-500' : isLight ? 'text-white' : 'text-black'}`} />
+                                    <span className={`${isV1 ? 'text-[11px] font-black' : 'text-[10px]'} uppercase tracking-[0.2em] ${isV1 ? 'text-amber-500' : inkClass}`}>
+                                        {activeBroadcast.text}
                                     </span>
                                 </div>
                             ))}
@@ -240,27 +204,42 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
                         >
                             {repeatedHistory.map((event, i) => {
                                 const isUp = event.direction === "UP" || event.direction === 1 || String(event.direction) === "1";
-                                const isWon = event.status === "WON";
+                                const ticker = (event.symbol ? event.symbol.split('/')[0] : 'BTC').toUpperCase();
+                                const sym = ticker.toLowerCase();
+                                const logoSrc = `/logos/${sym}.png`;
+                                const shares = parseFloat(event.shares || event.amount || 0).toFixed(2);
 
                                 return (
                                     <div key={`${event.id}-${i}`} className={`flex items-center gap-5 ${isV1 ? 'px-8 border-r-2' : 'px-10 border-r'} border-white/10 h-full`}>
+                                        {/* Asset logo (theme-filtered) */}
+                                        <img
+                                            src={logoSrc}
+                                            alt={ticker}
+                                            className={`${isV1 ? 'w-3.5 h-3.5' : 'w-4 h-4'} object-contain`}
+                                            style={{ filter: inkFilter }}
+                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                        {/* Asset ticker */}
+                                        <span className={`${isV1 ? 'text-[10px]' : 'text-[11px]'} font-black uppercase tracking-[0.2em] ${inkClass}`}>
+                                            {ticker}
+                                        </span>
+
+                                        {/* Prediction: up/down chip + label */}
                                         <div className="flex items-center gap-3">
-                                            <div className="p-1 rounded-full bg-white/10">
-                                                {isUp ? <ArrowUp size={isV1 ? 10 : 12} className="text-white" /> : <ArrowDown size={isV1 ? 10 : 12} className="text-white" />}
+                                            <div className={`p-1 rounded-full ${isLight ? 'bg-white/10' : 'bg-black/10'}`}>
+                                                {isUp
+                                                    ? <ArrowUp size={isV1 ? 10 : 12} className={inkClass} />
+                                                    : <ArrowDown size={isV1 ? 10 : 12} className={inkClass} />}
                                             </div>
-                                            <span className={`${isV1 ? 'text-[10px]' : 'text-[11px]'} font-black uppercase tracking-[0.2em] text-white`}>
-                                                {event.symbol ? event.symbol.split('/')[0] : 'BTC'}
+                                            <span className={`${isV1 ? 'text-[9px]' : 'text-[10px]'} font-black uppercase tracking-widest ${inkClass}`}>
+                                                {isUp ? 'UP' : 'DOWN'}
                                             </span>
                                         </div>
 
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex items-center gap-2">
-                                                {isWon ? <Check size={isV1 ? 10 : 12} className="text-white" /> : <X size={isV1 ? 10 : 12} className="text-white/60" />}
-                                                <span className={`${isV1 ? 'text-[9px]' : 'text-[10px]'} font-black uppercase tracking-widest text-white`}>
-                                                    {isWon ? `WON $${parseFloat(event.payout || event.amount || 0).toFixed(2)}` : 'LOST'}
-                                                </span>
-                                            </div>
-                                        </div>
+                                        {/* Shares bought */}
+                                        <span className={`${isV1 ? 'text-[9px]' : 'text-[10px]'} font-black uppercase tracking-widest ${inkSoftClass}`}>
+                                            {shares} SHARES
+                                        </span>
                                     </div>
                                 );
                             })}
