@@ -198,6 +198,13 @@ if (!isLocal && !envUrlArc) {
 }
 export const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN;
 
+// ─── Supabase Auth (admin portal identity) ──────────────────────────────
+// Admins sign in with email+password against Supabase Auth; the ONLY thing
+// the browser ever needs is the project URL + anon key (public by design —
+// RLS on admin_users blocks anon access entirely, the backend verifies).
+export const SUPABASE_AUTH_URL = import.meta.env.VITE_SUPABASE_AUTH_URL || 'https://cwzbdxvninfagfbaehre.supabase.co';
+export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
 // 2. Project ID (Reown / WalletConnect)
 export const projectId = import.meta.env.VITE_REOWN_PROJECT_ID;
 

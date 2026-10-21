@@ -1,4 +1,4 @@
-// ==================================================================================
+﻿// ==================================================================================
 // NEXUS CORE - SYSTEM ARCHITECTURE (UNIFIED ENTRY POINT)
 // ==================================================================================
 // This is the primary backend controller for the 15MARKET trading platform. 
@@ -38,7 +38,7 @@ const OddsEngine = require('./services/OddsEngine');
 const priceService = require('./services/priceService');
 const settlementPriceService = require('./services/settlementPriceService');
 const chainReconciler = require('./services/chainReconciler');
-const { requireAdminAuth, handleAdminLogin } = require('./security');
+const { requireAdminAuth, requirePerm, requireRoot, handleAdminAuthStatus, handleAdminBootstrap, handleAdminMe, handleAdminList, handleAdminCreate, handleAdminUpdate, handleAdminDelete } = require('./security');
 
 // --- DYNAMICALLY DERIVED SOLANA RELAYER ADDRESS ---
 let derivedSolanaRelayerAddress = '11111111111111111111111111111111'; // default fallback
@@ -69,7 +69,7 @@ const server = http.createServer(app);
  * calls `http://<that-host>:<PORT>` (see 15market/src/constants.js). Without
  * this, 127.0.0.1, 192.168.x.x and Vite's port fallback (5174) get no
  * Access-Control-Allow-Origin header and the browser silently drops the
- * response — which looks exactly like "my balance is not loading".
+ * response â€” which looks exactly like "my balance is not loading".
  */
 const isAllowedOrigin = (origin) => {
     if (!origin) return false;
@@ -79,7 +79,7 @@ const isAllowedOrigin = (origin) => {
         const { hostname } = new URL(origin);
         if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]') return true;
         if (/^192\.168\./.test(hostname) || /^10\./.test(hostname) || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) return true;
-    } catch { /* malformed origin — not allowed */ }
+    } catch { /* malformed origin â€” not allowed */ }
     return false;
 };
 
@@ -118,7 +118,7 @@ const classicEngine = new ClassicEngine(io);
 // Declared here, not at the top of the file: `app` is created further down and
 // classicEngine is constructed just above, so registering these earlier threw
 // "Cannot access 'app' before initialization" and the process would not boot at
-// all. Route order in this file is not free — it has to follow the objects the
+// all. Route order in this file is not free â€” it has to follow the objects the
 // handlers close over.
 
 /**
@@ -129,7 +129,7 @@ const classicEngine = new ClassicEngine(io);
  * turned into a LOST verdict, so a price-feed gap quietly cost users their stake
  * with nothing counting it.
  *
- * No auth and no PII — just aggregate counters, safe to poll. Counters are
+ * No auth and no PII â€” just aggregate counters, safe to poll. Counters are
  * in-process and reset on deploy, which is exactly the window you care about
  * when a change is live.
  */
@@ -160,16 +160,22 @@ app.get('/health/settlement', (req, res) => {
 });
 
 /**
- * POST /admin/login
+ * ADMIN AUTH (Supabase Auth) â€” routes
  *
- * Exchanges the operator credentials for a short-lived bearer token. This is the
- * missing link: generateAdminToken and requireAdminAuth both existed, but nothing
- * ever issued a token, so every admin endpoint was unreachable in practice.
- *
- * The secret stays server-side. A shared secret in the admin frontend would be
- * inlined into the public JS bundle and readable by anyone who opens the site.
+ * Identity lives in Supabase Auth; authorisation in the admin_users table
+ * (migration 011). The FIRST bootstrap becomes the root admin (the only root
+ * there will ever be); the root can create admins & moderators and grant
+ * granular permissions. Tokens are Supabase access tokens sent as
+ * `Authorization: Bearer <token>` â€” see src/security.js for the middleware.
  */
-app.post('/admin/login', handleAdminLogin);
+
+app.get('/admin/auth/status', handleAdminAuthStatus);
+app.post('/admin/auth/bootstrap', handleAdminBootstrap);
+app.get('/admin/auth/me', requireAdminAuth, handleAdminMe);
+app.get('/admin/auth/admins', requireRoot, handleAdminList);
+app.post('/admin/auth/admins', requireRoot, handleAdminCreate);
+app.patch('/admin/auth/admins/:id', requireRoot, handleAdminUpdate);
+app.delete('/admin/auth/admins/:id', requireRoot, handleAdminDelete);
 
 /**
  * AGGREGATED ADMIN METRICS BROADCAST
@@ -269,7 +275,7 @@ async function recoverUnsettledTrades() {
     // Adopt a locked verdict that survived in Redis (1h TTL). Re-deciding
     // from stale snapshots can flip the result, and for wins re-running
     // settlement would re-credit an already-paid payout. A WON restore is
-    // parked as WON — every settle path refuses non-PENDING objects, so
+    // parked as WON â€” every settle path refuses non-PENDING objects, so
     // money can never move twice; its record still syncs once below.
     try {
       const locked = await cache.getCachedTradeResult(id);
@@ -290,7 +296,7 @@ async function recoverUnsettledTrades() {
               Number(trade.amount) * mult * 0.99
             ));
           }
-          console.log(`[Recovery] #${id} adopted cached WON (no re-credit) — syncing record.`);
+          console.log(`[Recovery] #${id} adopted cached WON (no re-credit) â€” syncing record.`);
           cache.pushHistory(trade.userAddr, { ...trade }).catch(() => {});
         }
       }
@@ -328,7 +334,7 @@ oddsEngine.start();
 
 // --- DEDICATED PRICE FEED SERVICES ---
 // Separate modules for odds engine and settlement. Both write to shared cache.
-// MEXC primary, Kraken secondary, Binance tertiary (Pyth removed — returns 401).
+// MEXC primary, Kraken secondary, Binance tertiary (Pyth removed â€” returns 401).
 priceService.start(io);
 settlementPriceService.startSettlement(io);
 
@@ -454,16 +460,32 @@ app.get('/protocol-stats', (req, res) => {
   res.json(profiles.getGlobalStats());
 });
 
+// Platform-wide trading settings. In-memory by design: the values are live
+// operational switches (broadcast to every client on change), and a restart
+// resetting them to safe defaults is the correct behaviour after an incident.
+const platformSettings = {
+  minBet: config.DEFAULT_MIN_BET || 1.0,
+  maxBet: 1000000.0,
+  maintenanceMode: false,
+  tradingHalted: false,
+  systemBanner: "",
+  bannerLevel: "info",
+  treasuryAddress: config.TREASURY_ADDRESS
+};
+
 app.get('/settings', (req, res) => {
-  res.json({
-    minBet: config.DEFAULT_MIN_BET || 1.0,
-    maxBet: 1000000.0,
-    maintenanceMode: false,
-    tradingHalted: false,
-    systemBanner: "",
-    bannerLevel: "info",
-    treasuryAddress: config.TREASURY_ADDRESS
-  });
+  res.json(platformSettings);
+});
+
+app.post('/settings', requirePerm('platform.settings'), (req, res) => {
+  const body = req.body || {};
+  if (body.maintenanceMode !== undefined) platformSettings.maintenanceMode = !!body.maintenanceMode;
+  if (body.tradingHalted !== undefined) platformSettings.tradingHalted = !!body.tradingHalted;
+  if (body.systemBanner !== undefined) platformSettings.systemBanner = String(body.systemBanner).slice(0, 300);
+  if (body.bannerLevel !== undefined) platformSettings.bannerLevel = String(body.bannerLevel).slice(0, 20);
+  if (body.minBet !== undefined && Number(body.minBet) > 0) platformSettings.minBet = Number(body.minBet);
+  io.emit('settings_update', platformSettings);
+  res.json(platformSettings);
 });
 
 // Deposit tx hashes already credited, so a retried or replayed
@@ -472,7 +494,7 @@ app.get('/settings', (req, res) => {
 // process lifetime, which is the realistic double-credit window.
 const _creditedDepositTxs = new Set();
 
-// Main wallet balance — cached, refreshed periodically (no live RPC per request)
+// Main wallet balance â€” cached, refreshed periodically (no live RPC per request)
 let _mainBalanceCache = {}; // address -> { balance, updatedAt }
 const MAIN_BALANCE_CACHE_TTL = 15000; // 15s
 
@@ -487,7 +509,7 @@ app.get('/balance/:address', async (req, res) => {
       return res.json({ success: true, balance: cached.balance });
     }
 
-    // Fetch live — but only one concurrent request per address
+    // Fetch live â€” but only one concurrent request per address
     const bal = await rpc.getBalance(req.params.address);
     _mainBalanceCache[addr] = { balance: bal, updatedAt: now };
     res.json({ success: true, balance: bal });
@@ -573,7 +595,7 @@ app.post('/fund/monitor-cctp', async (req, res) => {
     const { address, txHash, fromChain, destChain, amount } = req.body;
     if (!txHash || !fromChain) return res.status(400).json({ error: 'Missing CCTP details' });
 
-    console.log(`[CCTP] Burn registered: chain ${fromChain} → ${destChain || 'auto'} | TX: ${txHash}`);
+    console.log(`[CCTP] Burn registered: chain ${fromChain} â†’ ${destChain || 'auto'} | TX: ${txHash}`);
 
     const userAddr = address.toLowerCase();
 
@@ -597,7 +619,7 @@ app.post('/fund/monitor-cctp', async (req, res) => {
       });
       console.log(`[CCTP-Relayer] Instantly credited ${amount} USDC to ${userAddr} (optimistic)`);
     } else {
-      console.warn(`[CCTP-Relayer] No active session for ${userAddr} — balance will sync on next poll`);
+      console.warn(`[CCTP-Relayer] No active session for ${userAddr} â€” balance will sync on next poll`);
     }
 
     // Offload full CCTP relay to background: poll IRIS, call receiveMessage on dest chain, finalize credit
@@ -693,7 +715,7 @@ app.get('/fund/gas-tank', async (req, res) => {
 
 
 
-// ─── SESSION WALLET ROUTES (Embedded EOA) ─────────────────────────────────────
+// â”€â”€â”€ SESSION WALLET ROUTES (Embedded EOA) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * POST /session/init
@@ -719,7 +741,7 @@ app.post('/session/init', async (req, res) => {
     // ARC to the session wallet for gas, unrelated to the trading pot). The trading
     // balance always lives in profile.balance, updated by syncBalance on every trade.
 
-    // Initialize or restore session — profile balance is the single source of truth
+    // Initialize or restore session â€” profile balance is the single source of truth
     let session = cache.sessions.get(userAddr);
     if (session) {
       const timeSinceTrade = Date.now() - (session.lastTradeAt || 0);
@@ -727,14 +749,14 @@ app.post('/session/init', async (req, res) => {
       if (timeSinceTrade >= 30000) {
         // Reconcile to the persisted virtual balance. Never re-inflate from on-chain ARC.
         session.balance = profileBal > 0 ? profileBal : (session.balance || 0);
-        // Re-sync profile if session drifted (e.g. from win credits) — but only keep
+        // Re-sync profile if session drifted (e.g. from win credits) â€” but only keep
         // the persisted value as truth; on-chain ARC is excluded.
         if (session.balance !== profileBal && profileBal > 0) {
           session.balance = profileBal;
         }
       }
     } else {
-      // No in-memory session — rebuild from the persisted profile balance only
+      // No in-memory session â€” rebuild from the persisted profile balance only
       const restoredBalance = profileBal;
       session = cache.getOrCreateSession(userAddr, {
         identityKey: userAddr,
@@ -782,19 +804,19 @@ app.get('/session/balance/:address', async (req, res) => {
     // Session balance is the authoritative source of truth.
     // It is updated in real-time by placeTrade, creditWinner, creditTradingWallet, etc.
     // Profile is the persistent backup that survives restarts.
-    // On-chain balance is NOT used here — the virtual trading balance may differ.
+    // On-chain balance is NOT used here â€” the virtual trading balance may differ.
     const session = cache.sessions.get(userAddr);
     const profile = profiles.get(userAddr);
     const profileBal = parseFloat(profile?.balance || 0);
 
     if (session) {
-      // Always return the live in-memory session balance — no guards, no Math.max
+      // Always return the live in-memory session balance â€” no guards, no Math.max
       // Sync to profile periodically so it survives restarts
       if (session.balance !== profileBal) {
         profiles.upsert(userAddr, { balance: session.balance });
       }
     } else {
-      // No in-memory session — a cold instance. Rebuild from the shared Redis
+      // No in-memory session â€” a cold instance. Rebuild from the shared Redis
       // snapshot first, then the persisted profile.
       //
       // This is what lets the client drop its localStorage balance cache: there
@@ -816,7 +838,7 @@ app.get('/session/balance/:address', async (req, res) => {
       });
     }
 
-    // ── On-chain reconciliation ──────────────────────────────────────────
+    // â”€â”€ On-chain reconciliation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // USDC sent directly to the trading wallet address (bypassing the app's
     // deposit flow) would otherwise sit on-chain forever without ever being
     // credited. This detects that inflow and credits it, after absorbing the
@@ -824,13 +846,13 @@ app.get('/session/balance/:address', async (req, res) => {
     //
     // Detached on purpose. The RPC read fans out across providers and can
     // outlast the frontend's 6s fetch timeout, which would make the whole
-    // balance response get discarded — the exact "my balance never loads"
+    // balance response get discarded â€” the exact "my balance never loads"
     // symptom this was meant to fix. The ledger is returned immediately and
     // the credit arrives via the balance_update socket push, or the next poll.
     chainReconciler.reconcileSessionBalance(userAddr, sessionWallet.address)
         .catch((reconErr) => console.warn('[session/balance] reconcile skipped:', reconErr.message));
 
-    // ── On-chain is the source of truth ───────────────────────────────────
+    // â”€â”€ On-chain is the source of truth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // The chain holds the money that can actually be staked, and it moves on
     // its own when a stake is sent to the treasury or a win settles back in.
     // We read it so the number the user sees is the real one after every
@@ -1196,7 +1218,7 @@ app.post('/session/execute', async (req, res) => {
       if (trade) trade.stakeTxHash = stakeTxHash;
     }
 
-    // SYNCHRONOUS COPY TRADE EXECUTION — same request, same block as provider trade
+    // SYNCHRONOUS COPY TRADE EXECUTION â€” same request, same block as provider trade
     // Executes immediately so investor activity is event-driven with zero latency
     const copyTradeResults = [];
     // A duplicate is a replay of a bet id that is already live. It produced no
@@ -1456,7 +1478,7 @@ app.post('/session/deposit', async (req, res) => {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    // ── 1. Signature check ────────────────────────────────────────────────
+    // â”€â”€ 1. Signature check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (!signature || !message) {
       return res.status(401).json({ error: "Signature required" });
     }
@@ -1485,7 +1507,7 @@ app.post('/session/deposit', async (req, res) => {
       return res.status(401).json({ error: "Confirmation expired, please retry the deposit" });
     }
 
-    // ── 2. On-chain verification ──────────────────────────────────────────
+    // â”€â”€ 2. On-chain verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let creditedAmount = requestedAmount;
     // Declared out here, not inside the `if (txHash)` block: the idempotency
     // check below also needs the session wallet to read the on-chain state.
@@ -1530,7 +1552,7 @@ app.post('/session/deposit', async (req, res) => {
       return res.status(400).json({ error: "txHash is required to verify a deposit" });
     }
 
-    // ── 3. Idempotency: never credit the same transfer twice ──────────────
+    // â”€â”€ 3. Idempotency: never credit the same transfer twice â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // The reconciler credits aggregate on-chain deltas with no tx hash, so it
     // never writes a claim. If it already absorbed this transfer (a user who
     // sent USDC directly, then called /fund/confirm for the same tx), claiming
@@ -1545,7 +1567,7 @@ app.post('/session/deposit', async (req, res) => {
             const s = cache.sessions.get(userAddr);
             currentBalance = s ? Number(s.balance || 0) : Number((profiles.get(userAddr) || {}).balance || 0);
         } catch (e) { }
-        console.log(`[Deposit] ${txHash} already absorbed by reconciler (on-chain ${absorbed.onChain}, baseline ${absorbed.baseline}) — not crediting again`);
+        console.log(`[Deposit] ${txHash} already absorbed by reconciler (on-chain ${absorbed.onChain}, baseline ${absorbed.baseline}) â€” not crediting again`);
         return res.json({ success: true, balance: currentBalance, credited: 0, alreadyReconciled: true });
     }
 
@@ -1641,7 +1663,7 @@ app.get('/history/:address', async (req, res) => {
   }
 });
 
-// ─── PUBLIC TRADE LOOKUP ───────────────────────────────────────────────────────
+// â”€â”€â”€ PUBLIC TRADE LOOKUP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Backs the shared-card QR. Scanning https://<site>/verify/<id> lands here and
 // renders that trade's win/lose card, so this must work for a logged-out
 // visitor who has no wallet and no session.
@@ -1704,10 +1726,10 @@ app.get('/trade/:id', async (req, res) => {
   });
 });
 
-// ─── ON-DEMAND SETTLEMENT ─────────────────────────────────────────────────────
+// â”€â”€â”€ ON-DEMAND SETTLEMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Client-triggered authoritative settle. Lets the UI resolve a trade that is
 // past its countdown but whose settlement events were missed (e.g. a socket
-// reconnect) — FAST and ACCURATE, returning the verdict in the HTTP response.
+// reconnect) â€” FAST and ACCURATE, returning the verdict in the HTTP response.
 // Idempotent: reuses the already-locked exit price if one was captured, so the
 // result can never change after countdown zero. Never fabricates a LOST.
 app.post('/trades/:id/settle', async (req, res) => {
@@ -1740,7 +1762,7 @@ app.post('/trades/:id/settle', async (req, res) => {
   }
 
   try {
-    classicEngine.lockResult(trade); // idempotent — reuses locked result if any
+    classicEngine.lockResult(trade); // idempotent â€” reuses locked result if any
     res.json({
       betId,
       status: trade.status,
@@ -1759,9 +1781,9 @@ app.post('/trades/:id/settle', async (req, res) => {
   }
 });
 
-// ─── PRICE PROXY ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ PRICE PROXY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The browser can NEVER call exchange REST APIs directly (CORS blocks every one
-// of them: MEXC, Binance, Kraken — none send an Access-Control-Allow-Origin
+// of them: MEXC, Binance, Kraken â€” none send an Access-Control-Allow-Origin
 // header). Any frontend "REST fallback" must come through THIS relay so the
 // exchange call happens server-side where CORS doesn't exist.
 app.get('/price/:key', async (req, res) => {
@@ -1780,12 +1802,12 @@ app.get('/price/:key', async (req, res) => {
   res.status(404).json({ error: 'No price for asset', key });
 });
 
-// ─── ROUNDS ACCESS (WAITLIST) — REMOVED: the rounds model was retired; the
-// Ladders product is a full-page Coming Soon with no gate codes. ──────────
+// â”€â”€â”€ ROUNDS ACCESS (WAITLIST) â€” REMOVED: the rounds model was retired; the
+// Ladders product is a full-page Coming Soon with no gate codes. â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ─── PROFILES ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ PROFILES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// Username availability check for signup validation. Boolean only — no
+// Username availability check for signup validation. Boolean only â€” no
 // profile data. Must sit ABOVE /profiles/:address or "username" parses as
 // an address.
 app.get('/profiles/username/:username', async (req, res) => {
@@ -1826,19 +1848,19 @@ app.get('/stats/global', (req, res) => {
   res.json(profiles.getGlobalStats());
 });
 
-// ─── PRICE HISTORY (live chart seed) ─────────────────────────────────────────
+// â”€â”€â”€ PRICE HISTORY (live chart seed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Recent backend-authoritative price points for one asset so a live chart can
 // render a COMPLETE, correctly-scaled window the instant it mounts, instead of
 // building up from an empty buffer (which made the first seconds look like a
 // wider timeframe until enough ticks arrived).
 //
-// Reads cache.priceHistory — the same feed the settlement engine uses — so what
+// Reads cache.priceHistory â€” the same feed the settlement engine uses â€” so what
 // the chart draws and what settles can never disagree. Read-only, public.
 //
 // IMPORTANT: the raw buffer is appended on EVERY trade (tens of points/second).
 // Sending it verbatim would both overflow the window (a few seconds of data)
 // and draw as noise. So we downsample into even ~50ms buckets, keeping the
-// latest tick in each — a clean series that spans the whole window.
+// latest tick in each â€” a clean series that spans the whole window.
 app.get('/prices/history', (req, res) => {
   const key = String(req.query.key || '').trim().toLowerCase();
   const ms = Math.min(Math.max(parseInt(req.query.ms, 10) || 20000, 1000), 600000);
@@ -1867,14 +1889,14 @@ app.get('/prices/history', (req, res) => {
   res.json({ key, ms, points });
 });
 
-// ─── Input validation (security) ─────────────────────────────────────────────
-// Usernames: 6–20 chars, letters/numbers ONLY (no special characters). The
+// â”€â”€â”€ Input validation (security) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Usernames: 6â€“20 chars, letters/numbers ONLY (no special characters). The
 // client validates too, but the API is the authority. Uniqueness is enforced
 // separately, fail-closed, via profiles.isUsernameTaken.
-// Avatars: PNG/JPEG data URLs (≤1MB file) or http(s) URLs; anything else is
+// Avatars: PNG/JPEG data URLs (â‰¤1MB file) or http(s) URLs; anything else is
 // dropped instead of stored.
 const USERNAME_RE = /^[A-Za-z0-9]{6,20}$/;
-const USERNAME_ERROR = 'Usernames are 6–20 letters or numbers — no special characters.';
+const USERNAME_ERROR = 'Usernames are 6â€“20 letters or numbers â€” no special characters.';
 const AVATAR_RE = /^data:image\/(png|jpe?g);base64,[A-Za-z0-9+/=]+$/;
 const sanitizeUsernameInput = (u) => {
   if (typeof u !== 'string') return undefined;
@@ -1886,7 +1908,7 @@ const sanitizeAvatarInput = (a) => {
   const v = a.trim();
   if (!v) return undefined;
   if (/^https?:\/\//i.test(v)) return v.slice(0, 1000); // remote URL (X profile etc.)
-  if (AVATAR_RE.test(v) && v.length <= 1_400_000) return v; // 1MB file ≈ 1.37MB base64
+  if (AVATAR_RE.test(v) && v.length <= 1_400_000) return v; // 1MB file â‰ˆ 1.37MB base64
   return undefined;
 };
 
@@ -1962,7 +1984,7 @@ app.post('/profiles', async (req, res) => {
   res.json({ success: true, profile, walletAddress: sessionWallet.address });
 });
 
-// ─── Referral program ─────────────────────────────────────────────────────
+// â”€â”€â”€ Referral program â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The referrer's code (7 chars) is what gets shared; the link form embeds it
 // as ?ref=CODE on the site URL.
 app.get('/referral/info/:address', async (req, res) => {
@@ -2006,7 +2028,7 @@ app.get('/referral/stats/:address', async (req, res) => {
   }
 });
 
-// Enroll into the referral program — mints the user's referral code. The hub
+// Enroll into the referral program â€” mints the user's referral code. The hub
 // requires this explicit step before a code/link/dashboard is shown.
 app.post('/referral/enroll/:address', async (req, res) => {
   try {
@@ -2049,7 +2071,7 @@ app.get('/referral/withdrawals/:address', async (req, res) => {
   }
 });
 
-app.get('/admin/referral/withdrawals', requireAdminAuth, async (req, res) => {
+app.get('/admin/referral/withdrawals', requirePerm('ref.withdrawals'), async (req, res) => {
   try {
     res.json(await profiles.getAdminRefWithdrawals());
   } catch (e) {
@@ -2058,7 +2080,7 @@ app.get('/admin/referral/withdrawals', requireAdminAuth, async (req, res) => {
   }
 });
 
-app.post('/admin/referral/withdrawals/:id', requireAdminAuth, async (req, res) => {
+app.post('/admin/referral/withdrawals/:id', requirePerm('ref.withdrawals'), async (req, res) => {
   try {
     const status = req.body?.status;
     const note = typeof req.body?.note === 'string' ? req.body.note : '';
@@ -2068,7 +2090,7 @@ app.post('/admin/referral/withdrawals/:id', requireAdminAuth, async (req, res) =
     const result = await profiles.setRefWithdrawalStatus(req.params.id, status, note);
     if (!result.ok) return res.status(result.status).json({ error: result.error });
 
-    // USER EMAIL NOTICE — cancelling a withdrawal request always emails the
+    // USER EMAIL NOTICE â€” cancelling a withdrawal request always emails the
     // user that an administrator cancelled it (and why, when a note was
     // attached); approving one emails them the approval. Emails go through
     // Resend with the profile's stored/verified address (skipped silently
@@ -2089,7 +2111,7 @@ app.post('/admin/referral/withdrawals/:id', requireAdminAuth, async (req, res) =
         notificationService.notifyUser(
           row.user_address,
           'Withdrawal Request Approved',
-          `Your referral commission withdrawal request of ${amount}${dest} has been approved. The payout is on its way — check your wallet shortly.`,
+          `Your referral commission withdrawal request of ${amount}${dest} has been approved. The payout is on its way â€” check your wallet shortly.`,
           'success',
           true
         ).catch(e => console.warn('[Referral] approval notice failed:', e.message));
@@ -2102,9 +2124,9 @@ app.post('/admin/referral/withdrawals/:id', requireAdminAuth, async (req, res) =
   }
 });
 
-// ── Referral admin management (migration 010) ─────────────────────────────
+// â”€â”€ Referral admin management (migration 010) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Enrolled users with their admin-control state for the management tab.
-app.get('/admin/referral/users', requireAdminAuth, async (req, res) => {
+app.get('/admin/referral/users', requirePerm('ref.manage'), async (req, res) => {
   try {
     res.json(await profiles.getAdminRefUsers(req.query?.q));
   } catch (e) {
@@ -2115,7 +2137,7 @@ app.get('/admin/referral/users', requireAdminAuth, async (req, res) => {
 
 // Suspend / unsuspend a user from the referral program. Suspended users keep
 // accrued commission but cannot request withdrawals.
-app.post('/admin/referral/suspend', requireAdminAuth, async (req, res) => {
+app.post('/admin/referral/suspend', requirePerm('ref.manage'), async (req, res) => {
   try {
     const address = req.body?.address;
     const result = await profiles.setReferralSuspension(address, req.body?.suspended === true);
@@ -2125,7 +2147,7 @@ app.post('/admin/referral/suspend', requireAdminAuth, async (req, res) => {
       (address || '').toLowerCase(),
       result.suspended ? 'Referral Program Suspended' : 'Referral Program Reinstated',
       result.suspended
-        ? 'An administrator has suspended your account from the referral program. Withdrawal requests are paused while suspended — contact support if you believe this is a mistake.'
+        ? 'An administrator has suspended your account from the referral program. Withdrawal requests are paused while suspended â€” contact support if you believe this is a mistake.'
         : 'Your account has been reinstated in the referral program. Withdrawal requests are available again.',
       result.suspended ? 'error' : 'success',
       true
@@ -2138,7 +2160,7 @@ app.post('/admin/referral/suspend', requireAdminAuth, async (req, res) => {
 });
 
 // Set / clear a per-user commission rate override (percent, null = default).
-app.post('/admin/referral/set-rate', requireAdminAuth, async (req, res) => {
+app.post('/admin/referral/set-rate', requirePerm('ref.manage'), async (req, res) => {
   try {
     const address = req.body?.address;
     const result = await profiles.setReferralRate(address, req.body?.rate ?? null);
@@ -2152,7 +2174,7 @@ app.post('/admin/referral/set-rate', requireAdminAuth, async (req, res) => {
 });
 
 // Slash a user's earned commission (permanent deduction).
-app.post('/admin/referral/slash', requireAdminAuth, async (req, res) => {
+app.post('/admin/referral/slash', requirePerm('ref.manage'), async (req, res) => {
   try {
     const address = String(req.body?.address || '').toLowerCase();
     const result = await profiles.slashReferralCommission(address, req.body?.amount);
@@ -2195,13 +2217,13 @@ app.patch('/profiles/:address', async (req, res) => {
   }
 
   const updates = { ...req.body };
-  // Username format gate: 6–20 letters/numbers (no special characters).
+  // Username format gate: 6â€“20 letters/numbers (no special characters).
   if (typeof updates.username === 'string') {
     if (updates.username.trim() && !USERNAME_RE.test(updates.username.trim())) {
       return res.status(400).json({ error: USERNAME_ERROR, reason: 'format' });
     }
   }
-  // Avatar gate: PNG/JPEG data URLs or http(s) URLs only — drop anything else
+  // Avatar gate: PNG/JPEG data URLs or http(s) URLs only â€” drop anything else
   // so arbitrary payloads can never be persisted as inline profile content.
   if (typeof updates.avatar === 'string' && updates.avatar.trim()) {
     const safe = sanitizeAvatarInput(updates.avatar);
@@ -2219,7 +2241,7 @@ app.patch('/profiles/:address', async (req, res) => {
     updates.onboarded = true;
     updates.onboardedAt = Date.now();
   }
-  // Same uniqueness gate as POST /profiles — a PATCH can rename an account too.
+  // Same uniqueness gate as POST /profiles â€” a PATCH can rename an account too.
   if (typeof updates.username === 'string' && updates.username.trim()) {
     const name = updates.username.trim();
     const current = profiles.get(addr);
@@ -2242,7 +2264,7 @@ app.patch('/profiles/:address', async (req, res) => {
   res.json({ success: true, profile });
 });
 
-// ─── X (TWITTER) OAUTH INTEGRATION ──────────────────────────────────────────────
+// â”€â”€â”€ X (TWITTER) OAUTH INTEGRATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const crypto = require('crypto');
 const oauthStates = new Map();
@@ -2318,7 +2340,7 @@ app.get('/auth/twitter/callback', async (req, res) => {
   }
 });
 
-// ─── CIRCLE WALLET ROUTES ───────────────────────────────────────────────────
+// â”€â”€â”€ CIRCLE WALLET ROUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app.get('/circle/wallet/:address', async (req, res) => {
   try {
@@ -2362,7 +2384,7 @@ app.post('/circle/transfer', async (req, res) => {
   }
 });
 
-// ─── ADMIN ENDPOINTS ──────────────────────────────────────────────────────────
+// â”€â”€â”€ ADMIN ENDPOINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app.get('/admin/stats', (req, res) => {
   // Use the global stats from profiles which aggregates data across all users
@@ -2417,7 +2439,7 @@ app.get('/admin/stats', (req, res) => {
  *
  * Body: { apply?: boolean, refund?: boolean, olderThanMinutes?: number, reason?: string }
  */
-app.post('/admin/trades/resolve-stuck', requireAdminAuth, async (req, res) => {
+app.post('/admin/trades/resolve-stuck', requirePerm('trades.maintenance'), async (req, res) => {
   const apply = req.body?.apply === true;
   const refund = req.body?.refund === true;
   const olderThanMinutes = Math.max(1, Number(req.body?.olderThanMinutes) || 10);
@@ -2469,7 +2491,7 @@ app.post('/admin/trades/resolve-stuck', requireAdminAuth, async (req, res) => {
     };
 
     if (!apply) {
-      summary.note = 'DRY RUN — nothing was changed. Re-run with { apply: true } to clear these.';
+      summary.note = 'DRY RUN â€” nothing was changed. Re-run with { apply: true } to clear these.';
       summary.wouldResolve = candidates.map(t => ({
         id: String(t.id || t.betId || ''),
         user: String(t.userAddr || t.user_address || '').slice(0, 12),
@@ -2577,7 +2599,7 @@ app.get('/admin/trade/:id', (req, res) => {
   res.status(404).json({ error: 'Trade not found' });
 });
 
-app.post('/admin/broadcast', (req, res) => {
+app.post('/admin/broadcast', requirePerm('broadcast.send'), (req, res) => {
   const { message, type, expiry } = req.body;
   if (!message) return res.status(400).json({ error: 'Message required' });
   
@@ -2601,10 +2623,16 @@ app.post('/admin/broadcast', (req, res) => {
   res.json({ success: true, broadcast });
 });
 
-app.post('/admin/settings/update', (req, res) => {
+app.post('/admin/settings/update', requirePerm('platform.settings'), (req, res) => {
   const settings = req.body;
-  // In a real app, you'd save this to a database/config file
-  // For now, we broadcast it instantly to all clients
+  // Persist the standard toggles in-memory and re-broadcast instantly.
+  if (settings && typeof settings === 'object') {
+    if (settings.maintenanceMode !== undefined) platformSettings.maintenanceMode = !!settings.maintenanceMode;
+    if (settings.tradingHalted !== undefined) platformSettings.tradingHalted = !!settings.tradingHalted;
+    if (settings.systemBanner !== undefined) platformSettings.systemBanner = String(settings.systemBanner).slice(0, 300);
+    if (settings.bannerLevel !== undefined) platformSettings.bannerLevel = String(settings.bannerLevel).slice(0, 20);
+    if (settings.minBet !== undefined && Number(settings.minBet) > 0) platformSettings.minBet = Number(settings.minBet);
+  }
   io.emit('settings_update', settings);
   res.json({ success: true, settings });
 });
@@ -2616,7 +2644,7 @@ app.get('/broadcast', (req, res) => {
   res.json(activeBroadcast);
 });
 
-// ─── MISC ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ MISC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app.get('/listings', (req, res) => {
   res.json([
@@ -3677,5 +3705,5 @@ app.post('/copy-trading/providers/:address/withdraw', async (req, res) => {
 module.exports = { app, server, io };
 
 server.listen(config.PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 Nexus Core (Embedded Wallet Mode) listening on port ${config.PORT}\n`);
+  console.log(`\nðŸš€ Nexus Core (Embedded Wallet Mode) listening on port ${config.PORT}\n`);
 });

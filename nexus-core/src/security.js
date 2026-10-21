@@ -74,170 +74,334 @@ function isEncrypted(value) {
   }
 }
 
-// ─── ADMIN AUTH MIDDLEWARE ──────────────────────────────────────────────────
-// Server-side admin authentication using HMAC-signed bearer tokens.
-// Tokens are short-lived (5 min) and bound to a session nonce.
+// ─── ADMIN AUTH (Supabase Auth) ─────────────────────────────────────────────
+// Admin identity lives in Supabase Auth (auth.users) + the admin_users table
+// (migration 011). The FIRST account created in admin_users becomes the ROOT
+// admin and is the only root there will ever be; the root can create further
+// admins and moderators and grant them granular permissions down from its own.
+//
+// Verification path: the admin frontend signs in with email+password against
+// Supabase Auth and sends `Authorization: Bearer <access_token>`. We resolve
+// the token against Supabase's /auth/v1/user endpoint (the authoritative
+// validator), then load the admin_users row to know the role and permissions.
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const ADMIN_SECRET = process.env.ADMIN_API_SECRET;
-const adminSessions = new Map(); // token -> { createdAt, ip }
+// Optional: pin the root admin to a single email. When set, roots can only
+// ever be bootstrapped for this email. When unset, the first bootstrap wins.
+const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || '').toLowerCase().trim();
 
-if (!ADMIN_SECRET) {
-  console.warn('[Security] ADMIN_API_SECRET not set. Admin endpoints are UNPROTECTED. Set this in production!');
+const ALL_PERMISSIONS = [
+  'ref.withdrawals',    // approve / cancel referral commission payouts
+  'ref.manage',         // suspend users, set commission rates, slash commission
+  'platform.settings',  // maintenance mode, trading halt, banner settings
+  'broadcast.send',     // live global broadcasts
+  'trades.maintenance', // resolve stuck trades
+  'admins.manage'       // create admins/moderators — root-only, NOT grantable
+];
+
+const ROLE_DEFAULTS = {
+  root: ['*'],
+  admin: ['ref.withdrawals', 'ref.manage', 'platform.settings', 'broadcast.send', 'trades.maintenance'],
+  moderator: ['ref.withdrawals']
+};
+
+const adminSessions = new Map(); // legacy map kept so requireOwnership's shape is unchanged
+const sessionCache = new Map();  // access token -> { user, expiresAt }
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.warn('[Security] SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — Supabase-Auth admin login is disabled.');
 }
 
-/**
- * Generate a short-lived admin session token.
- * Called by a server-side login endpoint (not exposed publicly).
- */
-function generateAdminToken(ip) {
-  if (!ADMIN_SECRET) return null;
-  const payload = JSON.stringify({
-    ts: Date.now(),
-    ip: String(ip || ''),
-    nonce: crypto.randomBytes(24).toString('hex')
+// Minimal service-role REST helper for the admin_users table + Supabase admin API.
+async function supabaseAdminRest(path, { method = 'GET', body } = {}) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) throw new Error('Supabase admin auth not configured');
+  const res = await fetch(`${SUPABASE_URL}${path}`, {
+    method,
+    headers: {
+      'apikey': SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
   });
-  const signature = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('hex');
-  // The payload is base64'd whole rather than joined with ':' because an address
-  // can itself contain colons — Node reports every IPv4 connection as
-  // '::ffff:127.0.0.1', so a colon-delimited token shredded the address on
-  // verification and the signature never matched. That made every admin request
-  // fail, which is why this path looked simply "unreachable".
-  const token = Buffer.from(`${payload}.${signature}`).toString('base64');
-  adminSessions.set(token, { createdAt: Date.now(), ip });
-  return token;
+  const text = await res.text().catch(() => '');
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { /* non-JSON body */ }
+  return { ok: res.ok, status: res.status, data, error: data?.message || data?.msg || (text || '').slice(0, 240) };
+}
+
+// Validate an access token against Supabase (the source of truth) and return
+// { id, email }. Cheap local exp pre-check first; results cached 30s per token.
+async function verifySupabaseToken(token) {
+  const cached = sessionCache.get(token);
+  if (cached && Date.now() < cached.expiresAt) return cached.user;
+  try {
+    const payload = JSON.parse(Buffer.from(String(token).split('.')[1], 'base64').toString('utf8'));
+    if (payload?.exp && payload.exp * 1000 < Date.now()) return null;
+  } catch (e) { /* let Supabase reject it */ }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${token}` },
+      signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined
+    });
+    if (!res.ok) return null;
+    const user = await res.json();
+    if (!user?.id) return null;
+    ctxSessionCacheSet(token, { id: user.id, email: (user.email || '').toLowerCase() });
+    return sessionCache.get(token).user;
+  } catch (e) {
+    console.warn('[Security] Supabase token verification failed:', e.message);
+    return null;
+  }
+}
+
+function ctxSessionCacheSet(token, user) {
+  sessionCache.set(token, { user, expiresAt: Date.now() + 30000 });
+  // Prune stale entries opportunistically (the map holds one entry per active admin).
+  if (sessionCache.size > 500) {
+    for (const [k, v] of sessionCache) {
+      if (Date.now() >= v.expiresAt) sessionCache.delete(k);
+    }
+  }
+}
+
+async function getAdminRecord(userId) {
+  const res = await supabaseAdminRest(`/rest/v1/admin_users?select=*&id=eq.${encodeURIComponent(userId)}&limit=1`);
+  return Array.isArray(res.data) && res.data[0] ? res.data[0] : null;
 }
 
 /**
- * Express middleware: protects admin endpoints.
- * Requires: Authorization: Bearer <token>
+ * Express middleware: protects admin endpoints. Requires a valid Supabase
+ * Auth bearer token backed by a non-suspended admin_users row. Populates
+ * req.admin = { id, email, role, permissions, isRoot }.
  */
-function requireAdminAuth(req, res, next) {
-  if (!ADMIN_SECRET) {
-    return res.status(503).json({ error: 'Admin auth not configured. Set ADMIN_API_SECRET.' });
+async function requireAdminAuth(req, res, next) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    return res.status(503).json({ error: 'Admin auth not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.' });
   }
-
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Admin authentication required' });
   }
-
-  const token = authHeader.slice(7);
-  const session = adminSessions.get(token);
-
-  if (!session) {
+  const user = await verifySupabaseToken(authHeader.slice(7));
+  if (!user) {
     return res.status(401).json({ error: 'Invalid or expired admin session' });
   }
-
-  // Token expires after 5 minutes
-  if (Date.now() - session.createdAt > 5 * 60 * 1000) {
-    adminSessions.delete(token);
-    return res.status(401).json({ error: 'Admin session expired' });
+  const rec = await getAdminRecord(user.id);
+  if (!rec || rec.suspended === true) {
+    return res.status(403).json({ error: rec?.suspended ? 'Admin account suspended' : 'Not an administrator' });
   }
-
-  // Verify HMAC integrity
-  try {
-    const decoded = Buffer.from(token, 'base64').toString('utf8');
-    const sep = decoded.lastIndexOf('.');
-    if (sep < 1) return res.status(401).json({ error: 'Malformed token' });
-
-    const payload = decoded.slice(0, sep);
-    const signature = decoded.slice(sep + 1);
-    const expected = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('hex');
-
-    // Compare BUFFER lengths, not string lengths. `expected` is 64 hex
-    // characters while its buffer is 32 bytes, so guarding on the string length
-    // rejected every validly signed token.
-    const sigBuf = Buffer.from(signature, 'hex');
-    const expBuf = Buffer.from(expected, 'hex');
-    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-      return res.status(401).json({ error: 'Invalid admin token signature' });
-    }
-  } catch (e) {
-    return res.status(401).json({ error: 'Token verification failed' });
-  }
-
+  req.admin = {
+    id: rec.id,
+    email: (rec.email || user.email || '').toLowerCase(),
+    role: rec.role || 'moderator',
+    permissions: Array.isArray(rec.permissions) ? rec.permissions : [],
+    isRoot: rec.role === 'root'
+  };
   next();
 }
 
-// ─── ADMIN LOGIN ─────────────────────────────────────────────────────────────
-//
-// generateAdminToken existed but nothing ever called it, so there was no way to
-// obtain a bearer token and requireAdminAuth was unreachable in practice. The
-// credentials it needed (ADMIN_USERNAME / ADMIN_PASSWORD) were already in the
-// environment; only the route was missing.
-//
-// The token is short-lived and server-signed. The secret never leaves the
-// server, which is the whole point: a shared secret in the admin FRONTEND would
-// be inlined into the public JS bundle and readable by anyone who opens the
-// admin site.
-
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-// Brute-force damper. Small and in-process, which is enough to make online
-// guessing impractical without pulling in a rate-limit dependency.
-const loginAttempts = new Map(); // ip -> { count, firstAt }
-const LOGIN_WINDOW_MS = 10 * 60 * 1000;
-const MAX_LOGIN_ATTEMPTS = 10;
-const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
-
-// Length-safe constant-time compare: timingSafeEqual throws on a length
-// mismatch, which would itself leak the length.
-function safeEqual(a, b) {
-  const bufA = Buffer.from(String(a ?? ''), 'utf8');
-  const bufB = Buffer.from(String(b ?? ''), 'utf8');
-  if (bufA.length !== bufB.length) {
-    // Still burn a comparison so a wrong length is not obviously faster.
-    crypto.timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
+/**
+ * Factory: protects admin endpoints with a specific permission tag.
+ * Root always passes (their record carries ['*']).
+ */
+function requirePerm(perm) {
+  return (req, res, next) => {
+    requireAdminAuth(req, res, () => {
+      const list = req.admin?.permissions || [];
+      if (!req.admin?.isRoot && !list.includes('*') && !list.includes(perm)) {
+        return res.status(403).json({ error: `Missing permission: ${perm}` });
+      }
+      next();
+    });
+  };
 }
 
-function adminLoginConfigured() {
-  return !!(ADMIN_SECRET && ADMIN_USERNAME && ADMIN_PASSWORD);
+const requireRoot = (req, res, next) => {
+  requireAdminAuth(req, res, () => {
+    if (req.admin?.role !== 'root') return res.status(403).json({ error: 'Root admin only' });
+    next();
+  });
+};
+
+/**
+ * GET /admin/auth/status (public) — tells the login page whether the root
+ * bootstrap is still open ({ initialized: false } → show the setup form).
+ */
+async function handleAdminAuthStatus(req, res) {
+  try {
+    const res2 = await supabaseAdminRest('/rest/v1/admin_users?select=id&limit=50');
+    const count = Array.isArray(res2.data) ? res2.data.length : 0;
+    res.json({ supabaseAuth: !!(SUPABASE_URL && SUPABASE_SERVICE_KEY), initialized: count > 0, rootEmailLocked: !!ROOT_ADMIN_EMAIL });
+  } catch (e) {
+    res.status(503).json({ error: 'Admin store unreachable', detail: e.message });
+  }
 }
 
 /**
- * POST /admin/login  { username, password } -> { token, expiresIn }
+ * POST /admin/auth/bootstrap { email, password } — one-time root admin setup.
+ * Creates the Supabase Auth user (auto-confirmed, via the service-role admin
+ * API) and the admin_users root row. Refuses once ANY admin exists.
  */
-function handleAdminLogin(req, res) {
-  if (!adminLoginConfigured()) {
-    return res.status(503).json({
-      error: 'Admin login not configured. Set ADMIN_API_SECRET, ADMIN_USERNAME and ADMIN_PASSWORD.'
+async function handleAdminBootstrap(req, res) {
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+      return res.status(503).json({ error: 'Supabase admin auth not configured on the backend' });
+    }
+    const countRes = await supabaseAdminRest('/rest/v1/admin_users?select=id&limit=1');
+    if (Array.isArray(countRes.data) && countRes.data.length > 0) {
+      return res.status(409).json({ error: 'Root admin already exists' });
+    }
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (ROOT_ADMIN_EMAIL && email !== ROOT_ADMIN_EMAIL) {
+      return res.status(403).json({ error: 'This email is not the configured root admin (ROOT_ADMIN_EMAIL)' });
+    }
+
+    // Create + auto-confirm the auth user with the service role key.
+    const created = await supabaseAdminRest('/auth/v1/admin/users', {
+      method: 'POST',
+      body: { email, password, email_confirm: true }
     });
+    if (!created.ok) {
+      return res.status(created.status).json({ error: `Supabase rejected the account: ${created.error}` });
+    }
+    const userId = created.data?.id;
+    if (!userId) return res.status(500).json({ error: 'Supabase created no user id' });
+
+    const ins = await supabaseAdminRest('/rest/v1/admin_users', {
+      method: 'POST',
+      body: { id: userId, email, role: 'root', permissions: ['*'], created_by: null }
+    });
+    if (!ins.ok) return res.status(502).json({ error: `Could not persist admin record: ${ins.error}` });
+
+    console.log(`[Security] ROOT ADMIN bootstrapped: ${email}`);
+    return res.json({ ok: true, role: 'root' });
+  } catch (e) {
+    console.error('[Security] bootstrap failed:', e.message);
+    res.status(500).json({ error: e.message });
   }
-
-  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-  const now = Date.now();
-  const record = loginAttempts.get(ip);
-
-  if (record?.lockedUntil && now < record.lockedUntil) {
-    const secs = Math.ceil((record.lockedUntil - now) / 1000);
-    return res.status(429).json({ error: `Too many failed attempts. Try again in ${secs}s.` });
-  }
-  if (record && now - record.firstAt > LOGIN_WINDOW_MS) {
-    loginAttempts.delete(ip);   // window elapsed, start fresh
-  }
-
-  const { username, password } = req.body || {};
-  const ok = safeEqual(username, ADMIN_USERNAME) & safeEqual(password, ADMIN_PASSWORD);
-
-  if (!ok) {
-    const cur = loginAttempts.get(ip) || { count: 0, firstAt: now };
-    cur.count += 1;
-    if (cur.count >= MAX_LOGIN_ATTEMPTS) cur.lockedUntil = now + LOGIN_LOCKOUT_MS;
-    loginAttempts.set(ip, cur);
-    console.warn(`[Security] Failed admin login from ${ip} (attempt ${cur.count})`);
-    // Deliberately identical to a bad username, so this cannot enumerate accounts.
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  loginAttempts.delete(ip);
-  const token = generateAdminToken(ip);
-  console.log(`[Security] Admin session issued to ${ip}`);
-  return res.json({ token, expiresIn: 300 });
 }
+
+/**
+ * GET /admin/auth/me (requireAdminAuth) — the role/permission snapshot the
+ * portal uses to decide which screens to render.
+ */
+async function handleAdminMe(req, res) {
+  res.json({
+    id: req.admin.id,
+    email: req.admin.email,
+    role: req.admin.role,
+    isRoot: req.admin.isRoot,
+    permissions: req.admin.isRoot ? ['*'] : req.admin.permissions,
+    allPermissions: ALL_PERMISSIONS,
+    roleDefaults: ROLE_DEFAULTS
+  });
+}
+
+/**
+ * GET /admin/auth/admins (root) — full roster of admins & moderators.
+ */
+async function handleAdminList(req, res) {
+  const res2 = await supabaseAdminRest('/rest/v1/admin_users?select=*&order=created_at.desc&limit=100');
+  if (!res2.ok) return res.status(502).json({ error: `Could not load admins: ${res2.error}` });
+  res.json((res2.data || []));
+}
+
+/**
+ * POST /admin/auth/admins (root) { email, password, role, permissions }
+ * Creates a Supabase Auth user + admin_users row. Never allows a second root.
+ */
+async function handleAdminCreate(req, res) {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    let role = String(req.body?.role || 'moderator');
+    if (!['admin', 'moderator'].includes(role)) {
+      return res.status(400).json({ error: 'Role must be admin or moderator — the root role is reserved for the initial bootstrap' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const perms = Array.isArray(req.body?.permissions) ? req.body.permissions.filter(p => ALL_PERMISSIONS.includes(p) && p !== 'admins.manage') : ROLE_DEFAULTS[role];
+
+    const created = await supabaseAdminRest('/auth/v1/admin/users', {
+      method: 'POST',
+      body: { email, password, email_confirm: true }
+    });
+    if (!created.ok) {
+      return res.status(created.status).json({ error: `Supabase rejected the account: ${created.error}` });
+    }
+    const userId = created.data?.id;
+    if (!userId) return res.status(500).json({ error: 'Supabase created no user id' });
+
+    const ins = await supabaseAdminRest('/rest/v1/admin_users', {
+      method: 'POST',
+      body: { id: userId, email, role, permissions: perms, suspended: false, created_by: req.admin.id }
+    });
+    if (!ins.ok) return res.status(502).json({ error: `Could not persist admin record: ${ins.error}` });
+    console.log(`[Security] Admin created: ${email} (${role}) by ${req.admin.email}`);
+    res.json({ ok: true, id: userId, role, permissions: perms });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+/**
+ * PATCH /admin/auth/admins/:id (root) { role?, permissions?, suspended? }
+ * Root rows can never be demoted, suspended or reshaped from here.
+ */
+async function handleAdminUpdate(req, res) {
+  try {
+    const target = await getAdminRecord(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Admin not found' });
+    if (target.role === 'root') return res.status(403).json({ error: 'The root admin record is locked' });
+
+    const patch = { updated_at: new Date().toISOString() };
+    if (req.body?.role !== undefined) {
+      if (!['admin', 'moderator'].includes(req.body.role)) return res.status(400).json({ error: 'Invalid role' });
+      patch.role = req.body.role;
+    }
+    if (Array.isArray(req.body?.permissions)) {
+      patch.permissions = req.body.permissions.filter(p => ALL_PERMISSIONS.includes(p) && p !== 'admins.manage');
+    }
+    if (req.body?.suspended !== undefined) patch.suspended = req.body.suspended === true;
+
+    const upd = await supabaseAdminRest(`/rest/v1/admin_users?id=eq.${encodeURIComponent(req.params.id)}`, {
+      method: 'PATCH',
+      body: patch
+    });
+    if (!upd.ok) return res.status(502).json({ error: `Could not update: ${upd.error}` });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+/**
+ * DELETE /admin/auth/admins/:id (root) — removes the admin_users row and the
+ * underlying Supabase Auth user. The root row is undeletable.
+ */
+async function handleAdminDelete(req, res) {
+  try {
+    const target = await getAdminRecord(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Admin not found' });
+    if (target.role === 'root' || String(req.params.id) === req.admin.id) {
+      return res.status(403).json({ error: 'The root admin record is locked' });
+    }
+    const del = await supabaseAdminRest(`/rest/v1/admin_users?id=eq.${encodeURIComponent(req.params.id)}`, { method: 'DELETE' });
+    if (!del.ok) return res.status(502).json({ error: `Could not delete: ${del.error}` });
+    await supabaseAdminRest(`/auth/v1/admin/users/${encodeURIComponent(req.params.id)}`, { method: 'DELETE' }).catch(() => {});
+    console.log(`[Security] Admin removed: ${target.email} (by ${req.admin.email})`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+// ─── DEPOSIT TX VERIFICATION ────────────────────────────────────────────────
 
 // ─── DEPOSIT TX VERIFICATION ────────────────────────────────────────────────
 
@@ -424,11 +588,14 @@ function requireOwnership(addressParam = 'address', { strict = false } = {}) {
       return res.status(400).json({ error: `Missing required target address parameter: ${addressParam}` });
     }
 
-    // Check if requester is authenticated admin
+    // Check if requester is an authenticated admin (Supabase-Auth middlewares
+    // stamp req.admin on the request when requireAdminAuth/requirePerm ran
+    // before this middleware). The legacy adminSessions map is kept for shape
+    // compatibility but issues no tokens anymore.
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
-      if (adminSessions.has(token)) {
+      if (adminSessions.has(token) || req.admin) {
         req.isOwner = true;
         req.isAdmin = true;
         req.callerAddress = 'admin';
@@ -480,10 +647,16 @@ module.exports = {
   encryptSecret,
   decryptSecret,
   isEncrypted,
-  generateAdminToken,
   requireAdminAuth,
-  handleAdminLogin,
-  adminLoginConfigured,
+  requirePerm,
+  requireRoot,
+  handleAdminAuthStatus,
+  handleAdminBootstrap,
+  handleAdminMe,
+  handleAdminList,
+  handleAdminCreate,
+  handleAdminUpdate,
+  handleAdminDelete,
   verifyDepositTx,
   checkRateLimit,
   verifyAddressSignature,

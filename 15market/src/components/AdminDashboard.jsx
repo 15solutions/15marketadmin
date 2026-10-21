@@ -32,9 +32,11 @@ import {
     BadgePercent,
     Mail,
     Landmark,
-    ChevronDown
+    ChevronDown,
+    LogOut
 } from "lucide-react";
-import { KEEPER_URL_ARC, ADMIN_TOKEN } from "../constants";
+import { KEEPER_URL_ARC } from "../constants";
+import { adminFetch, clearSession } from "../utils/adminAuth";
 import { socketService } from "../utils/socket";
 
 // Admin tabs. Even mobile widths keep every tool reachable — the tab row
@@ -42,10 +44,11 @@ import { socketService } from "../utils/socket";
 const ADMIN_TABS = [
     { key: 'overview', label: 'Overview', icon: Activity },
     { key: 'referral', label: 'Referral Program', icon: Gift },
-    { key: 'requests', label: 'Withdrawal Requests', icon: Landmark }
+    { key: 'requests', label: 'Withdrawal Requests', icon: Landmark },
+    { key: 'admins', label: 'Admins & Mods', icon: Shield }
 ];
 
-export function AdminDashboard({ onBack, theme, notify, platformSettings: initialSettings }) {
+export function AdminDashboard({ onBack, theme, notify, platformSettings: initialSettings, auth }) {
     const isLight = theme === 'light';
     
     const [platformSettings, setPlatformSettings] = useState(initialSettings || {
@@ -77,9 +80,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
     const fetchRefWithdrawals = async () => {
         try {
-            const res = await fetch(`${KEEPER_URL_ARC}/admin/referral/withdrawals`, {
-                headers: { 'Authorization': ADMIN_TOKEN }
-            });
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/referral/withdrawals`);
             if (res.ok) setRefWithdrawals(await res.json());
         } catch (e) { /* list stays empty; the card shows a retry button */ }
     };
@@ -91,9 +92,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const setRefWithdrawalStatus = async (id, status, note = '') => {
         setProcessingId(id);
         try {
-            const res = await fetch(`${KEEPER_URL_ARC}/admin/referral/withdrawals/${id}`, {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/referral/withdrawals/${id}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_TOKEN },
                 body: JSON.stringify({ status, note })
             });
             const data = await res.json().catch(() => ({}));
@@ -127,9 +127,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const fetchRefUsers = async (q = refUsersQ) => {
         try {
             const params = q ? `?q=${encodeURIComponent(q)}` : '';
-            const res = await fetch(`${KEEPER_URL_ARC}/admin/referral/users${params}`, {
-                headers: { 'Authorization': ADMIN_TOKEN }
-            });
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/referral/users${params}`);
             const data = await res.json().catch(() => []);
             if (res.ok) setRefUsers(Array.isArray(data) ? data : []);
         } catch (e) { /* card shows a retry button */ }
@@ -160,9 +158,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const doRefAction = async (endpoint, payload, successMsg) => {
         setRefActionBusy(`${endpoint}:${payload.address}`);
         try {
-            const res = await fetch(`${KEEPER_URL_ARC}/admin/referral/${endpoint}`, {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/referral/${endpoint}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_TOKEN },
                 body: JSON.stringify(payload)
             });
             const data = await res.json().catch(() => ({}));
@@ -283,12 +280,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         const performUpdate = async (retries = 2) => {
             try {
                 setSyncProgress(40);
-                const res = await fetch(`${KEEPER_URL_ARC}/settings`, {
+                const res = await adminFetch(`${KEEPER_URL_ARC}/settings`, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': ADMIN_TOKEN 
-                    },
                     body: JSON.stringify(newSettings)
                 });
                 
@@ -329,12 +322,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         
         setIsSaving(true);
         try {
-            const res = await fetch(`${KEEPER_URL_ARC}/admin/broadcast`, {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/broadcast`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': ADMIN_TOKEN 
-                },
                 body: JSON.stringify({
                     message: broadcastText,
                     expiry: Date.now() + broadcastDuration * 1000,
@@ -352,6 +341,125 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             setIsSaving(false);
         }
     };
+
+    // ── Auth context (Supabase-Auth admin) ──────────────────────────────
+    const isRoot = auth?.isRoot === true || auth?.role === 'root';
+    const adminPerms = auth?.permissions || [];
+    const hasPerm = (p) => isRoot || adminPerms.includes('*') || adminPerms.includes(p);
+    const canRequests = hasPerm('ref.withdrawals');
+    const canReferral = hasPerm('ref.manage');
+    const canSettings = hasPerm('platform.settings');
+    const canBroadcast = hasPerm('broadcast.send');
+
+    // Row-based tabs: only ones the signed-in admin is allowed to open.
+    const visibleTabs = ADMIN_TABS.filter(t => {
+        if (t.key === 'requests') return canRequests;
+        if (t.key === 'referral') return canReferral;
+        if (t.key === 'admins') return isRoot;
+        return true;
+    });
+
+    // ── Admins & Moderators (root-only, migration 011) ───────────────────
+    const [adminRoster, setAdminRoster] = useState([]);
+    const [rosterBusy, setRosterBusy] = useState(false);
+    const [newAdmin, setNewAdmin] = useState({ email: '', password: '', role: 'moderator', permissions: ['ref.withdrawals'] });
+    const [createAdminBusy, setCreateAdminBusy] = useState(false);
+    const [showCreateAdmin, setShowCreateAdmin] = useState(false);
+
+    const fetchAdminRoster = async () => {
+        setRosterBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/auth/admins`);
+            if (res.ok) setAdminRoster(Array.isArray(await res.json()) ? await res.json() : []);
+        } catch (e) { /* roster stays as-is */ }
+        finally { setRosterBusy(false); }
+    };
+
+    useEffect(() => {
+        if (adminTab === 'admins' && auth?.isRoot) fetchAdminRoster();
+    }, [adminTab, auth]);
+
+    const createAdmin = async () => {
+        setCreateAdminBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/auth/admins`, {
+                method: 'POST',
+                body: JSON.stringify({ ...newAdmin, email: newAdmin.email.trim() })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Could not create admin');
+            notify(`${newAdmin.email.trim()} created as ${newAdmin.role}`, 'success');
+            setShowCreateAdmin(false);
+            setNewAdmin({ email: '', password: '', role: 'moderator', permissions: ['ref.withdrawals'] });
+            fetchAdminRoster();
+        } catch (e) {
+            notify(e.message, 'error');
+        } finally {
+            setCreateAdminBusy(false);
+        }
+    };
+
+    const setAdminPermission = async (row, perm) => {
+        const next = (row.permissions || []).includes(perm)
+            ? (row.permissions || []).filter(p => p !== perm)
+            : [...(row.permissions || []), perm];
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/auth/admins/${row.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ permissions: next })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Update failed');
+            fetchAdminRoster();
+        } catch (e) { notify(e.message, 'error'); }
+    };
+
+    const setAdminRole = async (row, role) => {
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/auth/admins/${row.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ role, permissions: ROLE_PRESETS[role] })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Update failed');
+            notify(`${row.email} is now ${role}`, 'success');
+            fetchAdminRoster();
+        } catch (e) { notify(e.message, 'error'); }
+    };
+
+    const setAdminSuspension = async (row, suspended) => {
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/auth/admins/${row.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ suspended })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Update failed');
+            notify(suspended ? `${row.email} suspended` : `${row.email} reinstated`, 'success');
+            fetchAdminRoster();
+        } catch (e) { notify(e.message, 'error'); }
+    };
+
+    const removeAdmin = async (row) => {
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/auth/admins/${row.id}`, { method: 'DELETE' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Delete failed');
+            notify(`${row.email} removed from the admin team`, 'success');
+            fetchAdminRoster();
+        } catch (e) { notify(e.message, 'error'); }
+    };
+
+    // Permission presets for the (re)assign UI. Mirrors the backend defaults;
+    // 'admins.manage' is never grantable — it is the root's birthright.
+    const ROLE_PRESETS = { admin: ['ref.withdrawals', 'ref.manage', 'platform.settings', 'broadcast.send', 'trades.maintenance'], moderator: ['ref.withdrawals'] };
+    const GRANTABLE_PERMS = [
+        { tag: 'ref.withdrawals', label: 'Withdrawal requests' },
+        { tag: 'ref.manage', label: 'Referral management' },
+        { tag: 'platform.settings', label: 'Platform settings' },
+        { tag: 'broadcast.send', label: 'Broadcasts' },
+        { tag: 'trades.maintenance', label: 'Trade maintenance' }
+    ];
 
     const AdminCard = ({ title, icon: Icon, children, accent = "#1A6140" }) => (
         <div className={`p-6 border rounded-[32px] ${isLight ? 'bg-white/70 border-[#1A6140]/20 shadow-sm' : 'bg-[#0D0D0D]/80 border-white/5 shadow-2xl'} backdrop-blur-xl relative overflow-hidden group`}>
@@ -401,6 +509,24 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 Latency: 42ms
                             </span>
                         </div>
+                        {auth?.email && (
+                            <div className={`hidden md:flex items-center gap-3 px-4 py-2 rounded-2xl border ${isLight ? 'bg-white border-[#1A6140]/20' : 'bg-white/5 border-white/5'}`}>
+                                <div className="w-7 h-7 rounded-full bg-[#1A6140] flex items-center justify-center text-white text-[9px] font-black uppercase">
+                                    {auth.email.slice(0, 2)}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black' : 'text-white'}`}>{auth.email}</span>
+                                    <span className="text-[7px] font-black uppercase tracking-widest text-[#1A6140]">{auth.isRoot ? 'Root Admin' : auth.role || 'Admin'}</span>
+                                </div>
+                                <button
+                                    onClick={auth.signOut || auth.onSignOut}
+                                    title="Sign out"
+                                    className={`p-2 rounded-xl transition-all active:scale-95 ${isLight ? 'bg-black/[0.04] hover:bg-red-500/10 text-black/40 hover:text-red-500' : 'bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-500'}`}
+                                >
+                                    <LogOut size={13} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </header>
@@ -409,7 +535,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             <main className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-10 z-10">
                 {/* Tab bar — chip strip that scrolls horizontally on narrow screens */}
                 <div className="max-w-[1400px] mx-auto flex items-center gap-2 mb-6 md:mb-8 overflow-x-auto no-scrollbar">
-                    {ADMIN_TABS.map(t => {
+                    {visibleTabs.map(t => {
                         const Icon = t.icon;
                         const active = adminTab === t.key;
                         const badge = t.key === 'requests' ? refWithdrawals.filter(w => w.status === 'pending').length : 0;
@@ -434,6 +560,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     
                     {/* Security & Maintenance Controls (COL 1-7) */}
                     <div className="lg:col-span-7 flex flex-col gap-8">
+                        {canSettings && (
                         <AdminCard title="Security Protocols" icon={Shield} accent="#1A6140">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Maintenance Toggle */}
@@ -499,6 +626,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 </div>
                             </div>
                         </AdminCard>
+                        )}
 
                         <AdminCard title="Platform Metrics" icon={Activity} accent="#1A6140">
                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -555,6 +683,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                     {/* Broadcast Center (COL 8-12) */}
                     <div className="lg:col-span-5">
+                        {canBroadcast && (
                         <AdminCard title="Broadcast Center" icon={Radio} accent="#1A6140">
                             <div className="flex flex-col gap-6">
                                 <div>
@@ -621,6 +750,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 </div>
                             </div>
                         </AdminCard>
+                        )}
 
                         <AdminCard title="Recent Activity" icon={Clock} accent="#f59e0b">
                             <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto no-scrollbar">
@@ -903,9 +1033,149 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </div>
                     </AdminCard>
                 )}
-            </main>
+            {/* Admins & Moderators (root-only) — Supabase Auth identity */}
+            {adminTab === 'admins' && isRoot && (
+                <AdminCard title="Admins & Moderators" icon={Shield} accent="#1A6140">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <p className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black' : 'text-white'}`}>
+                                Identity: Supabase Auth · root is permanent · permissions are granular
+                            </p>
+                            <button
+                                onClick={() => setShowCreateAdmin(v => !v)}
+                                className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${showCreateAdmin ? 'bg-white/5 border border-white/10 text-white/60' : 'bg-[#1A6140] text-white hover:brightness-110'}`}
+                            >
+                                {showCreateAdmin ? 'Close form' : '+ New admin / mod'}
+                            </button>
+                        </div>
 
-            {/* Cancel-with-reason modal — the note travels into the user's email */}
+                        {showCreateAdmin && (
+                            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className={`p-5 rounded-3xl border flex flex-col gap-4 ${isLight ? 'bg-black/[0.03] border-black/10' : 'bg-black/30 border-white/10'}`}>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <input
+                                        value={newAdmin.email}
+                                        onChange={e => setNewAdmin(prev => ({ ...prev, email: e.target.value }))}
+                                        placeholder="email"
+                                        className={`px-4 py-3 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    />
+                                    <input
+                                        type="password"
+                                        value={newAdmin.password}
+                                        onChange={e => setNewAdmin(prev => ({ ...prev, password: e.target.value }))}
+                                        placeholder="temp password (min 8)"
+                                        className={`px-4 py-3 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    />
+                                    <div className="flex gap-2">
+                                        {[['admin', 'Admin'], ['moderator', 'Moderator']].map(([r, l]) => (
+                                            <button
+                                                key={r}
+                                                onClick={() => setNewAdmin(prev => ({ ...prev, role: r, permissions: ROLE_PRESETS[r] }))}
+                                                className={`flex-1 py-3 rounded-2xl border text-[9px] font-black uppercase tracking-widest transition-all ${newAdmin.role === r ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
+                                            >
+                                                {l}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {GRANTABLE_PERMS.map(p => {
+                                        const active = newAdmin.permissions.includes(p.tag);
+                                        return (
+                                            <button
+                                                key={p.tag}
+                                                onClick={() => setNewAdmin(prev => ({
+                                                    ...prev,
+                                                    permissions: active ? prev.permissions.filter(x => x !== p.tag) : [...prev.permissions, p.tag]
+                                                }))}
+                                                className={`px-3 py-2 rounded-xl border text-[8px] font-black uppercase tracking-widest transition-all ${active ? 'bg-[#1A6140]/15 text-[#1A6140] border-[#1A6140]/40' : isLight ? 'bg-white border-black/10 text-black/30' : 'bg-white/5 border-white/10 text-white/30'}`}
+                                            >
+                                                {active && <Check size={9} className="inline mr-1" />} {p.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <button
+                                    onClick={createAdmin}
+                                    disabled={createAdminBusy || !newAdmin.email.trim() || newAdmin.password.length < 8}
+                                    className="w-full py-3.5 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                                >
+                                    {createAdminBusy ? 'Creating…' : 'Create account'}
+                                </button>
+                            </motion.div>
+                        )}
+
+                        <div className="flex flex-col gap-2 max-h-[540px] overflow-y-auto no-scrollbar">
+                            {rosterBusy && adminRoster.length === 0 ? (
+                                <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">Loading roster…</div>
+                            ) : adminRoster.length === 0 ? (
+                                <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">No admins found</div>
+                            ) : adminRoster.map(row => {
+                                const isRootRow = row.role === 'root';
+                                return (
+                                    <div key={row.id} className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
+                                        <div className="min-w-0">
+                                            <div className={`text-[10px] font-black uppercase flex items-center gap-2 ${isLight ? 'text-black' : 'text-white'}`}>
+                                                {row.email}
+                                                {isRootRow ? (
+                                                    <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 text-[7px] font-black uppercase tracking-widest">Root</span>
+                                                ) : (
+                                                    <span className={`px-2 py-0.5 rounded-full border text-[7px] font-black uppercase tracking-widest ${row.role === 'admin' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>{row.role}</span>
+                                                )}
+                                                {row.suspended && (
+                                                    <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest">Suspended</span>
+                                                )}
+                                            </div>
+                                            <div className={`text-[8px] font-bold uppercase font-mono opacity-40 mt-1 ${isLight ? 'text-black' : 'text-white'}`}>
+                                                {(row.permissions || []).includes('*') ? 'All permissions' : (row.permissions || []).map(p => GRANTABLE_PERMS.find(g => g.tag === p)?.label || p).join(' · ') || '—'}
+                                            </div>
+                                        </div>
+                                        {!isRootRow ? (
+                                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                                                {GRANTABLE_PERMS.map(p => {
+                                                    const active = (row.permissions || []).includes(p.tag);
+                                                    return (
+                                                        <button
+                                                            key={p.tag}
+                                                            onClick={() => setAdminPermission(row, p.tag)}
+                                                            title={p.label}
+                                                            className={`px-2 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-wide transition-all ${active ? 'bg-[#1A6140]/15 text-[#1A6140] border-[#1A6140]/40' : isLight ? 'bg-black/[0.03] border-black/10 text-black/25 hover:text-black/50' : 'bg-white/5 border-white/10 text-white/25 hover:text-white/50'}`}
+                                                        >
+                                                            {active && <Check size={8} className="inline mr-0.5" />} {p.tag.split('.')[1]}
+                                                        </button>
+                                                    );
+                                                })}
+                                                <button
+                                                    onClick={() => setAdminRole(row, row.role === 'admin' ? 'moderator' : 'admin')}
+                                                    className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${isLight ? 'bg-black/[0.03] border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
+                                                >
+                                                    {row.role === 'admin' ? '→ Mod' : '→ Admin'}
+                                                </button>
+                                                <button
+                                                    onClick={() => setAdminSuspension(row, !row.suspended)}
+                                                    className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${row.suspended ? 'bg-[#1A6140] text-white border-[#1A6140]' : 'bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20'}`}
+                                                >
+                                                    {row.suspended ? 'Unsuspend' : 'Suspend'}
+                                                </button>
+                                                <button
+                                                    onClick={() => removeAdmin(row)}
+                                                    className="px-2.5 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <span className={`shrink-0 text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>Locked</span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className={`text-[8px] font-bold ${isLight ? 'text-black/30' : 'text-white/30'}`}>
+                            Permission toggles apply instantly. Removing an admin deletes their Supabase Auth account. Passwords are managed by Supabase Auth.
+                        </p>
+                    </div>
+                </AdminCard>
+            )}
             <AnimatePresence>
                 {cancelFor != null && (
                     <motion.div
@@ -953,6 +1223,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     </motion.div>
                 )}
             </AnimatePresence>
+            </main>
 
             {/* Persistence Layer Status */}
             <footer className={`flex-none p-5 border-t backdrop-blur-3xl px-10 flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#050505]/50 border-white/5'}`}>
