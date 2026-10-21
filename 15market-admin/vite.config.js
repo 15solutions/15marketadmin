@@ -25,8 +25,18 @@ export default defineConfig({
         exclude: []
     },
     build: {
+        // Raise the chunk-size warning threshold — admin is a dashboard, not a user-facing app
+        chunkSizeWarningLimit: 1000,
         rollupOptions: {
-            external: []
+            output: {
+                manualChunks: {
+                    'react-vendor': ['react', 'react-dom', 'react-is'],
+                    'wagmi-vendor': ['wagmi', 'viem', '@wagmi/core', '@reown/appkit', '@reown/appkit-adapter-wagmi'],
+                    'charts': ['recharts', 'lightweight-charts'],
+                    'motion': ['framer-motion'],
+                    'ui': ['lucide-react', 'clsx', 'tailwind-merge', '@radix-ui/react-label', '@radix-ui/react-scroll-area', '@radix-ui/react-select', '@radix-ui/react-slot', '@radix-ui/react-tabs'],
+                }
+            }
         }
     },
     server: {
