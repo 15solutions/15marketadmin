@@ -230,62 +230,66 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [authenticated]);
 
-    // Identity address for profile + trading-wallet assignment: connected
-    // wallet first, else the Privy embedded wallet (email/social logins
-    // have no wagmi address — without this fallback their finale could never
-    // save).
+    // ── Identity address for profile + trading-wallet assignment ────────
+    // Sources, in priority order: external (wagmi) wallet → Privy's
+    // `user.wallet.address` (available synchronously right after login, often
+    // before the wallets collection updates) → the wallets collection
+    // (shape-tolerant: walletClientType/queue type 'privy', any connected
+    // wallet, any wallet with an address).
     const { wallets } = useWallets();
     const { createWallet } = useCreateWallet();
-    // Embedded wallets are the signup authority: external (wagmi) first, then
-    // a Privy-created wallet. Detection tolerates SDK shape differences —
-    // walletClientType 'privy' OR wallet.type 'privy' — and as a last resort
-    // any connected wallet that owns an address.
-    const embeddedAddress = (wallets || []).find(w =>
-        w?.address && (w.walletClientType === 'privy' || w.type === 'privy')
-    )?.address
+
+    const identityAddress =
+        wagmiAddress
+        || user?.wallet?.address
+        || (user?.linkedAccounts || []).find(a => a?.type === 'wallet' && a?.address)?.address
+        || (wallets || []).find(w => w?.address && (w.walletClientType === 'privy' || w.type === 'privy'))?.address
         || (wallets || []).find(w => w?.address && w?.connected)?.address
         || (wallets || []).find(w => w?.address)?.address
         || null;
-    const identityAddress = wagmiAddress || embeddedAddress || null;
-    // Live refs so the waiter below always reads the newest values, not the
-    // render closure it was created in.
-    const wagmiRef = useRef(null);
-    wagmiRef.current = wagmiAddress || null;
-    const walletsRef = useRef([]);
-    walletsRef.current = wallets || [];
-    const createWalletRef = useRef(null);
-    createWalletRef.current = createWallet;
-    // Embedded wallets provision a few seconds AFTER login. The finale used to
-    // fail instantly ("wallet not ready"). Now it polls for up to 60s, and if
-    // nothing has appeared after 6s it explicitly asks Privy to create the
-    // embedded wallet (covers logins where auto-creation is still queued — this
-    // guarantees "we cannot create a new 15market user account" can only happen
-    // if Privy itself is unreachable, after a very long, visible wait).
-    const resolveIdentityAddress = (timeoutMs = 60000) => new Promise((resolveAddr, rejectAddr) => {
+
+    // Live refs so the waiter below reads the newest values, not a stale
+    // render closure.
+    const identityRef = useRef(null);
+    identityRef.current = identityAddress;
+
+    // ── Eager wallet provisioning ────────────────────────────────────────
+    // The user should NEVER wait for a wallet at the finish line: as soon as
+    // they are authenticated but have no wallet yet, ask Privy to create the
+    // embedded wallet right away. By the time they finish typing their
+    // username the address already exists, so the finale completes instantly.
+    const walletNudgeRef = useRef(false); // one creation request per session
+    useEffect(() => {
+        if (!authenticated || walletNudgeRef.current) return;
+        if (identityRef.current) return; // wallet already exists — nothing to do
+        if (typeof createWallet !== 'function') return;
+        walletNudgeRef.current = true;
+        try {
+            const p = createWallet();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch { /* hook threw; the finale waiter retries if still missing */ }
+    }, [authenticated, createWallet]);
+
+    // Finale waiter: identity comes from Privy synchronously in the normal
+    // case, so this resolves on the FIRST tick. The poll is only a safety
+    // net (slow Privy backend, page restored mid-wizard): it re-fires the
+    // creation nudge and caps at 8s, so a signup never hangs around.
+    const resolveIdentityAddress = (timeoutMs = 8000) => new Promise((resolveAddr, rejectAddr) => {
         const started = Date.now();
-        let requested = false;
         const tick = () => {
-            const w = wagmiRef.current;
-            const list = walletsRef.current || [];
-            const emb = list.find(x => x?.address && (x.walletClientType === 'privy' || x.type === 'privy'))?.address
-                || list.find(x => x?.address && x?.connected)?.address
-                || list.find(x => x?.address)?.address
-                || null;
-            const addr = w || emb;
-            if (addr) return resolveAddr(addr);
-            if (!requested && Date.now() - started >= 6000 && createWalletRef.current) {
-                // Nudge Privy once — the wallet may simply not have been created
-                // yet (referral-link entries, OAuth logins, cold-backed sessions).
-                requested = true;
+            if (identityRef.current) return resolveAddr(identityRef.current);
+            // Re-arm the nudge (the eager effect can only fire once per mount).
+            if (!walletNudgeRef.current && Date.now() - started >= 2000 && typeof createWallet === 'function') {
+                walletNudgeRef.current = true;
                 try {
-                    const p = createWalletRef.current();
+                    const p = createWallet();
                     if (p && typeof p.catch === 'function') p.catch(() => {});
-                } catch { /* hook unavailable; keep polling */ }
+                } catch { /* keep polling */ }
             }
             if (Date.now() - started >= timeoutMs) {
-                return rejectAddr(new Error('Your wallet is still syncing. Check your connection and try again in a moment.'));
+                return rejectAddr(new Error('Your wallet is still syncing — tap Create account again.'));
             }
-            setTimeout(tick, 300);
+            setTimeout(tick, 250);
         };
         tick();
     });
