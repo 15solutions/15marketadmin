@@ -38,7 +38,9 @@ import {
     ChevronsLeft,
     ChevronsRight,
     Flame,
-    BarChart3
+    BarChart3,
+    Sun,
+    Moon
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
@@ -57,8 +59,17 @@ const NAV = [
 ];
 
 export function AdminDashboard({ onBack, theme, notify, platformSettings: initialSettings, auth }) {
-    const isLight = theme === 'light';
-    
+    // Live theme state — the sidebar switch flips it in place.
+    const [themeState, setThemeState] = useState(() => {
+        try { return localStorage.getItem('15market_theme') || theme || 'dark'; } catch (e) { return theme || 'dark'; }
+    });
+    const isLight = themeState === 'light';
+    const toggleTheme = () => {
+        const next = isLight ? 'dark' : 'light';
+        try { localStorage.setItem('15market_theme', next); } catch (e) {}
+        setThemeState(next);
+    };
+
     const [platformSettings, setPlatformSettings] = useState(initialSettings || {
         maintenanceMode: false,
         tradingHalted: false,
@@ -528,7 +539,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     );
 
     return (
-        <div className={`h-screen w-full flex overflow-hidden ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'} relative`}>
+        <div className={`h-screen w-full flex overflow-hidden relative ${isLight ? 'bg-[#F4F7F5] text-black' : 'bg-[#050505] text-white'}`}>
             {/* Background Flair */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#1A6140]/5 rounded-full blur-[120px]" />
@@ -581,6 +592,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 {/* Bottom rail: identity + collapse toggle */}
                 <div className={`flex-none p-3 flex flex-col gap-1.5 border-t ${isLight ? 'border-black/5' : 'border-white/5'}`}>
                     <button
+                        onClick={toggleTheme}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/30 hover:text-white hover:bg-white/5'}`}
+                    >
+                        {isLight ? <Moon size={14} /> : <Sun size={14} />}
+                        {sidebarOpen && <span>{isLight ? 'Dark mode' : 'Light mode'}</span>}
+                    </button>
+                    <button
                         onClick={toggleSidebar}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/30 hover:text-white hover:bg-white/5'}`}
                     >
@@ -616,11 +634,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             {/* Main column */}
             <div className="flex-1 flex flex-col min-w-0">
 
-                {/* Market scroller strip — same participation feed as the user side */}
-                <div className="flex-none px-4 pt-3">
-                    <div className="w-full overflow-hidden relative rounded-[10px]">
-                        <GlobalTradeScroller theme={theme} />
-                    </div>
+                {/* Market scroller — full-bleed across the screen, under the menu */}
+                <div className={`flex-none w-full overflow-hidden relative border-b ${isLight ? 'border-black/5' : 'border-white/5'}`}>
+                    <GlobalTradeScroller theme={themeState} />
                 </div>
 
             <main className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-6 lg:p-8 z-10">
@@ -628,27 +644,29 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 {activeNav === 'overview' && (
                 <div className="w-full flex flex-col gap-6 min-w-0">
 
-                    {/* Headline ops metrics — full width, responsive */}
-                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                    {/* Headline ops metrics — small, one line, leaving room for the trade feed */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {[
                             { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: DollarSign, color: '#1A6140' },
                             { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, icon: BarChart3, color: '#3b82f6' },
                             { label: 'Users Live Now', value: String(stats.activeCount | 0), icon: Flame, color: '#22c55e' },
                             { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Zap, color: '#f59e0b' }
                         ].map((stat, i) => (
-                            <div key={i} className={`p-5 md:p-6 rounded-3xl border ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'} shadow-[0_0_40px_-18px_rgba(26,97,64,0.35)]`}>
-                                <div className="flex items-center gap-2 mb-3 opacity-40">
-                                    <stat.icon size={13} style={{ color: stat.color }} />
-                                    <span className="text-[8px] font-black uppercase tracking-widest">{stat.label}</span>
+                            <div key={i} className={`px-4 py-3 rounded-2xl border flex items-center gap-3 min-w-0 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
+                                <div className="p-2 rounded-xl flex-none" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                                    <stat.icon size={14} />
                                 </div>
-                                <div className={`text-2xl font-black tracking-tighter truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                <div className="min-w-0">
+                                    <div className="text-[7px] font-black uppercase tracking-widest opacity-40 truncate">{stat.label}</div>
+                                    <div className={`text-sm md:text-base font-black tracking-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                </div>
                             </div>
                         ))}
                     </div>
 
-                    {/* Platform trade index — every trade lands under the metrics */}
-                    <AdminCard title="Platform Trades" icon={TrendingUp} accent="#1A6140">
-                        <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+                    {/* Platform trade index — plain indexed feed, no boxes behind the rows */}
+                    <div className="flex flex-col min-w-0">
+                        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-4">
                                 <div>
                                     <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>{String(recentActivity.length).padStart(2, '0')}</div>
@@ -670,7 +688,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         <div className={`hidden lg:grid grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] gap-3 px-3 pb-2 text-[7px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
                             <span>#</span><span>Trader</span><span>Market</span><span>Side</span><span>Amount</span><span>Result</span><span>Time</span>
                         </div>
-                        <div className="flex flex-col gap-2 max-h-[560px] overflow-y-auto no-scrollbar">
+                        <div className={`flex flex-col max-h-[600px] overflow-y-auto no-scrollbar divide-y ${isLight ? 'divide-black/5' : 'divide-white/5'}`}>
                             {recentActivity.length === 0 ? (
                                 <div className="py-10 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
                                     No trades detected yet
@@ -681,7 +699,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         initial={{ x: -16, opacity: 0 }}
                                         animate={{ x: 0, opacity: 1 }}
                                         key={act.id || `${act.timestamp}-${i}`}
-                                        className={`p-3 rounded-2xl border lg:grid lg:grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] lg:items-center lg:gap-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 justify-between min-w-0 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}
+                                        className={`px-2 lg:px-3 py-2.5 lg:grid lg:grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] lg:items-center lg:gap-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 justify-between min-w-0 transition-colors ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
                                     >
                                         <span className="hidden lg:block text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -717,7 +735,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 ))
                             )}
                         </div>
-                    </AdminCard>
+                    </div>
                 </div>
                 )}
 
@@ -746,7 +764,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                     <AdminCard title="Global Reach" icon={Globe} accent="#3b82f6">
                         <div className={`relative w-full h-[520px] xl:h-[640px] rounded-3xl overflow-hidden border ${isLight ? 'bg-[#1A6140]/[0.06] border-[#1A6140]/10' : 'bg-black/40 border-white/5'}`}>
-                            <AdminGlobe theme={theme} countries={stats.userCountries} pulse={pulse} />
+                            <AdminGlobe theme={themeState} countries={stats.userCountries} pulse={pulse} />
                             <div className="absolute bottom-4 left-6 flex items-center gap-2 pointer-events-none">
                                 <div className="w-2 h-2 rounded-full bg-[#3CB371] animate-pulse" />
                                 <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Users by country · live trade flashes</span>
@@ -767,7 +785,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div className={`p-6 rounded-[24px] border ${platformSettings.maintenanceMode ? 'bg-[#1A6140]/10 border-[#1A6140]/40' : 'bg-white/5 border-white/5'} transition-all`}>
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-4">
-                                            <div className={`p-3 rounded-2xl ${platformSettings.maintenanceMode ? 'bg-[#1A6140] text-white' : 'bg-white/5 text-white/40'}`}>
+                                            <div className={`p-3 rounded-2xl ${platformSettings.maintenanceMode ? 'bg-[#1A6140] text-white' : isLight ? 'bg-black/[0.04] text-black/40' : 'bg-white/5 text-white/40'}`}>
                                                 <Settings size={20} className={platformSettings.maintenanceMode ? 'animate-spin-slow' : ''} />
                                             </div>
                                             <div>
@@ -794,7 +812,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div className={`p-6 rounded-[24px] border ${platformSettings.tradingHalted ? 'bg-red-500/10 border-red-500/40' : 'bg-white/5 border-white/5'} transition-all`}>
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-4">
-                                            <div className={`p-3 rounded-2xl ${platformSettings.tradingHalted ? 'bg-red-500 text-white' : 'bg-white/5 text-white/40'}`}>
+                                            <div className={`p-3 rounded-2xl ${platformSettings.tradingHalted ? 'bg-red-500 text-white' : isLight ? 'bg-black/[0.04] text-black/40' : 'bg-white/5 text-white/40'}`}>
                                                 <Lock size={20} />
                                             </div>
                                             <div>
@@ -851,7 +869,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 <button
                                                     key={m}
                                                     onClick={() => setBroadcastDuration(m * 60)}
-                                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#1A6140] text-white border-[#1A6140]' : 'bg-white/5 border-white/5 opacity-50 hover:opacity-100'}`}
+                                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
                                                 >
                                                     {m}m
                                                 </button>

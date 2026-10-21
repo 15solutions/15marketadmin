@@ -73,9 +73,11 @@ export function AdminGlobe({ theme = 'dark', countries = {}, pulse = [] }) {
                     dark={isLight ? 0 : 1}
                     scale={isLight ? 1.05 : 1.3}
                     diffuse={isLight ? 1.6 : 1.15}
+                    mapSamples={24000}
+                    mapBrightness={isLight ? 5.5 : 8.5}
                     baseColor={isLight ? '#203c30' : '#1a1a1a'}
                     markerColor="#3CB371"
-                    glowColor={isLight ? '#2e7d52' : '#1A6140'}
+                    glowColor={isLight ? '#3c9b6e' : '#1A6140'}
                     markers={markers}
                     markerDiameter={0.28}
                 />

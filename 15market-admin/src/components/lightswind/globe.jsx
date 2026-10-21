@@ -1,7 +1,7 @@
 // lightswind Globe — cobe-powered 3D dotted globe.
 //   import Globe from '@/components/lightswind/globe';
 //
-//   <Globe />                      // defaults: slow auto-rotate, brand colors
+//   <Globe />                      // defaults: continuous auto-rotate, brand colors
 //   <Globe
 //     theta={0.2}                  // initial tilt
 //     dark={1}
@@ -27,127 +27,124 @@ function toRGB(color, fallback = [0.1, 0.35, 0.25]) {
     return fallback;
 }
 
-const DEFAULT_MARKERS = [];
-
 export default function Globe({
     theta = 0.25,
     dark = 1,
     scale = 1,
     diffuse = 1.2,
-    mapSamples = 17000,
+    mapSamples = 24000,
     mapBrightness = 6.5,
     baseColor = [0.16, 0.3, 0.23],
     markerColor = [0.35, 0.94, 0.58],
     glowColor = [0.08, 0.3, 0.2],
-    markers = DEFAULT_MARKERS,
+    markers = [],
     markerDiameter = 0.011,
     offset = [0, 0],
     autoRotate = true,
-    rotateSpeed = 0.0045,
+    rotateSpeed = 0.0035,
     pointerInteractions = true,
     className = "",
     ...props
 }) {
+    const wrapperRef = useRef();
     const canvasRef = useRef();
-    const pointerInteracting = useRef(null);
-    const pointerInteractionMovement = useRef(0);
-    const rotation = useRef(theta);
-    const [phi, setPhi] = useState(4.05);
-    const [width, setWidth] = useState(0);
+    const dragging = useRef(false);
+    const lastPointerX = useRef(null);
+    const dragOffset = useRef(0);   // user drag deformation of the spin
+    const phiRef = useRef(4.05);    // continuous spin accumulator
+    const [size, setSize] = useState(0);
 
-    // Fit the canvas to its container.
+    // Square side fits whichever box dimension is smaller, so the whole
+    // globe is always fully visible (no clipped poles).
     useEffect(() => {
-        const onResize = () => canvasRef.current && setWidth(canvasRef.current.offsetWidth);
-        onResize();
-        window.addEventListener("resize", onResize);
-        return () => window.removeEventListener("resize", onResize);
+        const el = wrapperRef.current;
+        if (!el) return;
+        const measure = () => setSize(Math.floor(Math.min(el.clientWidth, el.clientHeight)));
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        window.addEventListener("resize", measure);
+        return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
     }, []);
 
+    // Rebuild only when something structural changes; the spin lives in
+    // refs so a re-render never resets the rotation.
+    const markersKey = JSON.stringify(markers);
     useEffect(() => {
         let destroyed = false;
-        const base = toRGB(baseColor);
-        const marker = toRGB(markerColor);
-        const glow = toRGB(glowColor);
         const globe = createGlobe(canvasRef.current, {
             devicePixelRatio: 2,
-            width: width * 2,
-            height: width * 2,
-            phi: phi,
-            theta: rotation.current,
+            width: size * 2,
+            height: size * 2,
+            phi: phiRef.current,
+            theta: theta,
             dark: dark,
             diffuse: diffuse,
+            scale: scale,
             mapSamples: mapSamples,
             mapBrightness: mapBrightness,
-            baseColor: base,
-            markerColor: marker,
-            glowColor: glow,
-            markers: markers,
+            baseColor: toRGB(baseColor),
+            markerColor: toRGB(markerColor),
+            glowColor: toRGB(glowColor),
+            markers: JSON.parse(markersKey),
             markerDiameter: markerDiameter,
             offset: offset,
             opacity: 1,
             onRender: (state) => {
                 if (destroyed) return;
-                // Idle spin + inertia from pointer drags.
-                if (autoRotate && pointerInteracting.current === null) {
-                    state.phi = phi + rotateSpeed;
-                } else if (pointerInteracting.current !== null && !pointerInteracting.current.destroyed) {
-                    state.phi = phi + pointerInteractionMovement.current / 2800;
-                }
-                if (!state || destroyed) return;
-                setPhi(state.phi);
+                // The globe always turns; the user's drag adds on top.
+                if (autoRotate && !dragging.current) phiRef.current += rotateSpeed;
+                state.phi = phiRef.current + dragOffset.current;
             },
         });
-
         return () => {
             destroyed = true;
             globe.destroy();
         };
-    }, [width, markers]); // rebuilt on resize or marker change
-
-    const lastPointerX = useRef(null);
+    }, [size, markersKey]);
 
     return (
         <div
-            style={{
-                width: "100%",
-                maxWidth: 800,
-                aspectRatio: "1 / 1",
-                margin: "auto",
-                position: "relative",
-            }}
+            ref={wrapperRef}
+            style={{ width: "100%", height: "100%", position: "relative" }}
             className={`relative overflow-hidden ${className}`}
             {...props}
         >
             <canvas
                 ref={canvasRef}
                 style={{
-                    width: "100%",
-                    height: "100%",
+                    width: `${size || 0}px`,
+                    height: `${size || 0}px`,
                     contain: "layout paint size",
                     touchAction: pointerInteractions ? "none" : undefined,
-                    opacity: width ? 1 : 0,
+                    opacity: size ? 1 : 0,
                     transition: "opacity 0.4s ease",
                     cursor: pointerInteractions ? "grab" : undefined,
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
                 }}
                 onPointerDown={(e) => {
                     if (!pointerInteractions) return;
-                    pointerInteracting.current = { destroyed: false };
+                    dragging.current = true;
                     lastPointerX.current = e.clientX;
                     canvasRef.current.style.cursor = "grabbing";
                 }}
                 onPointerUp={() => {
-                    pointerInteracting.current = null;
+                    dragging.current = false;
+                    lastPointerX.current = null;
                     canvasRef.current.style.cursor = "grab";
                 }}
-                onPointerOut={() => {
-                    pointerInteracting.current = null;
+                onPointerLeave={() => {
+                    dragging.current = false;
+                    lastPointerX.current = null;
                     canvasRef.current.style.cursor = "grab";
                 }}
                 onMouseMove={(e) => {
-                    if (pointerInteracting.current === null || lastPointerX.current == null) return;
-                    const delta = e.clientX - lastPointerX.current;
+                    if (!dragging.current || lastPointerX.current == null) return;
+                    dragOffset.current += (e.clientX - lastPointerX.current) / 220;
                     lastPointerX.current = e.clientX;
-                    pointerInteractionMovement.current += delta;
                 }}
             />
         </div>
