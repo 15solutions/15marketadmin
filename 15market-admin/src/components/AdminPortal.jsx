@@ -31,30 +31,43 @@ export function AdminPortal({ onBack, notify }) {
     const isLight = localStorage.getItem("15market_theme") === 'light';
 
     const loadAuthContext = useCallback(async () => {
-        const res = await fetch(`${KEEPER_URL_ARC}/admin/auth/me`, {
-            headers: { Authorization: `Bearer ${getSession()?.accessToken || ''}` }
-        });
-        if (res.status === 401) { clearSession(); setStatus('login'); return; }
-        if (!res.ok) {
-            setLoginError('Admin store unreachable. Try again in a moment.');
-            setStatus('login');
-            return;
-        }
-        const me = await res.json();
-        setAuth(me);
-        // Hydrate the bootstrap status too, so a later sign-out reveal can
-        // show the right form (login vs one-time root setup).
         try {
-            const sRes = await fetch(`${KEEPER_URL_ARC}/admin/auth/status`);
-            if (sRes.ok) setBootStatus(await sRes.json());
-        } catch (e) { /* bootstrap info optional */ }
-        setStatus('ready');
+            const res = await fetch(`${KEEPER_URL_ARC}/admin/auth/me`, {
+                headers: { Authorization: `Bearer ${getSession()?.accessToken || ''}` },
+                signal: AbortSignal.timeout(8000)
+            });
+            if (res.status === 401) { clearSession(); setStatus('login'); return; }
+            if (!res.ok) {
+                setLoginError('Admin store unreachable. Try again in a moment.');
+                setStatus('login');
+                return;
+            }
+            const me = await res.json();
+            setAuth(me);
+            try {
+                const sRes = await fetch(`${KEEPER_URL_ARC}/admin/auth/status`, {
+                    signal: AbortSignal.timeout(5000)
+                });
+                if (sRes.ok) setBootStatus(await sRes.json());
+            } catch (e) { /* bootstrap info optional */ }
+            setStatus('ready');
+        } catch (e) {
+            // Timeout or network error — drop to login so the screen is never
+            // stuck on a spinner indefinitely.
+            clearSession();
+            setLoginError('Backend unreachable. Check your connection and try again.');
+            setStatus('login');
+        }
     }, []);
 
     useEffect(() => {
         let cancelled = false;
+        // Hard safety net: if status is still 'checking' after 10s, force login.
+        const safetyTimer = setTimeout(() => {
+            if (!cancelled) setStatus(s => s === 'checking' ? 'login' : s);
+        }, 10000);
+
         (async () => {
-            // Rotate a stale session first so a returning admin lands straight in.
             if (!sessionValid()) {
                 try { await refreshSession(); } catch (e) { /* falls through to login */ }
             }
@@ -64,15 +77,15 @@ export function AdminPortal({ onBack, notify }) {
             } else {
                 setStatus('login');
                 try {
-                    const res = await fetch(`${KEEPER_URL_ARC}/admin/auth/status`);
+                    const res = await fetch(`${KEEPER_URL_ARC}/admin/auth/status`, {
+                        signal: AbortSignal.timeout(5000)
+                    });
                     if (res.ok) setBootStatus(await res.json());
                 } catch (e) { /* bootstrap info optional */ }
             }
         })();
-        // Opportunistic token rotation every 45 minutes so a long admin
-        // session never hits a hard 401 mid-action.
         const iv = setInterval(() => { refreshSession().catch(() => {}); }, 45 * 60 * 1000);
-        return () => { cancelled = true; clearInterval(iv); };
+        return () => { cancelled = true; clearInterval(iv); clearTimeout(safetyTimer); };
     }, [loadAuthContext]);
 
     const handleLogin = async () => {
