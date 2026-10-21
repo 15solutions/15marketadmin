@@ -370,7 +370,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         setRosterBusy(true);
         try {
             const res = await adminFetch(`${KEEPER_URL_ARC}/admin/auth/admins`);
-            if (res.ok) setAdminRoster(Array.isArray(await res.json()) ? await res.json() : []);
+            if (res.ok) {
+                const data = await res.json().catch(() => []);
+                setAdminRoster(Array.isArray(data) ? data : []);
+            }
         } catch (e) { /* roster stays as-is */ }
         finally { setRosterBusy(false); }
     };
