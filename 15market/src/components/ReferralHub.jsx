@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { KEEPER_URL_ARC } from '../constants';
 import {
     Gift, Users, Copy, Check, ArrowLeft, Wallet, TrendingUp,
-    Percent, BadgeCheck, Clock, LogOut, XCircle, Sparkles, RefreshCw, ChevronDown
+    Percent, BadgeCheck, Clock, LogOut, XCircle, Sparkles, RefreshCw, ChevronDown, Ban, Lock
 } from 'lucide-react';
 
 // Minimum commission withdrawal — requests below this are rejected server-side.
@@ -12,7 +12,7 @@ const MIN_WITHDRAWAL = 25;
 const statusChip = {
     pending: { icon: Clock, cls: 'bg-amber-500/15 text-amber-500 border-amber-500/30', label: 'Pending' },
     paid: { icon: BadgeCheck, cls: 'bg-[#1A6140]/15 text-[#1A6140] border-[#1A6140]/30', label: 'Paid' },
-    rejected: { icon: XCircle, cls: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'Rejected' }
+    rejected: { icon: XCircle, cls: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'Cancelled' }
 };
 
 const truncateAddr = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—');
@@ -27,9 +27,13 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
     const [withdrawals, setWithdrawals] = useState([]);
     const [enrolling, setEnrolling] = useState(false);
     const [wdAmount, setWdAmount] = useState('');
+    // Withdrawal request routing: chain is auto-set to Arc for now (locked),
+    // and the destination wallet address defaults to the user's main wallet.
+    const [wdDest, setWdDest] = useState('');
     const [wdBusy, setWdBusy] = useState(false);
     const [error, setError] = useState('');
     const [copiedKey, setCopiedKey] = useState(null);
+    useEffect(() => { setWdDest(prev => prev || (address || '').toLowerCase()); }, [address]);
     // Ref-code entry (for users who skipped at signup): verified once, then
     // stored on their profile so the referrer starts earning.
     const [refCodeInput, setRefCodeInput] = useState('');
@@ -41,8 +45,9 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
     const enrolled = info?.referralEnrolled === true;
     const referralCode = info?.referralCode || '';
     const shareLink = referralCode ? `${window.location.origin}/?ref=${referralCode}` : '';
+    const suspended = info?.referralSuspended === true;
     const available = Math.max(0, Number(stats?.totalCommission || 0) - withdrawals.filter(w => w.status !== 'rejected').reduce((s, w) => s + Number(w.amount || 0), 0));
-    const canWithdraw = available >= MIN_WITHDRAWAL;
+    const canWithdraw = available >= MIN_WITHDRAWAL && !suspended;
 
     const refresh = useCallback(async () => {
         if (!address) { setLoading(false); setError('Connect a wallet to access the referral program.'); return; }
@@ -132,13 +137,14 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
     const requestWithdrawal = async () => {
         const amt = parseFloat(wdAmount);
         if (!(amt > 0)) { setError('Enter an amount to withdraw.'); return; }
+        if (!wdDest.trim()) { setError('Enter the wallet address to withdraw to.'); return; }
         setWdBusy(true);
         setError('');
         try {
             const res = await fetch(`${KEEPER_URL_ARC}/referral/withdraw/${address.toLowerCase()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: amt })
+                body: JSON.stringify({ amount: amt, chain: 'Arc', destination: wdDest.trim() })
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok) {
@@ -397,12 +403,22 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                         <div className={card}>
                             <div className="flex items-center gap-2 mb-1">
                                 <LogOut size={14} className="text-[#1A6140]" />
-                                <p className="text-[10px] font-black uppercase tracking-widest">Withdraw commission</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest">Withdrawal request</p>
                             </div>
                             <p className={`text-[9px] font-bold mb-4 ${chipText}`}>
-                                Not on-chain and nothing automatic. You apply for a withdrawal of a chosen amount and the team processes it manually. Minimum {fmt(MIN_WITHDRAWAL)}.
+                                Not on-chain and nothing automatic. You submit a withdrawal request with the amount, the payout chain and your destination wallet address — the team processes it manually. Minimum {fmt(MIN_WITHDRAWAL)}.
                             </p>
-                            <div className="flex gap-2 mb-3">
+
+                            {suspended && (
+                                <div className="flex items-center gap-3 p-3 rounded-2xl bg-red-500/10 border border-red-500/30 mb-4">
+                                    <Ban size={14} className="text-red-400 shrink-0" />
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-red-400">
+                                        Account suspended from the referral program — withdrawal requests are paused. Contact an administrator.
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="flex gap-2 mb-2">
                                 <input
                                     type="number"
                                     min="0"
@@ -421,10 +437,39 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                                     {wdBusy ? '…' : 'Request'}
                                 </button>
                             </div>
+
+                            {/* Payout route: chain auto-set to Arc + destination wallet */}
+                            <div className="flex items-center gap-2 mb-2">
+                                <button
+                                    type="button"
+                                    disabled
+                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl border text-[9px] font-black uppercase tracking-widest cursor-not-allowed ${isLight ? 'bg-[#1A6140]/10 border-[#1A6140]/30 text-[#1A6140]' : 'bg-[#1A6140]/15 border-[#1A6140]/40 text-[#7ee2b4]'}`}
+                                    title="Payout chain — automatically set to Arc for now"
+                                >
+                                    <Lock size={11} /> Chain: Arc (auto)
+                                </button>
+                                <input
+                                    type="text"
+                                    value={wdDest}
+                                    onChange={(e) => setWdDest(e.target.value)}
+                                    placeholder="0x… destination wallet address"
+                                    disabled={!canWithdraw}
+                                    spellCheck={false}
+                                    className={`flex-1 min-w-0 px-4 py-2.5 rounded-2xl border text-[10px] font-black outline-none transition-all disabled:opacity-40 ${isLight ? 'bg-black/5 border-black/10 focus:border-[#1A6140]' : 'bg-white/5 border-white/10 focus:border-[#1A6140]'}`}
+                                />
+                            </div>
+                            <p className={`text-[8px] font-bold mb-3 ${chipText}`}>
+                                Chain is set to Arc automatically. Funds arrive at the address above once the team approves your request.
+                            </p>
+                            {error && (
+                                <p className="text-[9px] font-black uppercase tracking-widest text-red-400 mb-3">{error}</p>
+                            )}
+
                             <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
                                 <span className={chipText}>Available</span>
                                 <span className={canWithdraw ? 'text-[#1A6140]' : 'text-amber-500'}>
-                                    {fmt(available)} {!canWithdraw && `· needs ${fmt(MIN_WITHDRAWAL - available)} more`}
+                                    {fmt(available)}
+                                    {!suspended && !canWithdraw && ` · needs ${fmt(MIN_WITHDRAWAL - available)} more`}
                                 </span>
                             </div>
                             {!canWithdraw && (
@@ -442,13 +487,21 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                                     <p className={`text-[8px] font-black uppercase tracking-widest ${chipText}`}>Past requests</p>
                                     {withdrawals.map(w => {
                                         const Chip = statusChip[w.status] || statusChip.pending;
+                                        const Icon = Chip.icon || Clock;
                                         return (
-                                            <div key={w.id} className={`flex items-center justify-between p-3 rounded-2xl ${isLight ? 'bg-black/5' : 'bg-white/5'}`}>
-                                                <div>
+                                            <div key={w.id} className={`flex items-center justify-between gap-2 p-3 rounded-2xl ${isLight ? 'bg-black/5' : 'bg-white/5'}`}>
+                                                <div className="min-w-0">
                                                     <p className={`text-sm font-black ${isLight ? 'text-black' : 'text-white'}`}>{fmt(w.amount)}</p>
-                                                    <p className={`text-[8px] font-bold ${chipText}`}>{w.requested_at ? new Date(w.requested_at).toLocaleDateString() : ''}</p>
+                                                    <p className={`text-[8px] font-bold truncate ${chipText}`}>
+                                                        {(w.destination_address || w.dest || '') ? `→ ${truncateAddr(w.destination_address || w.dest)}` : ''} {w.requested_at ? `· ${new Date(w.requested_at).toLocaleDateString()}` : ''}
+                                                    </p>
+                                                    {w.admin_note && w.status === 'rejected' && (
+                                                        <p className="text-[8px] font-bold text-red-400/70 mt-0.5">Reason: {w.admin_note}</p>
+                                                    )}
                                                 </div>
-                                                <span className={`px-3 py-1 rounded-full border text-[8px] font-black uppercase tracking-widest ${Chip.cls}`}>{Chip.label}</span>
+                                                <span className={`px-3 py-1 rounded-full border text-[8px] font-black uppercase tracking-widest shrink-0 flex items-center gap-1 ${Chip.cls}`}>
+                                                    <Icon size={10} /> {Chip.label}
+                                                </span>
                                             </div>
                                         );
                                     })}

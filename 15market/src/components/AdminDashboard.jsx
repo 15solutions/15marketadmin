@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-    Shield, 
-    Radio, 
-    Settings, 
-    Power, 
-    AlertTriangle, 
-    Check, 
-    X, 
-    Clock, 
+import {
+    Shield,
+    Radio,
+    Settings,
+    Power,
+    AlertTriangle,
+    Check,
+    X,
+    Clock,
     MessageSquare,
     Zap,
     Lock,
@@ -23,10 +23,27 @@ import {
     DollarSign,
     Users,
     Gift,
-    Calendar
+    Calendar,
+    Search,
+    Ban,
+    UserX,
+    UserCheck,
+    Scissors,
+    BadgePercent,
+    Mail,
+    Landmark,
+    ChevronDown
 } from "lucide-react";
 import { KEEPER_URL_ARC, ADMIN_TOKEN } from "../constants";
 import { socketService } from "../utils/socket";
+
+// Admin tabs. Even mobile widths keep every tool reachable — the tab row
+// scrolls horizontally as a chip strip instead of collapsing.
+const ADMIN_TABS = [
+    { key: 'overview', label: 'Overview', icon: Activity },
+    { key: 'referral', label: 'Referral Program', icon: Gift },
+    { key: 'requests', label: 'Withdrawal Requests', icon: Landmark }
+];
 
 export function AdminDashboard({ onBack, theme, notify, platformSettings: initialSettings }) {
     const isLight = theme === 'light';
@@ -71,20 +88,98 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         fetchRefWithdrawals();
     }, []);
 
-    const setRefWithdrawalStatus = async (id, status) => {
+    const setRefWithdrawalStatus = async (id, status, note = '') => {
+        setProcessingId(id);
         try {
             const res = await fetch(`${KEEPER_URL_ARC}/admin/referral/withdrawals/${id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_TOKEN },
-                body: JSON.stringify({ status })
+                body: JSON.stringify({ status, note })
             });
-            if (!res.ok) throw new Error('Update failed');
-            notify(status === 'paid' ? 'Withdrawal marked paid' : 'Withdrawal rejected', 'success');
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Update failed');
+            notify(status === 'paid' ? 'Withdrawal approved — user notified by email' : 'Withdrawal cancelled — user notified by email', 'success');
+            fetchRefWithdrawals();
+            if (adminTab === 'referral') fetchRefUsers();
+        } catch (e) {
+            notify(e.message, 'error');
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    // ── Referral Program Management (migration 010) ──────────────────────
+    const [adminTab, setAdminTab] = useState('overview');
+    const [refUsers, setRefUsers] = useState([]);
+    const [refUsersQ, setRefUsersQ] = useState('');
+    const [openRefUser, setOpenRefUser] = useState(null);
+    const [refStatCache, setRefStatCache] = useState({});
+    const [rateDrafts, setRateDrafts] = useState({});
+    const [slashDrafts, setSlashDrafts] = useState({});
+    const [refActionBusy, setRefActionBusy] = useState('');
+    const [processingId, setProcessingId] = useState(null);
+    const [wdFilter, setWdFilter] = useState('all');
+    // Cancel-with-reason modal state: the note is emailed to the user with
+    // the cancellation notice.
+    const [cancelFor, setCancelFor] = useState(null);
+    const [cancelNote, setCancelNote] = useState('');
+
+    const fetchRefUsers = async (q = refUsersQ) => {
+        try {
+            const params = q ? `?q=${encodeURIComponent(q)}` : '';
+            const res = await fetch(`${KEEPER_URL_ARC}/admin/referral/users${params}`, {
+                headers: { 'Authorization': ADMIN_TOKEN }
+            });
+            const data = await res.json().catch(() => []);
+            if (res.ok) setRefUsers(Array.isArray(data) ? data : []);
+        } catch (e) { /* card shows a retry button */ }
+    };
+
+    // Expand a user: fetch their commission stats + withdrawals once, lazily —
+    // the bulk admin read stays light while still showing real numbers.
+    const toggleRefUser = async (addr) => {
+        const next = openRefUser === addr ? null : addr;
+        setOpenRefUser(next);
+        if (next && !refStatCache[addr]) {
+            setRefStatCache(prev => ({ ...prev, [addr]: 'loading' }));
+            try {
+                const [s, w] = await Promise.all([
+                    fetch(`${KEEPER_URL_ARC}/referral/stats/${addr}`),
+                    fetch(`${KEEPER_URL_ARC}/referral/withdrawals/${addr}`)
+                ]);
+                const sData = s.ok ? await s.json() : null;
+                const wds = w.ok ? (await w.json()) || [] : [];
+                const sumBy = (st) => wds.filter(x => x.status === st).reduce((acc, x) => acc + Number(x.amount || 0), 0);
+                setRefStatCache(prev => ({ ...prev, [addr]: { stats: sData, pending: sumBy('pending'), paid: sumBy('paid') } }));
+            } catch (e) {
+                setRefStatCache(prev => { const c = { ...prev }; delete c[addr]; return c; });
+            }
+        }
+    };
+
+    const doRefAction = async (endpoint, payload, successMsg) => {
+        setRefActionBusy(`${endpoint}:${payload.address}`);
+        try {
+            const res = await fetch(`${KEEPER_URL_ARC}/admin/referral/${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': ADMIN_TOKEN },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Action failed');
+            if (successMsg) notify(successMsg, 'success');
+            await fetchRefUsers();
             fetchRefWithdrawals();
         } catch (e) {
             notify(e.message, 'error');
+        } finally {
+            setRefActionBusy('');
         }
     };
+
+    useEffect(() => {
+        if (adminTab === 'referral') fetchRefUsers();
+    }, [adminTab]);
 
     const fetchProfile = async (addr) => {
         if (!addr) return;
@@ -311,7 +406,30 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             </header>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto no-scrollbar p-10 z-10">
+            <main className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-10 z-10">
+                {/* Tab bar — chip strip that scrolls horizontally on narrow screens */}
+                <div className="max-w-[1400px] mx-auto flex items-center gap-2 mb-6 md:mb-8 overflow-x-auto no-scrollbar">
+                    {ADMIN_TABS.map(t => {
+                        const Icon = t.icon;
+                        const active = adminTab === t.key;
+                        const badge = t.key === 'requests' ? refWithdrawals.filter(w => w.status === 'pending').length : 0;
+                        return (
+                            <button
+                                key={t.key}
+                                onClick={() => setAdminTab(t.key)}
+                                className={`flex items-center gap-2 px-4 md:px-5 py-3 rounded-2xl border text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${active ? 'bg-[#1A6140] text-white border-[#1A6140] shadow-lg shadow-[#1A6140]/20' : isLight ? 'bg-white/60 border-black/10 text-black/50 hover:text-black' : 'bg-white/5 border-white/10 text-white/40 hover:text-white'}`}
+                            >
+                                <Icon size={13} />
+                                {t.label}
+                                {badge > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[8px] font-black leading-none">{badge}</span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {adminTab === 'overview' && (
                 <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
                     {/* Security & Maintenance Controls (COL 1-7) */}
@@ -549,58 +667,292 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 )}
                             </div>
                         </AdminCard>
-                    </div>
+                     </div>
                 </div>
+                )}
 
-                {/* Referral Withdrawals — manual payout approvals */}
-                <AdminCard title="Referral Withdrawals" icon={Gift} accent="#1A6140">
-                    <div className="flex flex-col gap-2 max-h-[360px] overflow-y-auto no-scrollbar">
-                        <div className="flex items-center justify-between mb-2">
-                            <p className={`text-[8px] font-black uppercase tracking-widest opacity-40`}>Commission payout requests (manual — pay off-chain)</p>
-                            <button onClick={fetchRefWithdrawals} className="p-2 rounded-xl bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20 transition-all">
-                                <RefreshCw size={13} />
-                            </button>
-                        </div>
-                        {refWithdrawals.length === 0 ? (
-                            <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
-                                No withdrawal requests
+                {/* Withdrawal Requests tab — approve pays out, cancel emails the user */}
+                {adminTab === 'requests' && (
+                    <AdminCard title="Withdrawal Requests" icon={Gift} accent="#1A6140">
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                    {[['all', 'All'], ['pending', 'Pending'], ['paid', 'Approved'], ['rejected', 'Cancelled']].map(([k, l]) => (
+                                        <button
+                                            key={k}
+                                            onClick={() => setWdFilter(k)}
+                                            className={`px-4 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${wdFilter === k ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
+                                        >
+                                            {l}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button onClick={fetchRefWithdrawals} className="p-2 rounded-xl bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20 transition-all">
+                                    <RefreshCw size={13} />
+                                </button>
                             </div>
-                        ) : (
-                            refWithdrawals.map(w => (
-                                <motion.div
-                                    key={w.id}
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className={`p-3 rounded-2xl border flex items-center justify-between gap-3 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}
-                                >
-                                    <div className="min-w-0">
-                                        <div className="text-[10px] font-black uppercase">
-                                            {w.username ? `@${w.username}` : `${(w.user_address || '').slice(0, 6)}…${(w.user_address || '').slice(-4)}`}
-                                        </div>
-                                        <div className="text-[8px] opacity-40 font-bold uppercase font-mono">
-                                            ${(Number(w.amount) || 0).toFixed(2)} • {w.status} • {w.requested_at ? new Date(w.requested_at).toLocaleDateString() : ''}
-                                        </div>
+
+                            <div className="flex flex-col gap-2 max-h-[560px] overflow-y-auto no-scrollbar">
+                                {(wdFilter === 'all' ? refWithdrawals : refWithdrawals.filter(w => w.status === wdFilter)).length === 0 ? (
+                                    <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
+                                        No withdrawal requests
                                     </div>
-                                    {w.status === 'pending' ? (
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <button onClick={() => setRefWithdrawalStatus(w.id, 'paid')} className="px-3 py-2 rounded-xl bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 transition-all">
-                                                Mark paid
-                                            </button>
-                                            <button onClick={() => setRefWithdrawalStatus(w.id, 'rejected')} className="px-3 py-2 rounded-xl bg-red-500/10 text-red-500 text-[8px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">
-                                                Reject
-                                            </button>
+                                ) : (wdFilter === 'all' ? refWithdrawals : refWithdrawals.filter(w => w.status === wdFilter)).map(w => (
+                                    <motion.div
+                                        key={w.id}
+                                        initial={{ opacity: 0, y: 8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}
+                                    >
+                                        <div className="min-w-0">
+                                            <div className={`text-[10px] font-black uppercase ${isLight ? 'text-black' : 'text-white'}`}>
+                                                {w.username ? `@${w.username}` : `${(w.user_address || '').slice(0, 6)}…${(w.user_address || '').slice(-4)}`}
+                                            </div>
+                                            <div className={`text-[8px] opacity-40 font-bold uppercase font-mono break-all ${isLight ? 'text-black' : 'text-white'}`}>
+                                                ${(Number(w.amount) || 0).toFixed(2)} · {(w.chain || 'Arc').toUpperCase()} → {w.destination_address || 'no destination on file'}
+                                            </div>
+                                            <div className={`text-[8px] opacity-30 font-mono ${isLight ? 'text-black' : 'text-white'}`}>
+                                                {w.requested_at ? `Requested ${new Date(w.requested_at).toLocaleString()}` : ''}{w.processed_at ? ` · Processed ${new Date(w.processed_at).toLocaleString()}` : ''}
+                                            </div>
+                                            {w.admin_note && (
+                                                <div className="text-[8px] font-bold text-red-400 mt-1">Note: {w.admin_note}</div>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <span className={`shrink-0 px-3 py-1.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${w.status === 'paid' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
-                                            {w.status}
-                                        </span>
-                                    )}
-                                </motion.div>
-                            ))
-                        )}
-                    </div>
-                </AdminCard>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {w.status === 'pending' && w.hasEmail === false && (
+                                                <span className="hidden md:flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-amber-500" title="No email on file — the automatic notice cannot be delivered">
+                                                    <Mail size={11} /> No email
+                                                </span>
+                                            )}
+                                            {w.status === 'pending' ? (
+                                                <>
+                                                    <button
+                                                        onClick={() => setRefWithdrawalStatus(w.id, 'paid')}
+                                                        disabled={processingId === w.id}
+                                                        className="px-3 py-2 rounded-xl bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                                                    >
+                                                        {processingId === w.id ? '…' : 'Approve'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setCancelFor(w.id); setCancelNote(''); }}
+                                                        disabled={processingId === w.id}
+                                                        className="px-3 py-2 rounded-xl bg-red-500/10 text-red-500 text-[8px] font-black uppercase tracking-widest hover:bg-red-500/20 active:scale-95 transition-all disabled:opacity-50"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <span className={`shrink-0 px-3 py-1.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${w.status === 'paid' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                                                    {w.status === 'paid' ? 'Approved' : 'Cancelled'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                            <p className={`text-[8px] font-bold opacity-30 uppercase tracking-wide ${isLight ? 'text-black' : 'text-white'}`}>
+                                Approving marks the request paid and emails the user. Cancelling releases the hold back to their commission balance and emails them with the reason.
+                            </p>
+                        </div>
+                    </AdminCard>
+                )}
+
+                {/* Referral Program Management tab — suspend/rate/slash */}
+                {adminTab === 'referral' && (
+                    <AdminCard title="Referral Program Management" icon={Gift} accent="#1A6140">
+                        <div className="flex flex-col gap-4">
+                            {/* Enrolled-user search */}
+                            <div className="flex items-center gap-3">
+                                <div className="relative flex-1 min-w-0">
+                                    <Search size={14} className={`absolute left-4 top-1/2 -translate-y-1/2 ${isLight ? 'text-black/30' : 'text-white/30'}`} />
+                                    <input
+                                        value={refUsersQ}
+                                        onChange={e => setRefUsersQ(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') fetchRefUsers(); }}
+                                        placeholder="Search username or address…"
+                                        className={`w-full pl-11 pr-4 py-3.5 rounded-2xl border text-xs font-bold outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    />
+                                </div>
+                                <button onClick={() => fetchRefUsers()} className="p-3 rounded-2xl bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20 transition-all shrink-0">
+                                    <RefreshCw size={14} />
+                                </button>
+                            </div>
+
+                            <div className="flex flex-col gap-2 max-h-[560px] overflow-y-auto no-scrollbar">
+                                {refUsers.length === 0 ? (
+                                    <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
+                                        No enrolled users found
+                                    </div>
+                                ) : refUsers.map(u => {
+                                    const open = openRefUser === u.address;
+                                    const cache = refStatCache[u.address];
+                                    const rateVal = rateDrafts[u.address] ?? (u.rateOverride != null ? String(u.rateOverride) : '');
+                                    const slashVal = slashDrafts[u.address] || '';
+                                    const busyKey = (ep) => refActionBusy === `${ep}:${u.address}`;
+                                    return (
+                                        <div key={u.address} className={`rounded-2xl border overflow-hidden ${open ? (isLight ? 'border-[#1A6140]/40' : 'border-[#1A6140]/30') : (isLight ? 'border-black/5' : 'border-white/5')} ${isLight ? 'bg-white' : 'bg-white/5'} transition-colors`}>
+                                            <button onClick={() => toggleRefUser(u.address)} className="w-full flex items-center justify-between gap-3 p-4 text-left">
+                                                <div className="min-w-0">
+                                                    <div className={`text-[10px] font-black uppercase ${isLight ? 'text-black' : 'text-white'}`}>
+                                                        {u.username ? `@${u.username}` : `${(u.address || '').slice(0, 6)}…${(u.address || '').slice(-4)}`}
+                                                    </div>
+                                                    <div className={`text-[8px] font-bold uppercase font-mono ${isLight ? 'text-black/40' : 'text-white/40'}`}>
+                                                        {u.referralCode ? `Code ${u.referralCode}` : 'No code'} · By {u.referredBy ? `${(u.referredBy || '').slice(0, 6)}…` : '—'}{u.enrolledAt ? ` · ${new Date(u.enrolledAt).toLocaleDateString()}` : ''}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {u.suspended && (
+                                                        <span className="px-2 py-1 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest flex items-center gap-1">
+                                                            <Ban size={9} /> Suspended
+                                                        </span>
+                                                    )}
+                                                    {u.rateOverride != null && (
+                                                        <span className="px-2 py-1 rounded-full bg-[#1A6140]/10 text-[#1A6140] border border-[#1A6140]/30 text-[7px] font-black uppercase tracking-widest">{u.rateOverride}% Rate</span>
+                                                    )}
+                                                    {u.slashed > 0 && (
+                                                        <span className="px-2 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[7px] font-black uppercase tracking-widest">−${u.slashed.toFixed(2)}</span>
+                                                    )}
+                                                    <ChevronDown size={14} className={`transition-transform duration-300 ${open ? 'rotate-180' : ''} opacity-50`} />
+                                                </div>
+                                            </button>
+
+                                            {open && (
+                                                <div className="px-4 pb-4 flex flex-col gap-4">
+                                                    {/* Commission readout (lazy-fetched) */}
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                        {[
+                                                            { label: 'Total Commission', value: cache && cache !== 'loading' ? `$${Number(cache.stats?.totalCommission || 0).toFixed(2)}` : '…' },
+                                                            { label: 'Referrals', value: cache && cache !== 'loading' ? String(cache.stats?.count ?? '…') : '…' },
+                                                            { label: 'Pending', value: cache && cache !== 'loading' ? `$${Number(cache.pending || 0).toFixed(2)}` : '…' },
+                                                            { label: 'Paid Out', value: cache && cache !== 'loading' ? `$${Number(cache.paid || 0).toFixed(2)}` : '…' }
+                                                        ].map((s, i) => (
+                                                            <div key={i} className={`p-3 rounded-xl border ${isLight ? 'bg-black/[0.03] border-black/5' : 'bg-black/30 border-white/5'}`}>
+                                                                <div className={`text-[7px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>{s.label}</div>
+                                                                <div className={`text-sm font-black ${isLight ? 'text-black' : 'text-white'}`}>{s.value}</div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    {cache === 'loading' && <p className={`text-[8px] font-bold uppercase tracking-widest ${isLight ? 'text-black/30' : 'text-white/30'}`}>Loading commission…</p>}
+
+                                                    {/* Actions: suspend · set rate · slash */}
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                        <button
+                                                            disabled={busyKey('suspend')}
+                                                            onClick={() => doRefAction('suspend', { address: u.address, suspended: !u.suspended }, u.suspended ? 'User reinstated in the program' : 'User suspended from the program')}
+                                                            className={`flex items-center justify-center gap-2 py-3.5 px-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${u.suspended ? 'bg-[#1A6140] text-white hover:brightness-110' : 'bg-red-500/15 text-red-500 border border-red-500/30 hover:bg-red-500/25'}`}
+                                                        >
+                                                            {u.suspended ? <UserCheck size={13} /> : <UserX size={13} />} {u.suspended ? 'Unsuspend' : 'Suspend'}
+                                                        </button>
+                                                        <div className="flex gap-2">
+                                                            <div className="relative flex-1 min-w-0">
+                                                                <BadgePercent size={12} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-black/30' : 'text-white/30'}`} />
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    step="0.1"
+                                                                    value={rateVal}
+                                                                    onChange={e => setRateDrafts(prev => ({ ...prev, [u.address]: e.target.value }))}
+                                                                    placeholder="Rate %"
+                                                                    className={`w-full pl-8 pr-2 py-3 rounded-2xl border text-[10px] font-black outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                                                />
+                                                            </div>
+                                                            <button
+                                                                disabled={busyKey('set-rate')}
+                                                                onClick={() => doRefAction('set-rate', { address: u.address, rate: rateVal.trim() === '' ? null : Number(rateVal) }, rateVal.trim() === '' ? 'Rate reset to program default' : 'Commission rate set')}
+                                                                className="px-4 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                                                            >
+                                                                {busyKey('set-rate') ? '…' : 'Set'}
+                                                            </button>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <div className="relative flex-1 min-w-0">
+                                                                <Scissors size={12} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-black/30' : 'text-white/30'}`} />
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    value={slashVal}
+                                                                    onChange={e => setSlashDrafts(prev => ({ ...prev, [u.address]: e.target.value }))}
+                                                                    placeholder="Slash $"
+                                                                    className={`w-full pl-8 pr-2 py-3 rounded-2xl border text-[10px] font-black outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-red-400 text-black' : 'bg-black/40 border-white/10 focus:border-red-400 text-white'}`}
+                                                                />
+                                                            </div>
+                                                            <button
+                                                                disabled={busyKey('slash')}
+                                                                onClick={() => {
+                                                                    const amt = Number(slashVal);
+                                                                    if (!(amt > 0)) return notify('Enter an amount to slash', 'error');
+                                                                    doRefAction('slash', { address: u.address, amount: amt }, `Slashed $${amt.toFixed(2)} from commission`);
+                                                                }}
+                                                                className="px-4 rounded-2xl bg-red-500/15 text-red-500 border border-red-500/30 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/25 active:scale-95 transition-all disabled:opacity-50"
+                                                            >
+                                                                {busyKey('slash') ? '…' : 'Slash'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <p className={`text-[8px] font-bold ${isLight ? 'text-black/30' : 'text-white/30'}`}>
+                                                        Rate override (percent) applies to the deposit & volume commission this user earns. Blank resets to the program default. Slash permanently deducts from their commission balance.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </AdminCard>
+                )}
             </main>
+
+            {/* Cancel-with-reason modal — the note travels into the user's email */}
+            <AnimatePresence>
+                {cancelFor != null && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        onClick={processingId ? undefined : () => setCancelFor(null)}
+                        className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }}
+                            onClick={e => e.stopPropagation()}
+                            className={`w-full max-w-md p-6 md:p-7 rounded-[32px] border flex flex-col gap-5 ${isLight ? 'bg-white border-black/10' : 'bg-[#0D0D0D] border-white/10 shadow-2xl'}`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <h3 className={`text-base font-black uppercase tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Cancel withdrawal request</h3>
+                                <button onClick={() => setCancelFor(null)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
+                                    <X size={18} className={isLight ? 'text-black' : 'text-white'} />
+                                </button>
+                            </div>
+                            <div>
+                                <label className={`text-[9px] font-black uppercase tracking-widest opacity-30 block mb-3 ml-1 ${isLight ? 'text-black' : 'text-white'}`}>Reason (emailed to the user)</label>
+                                <textarea
+                                    value={cancelNote}
+                                    onChange={e => setCancelNote(e.target.value)}
+                                    placeholder="Why is this request being cancelled…"
+                                    className={`w-full min-h-[110px] p-4 rounded-2xl border text-xs font-bold resize-none outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                />
+                            </div>
+                            <p className={`text-[9px] font-bold opacity-40 uppercase leading-relaxed ${isLight ? 'text-black' : 'text-white'}`}>
+                                The user is emailed that an administrator cancelled their withdrawal request. The amount releases back to their referral commission balance immediately.
+                            </p>
+                            <button
+                                onClick={() => {
+                                    const id = cancelFor;
+                                    setCancelFor(null);
+                                    const note = cancelNote;
+                                    setCancelNote('');
+                                    setRefWithdrawalStatus(id, 'rejected', note);
+                                }}
+                                disabled={processingId != null}
+                                className="w-full py-4 rounded-2xl bg-red-500 text-white text-[10px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50"
+                            >
+                                {processingId != null ? 'Processing…' : 'Confirm cancellation'}
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Persistence Layer Status */}
             <footer className={`flex-none p-5 border-t backdrop-blur-3xl px-10 flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#050505]/50 border-white/5'}`}>

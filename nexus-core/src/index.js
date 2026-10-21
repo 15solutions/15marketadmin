@@ -1973,7 +1973,12 @@ app.get('/referral/info/:address', async (req, res) => {
       referredBy: profile?.referredBy || null,
       referredAt: profile?.referredAt || null,
       referralEnrolled: profile?.referralEnrolled === true,
-      referralEnrolledAt: profile?.referralEnrolledAt || null
+      referralEnrolledAt: profile?.referralEnrolledAt || null,
+      // Admin controls (010) surfaced to the user's hub: suspension blocks
+      // withdrawal requests, override/slashed show the true balance.
+      referralSuspended: profile?.referralSuspended === true,
+      rateOverride: profile?.referralRateOverride != null ? Number(profile.referralRateOverride) : null,
+      slashed: Number(profile?.referralSlashed) || 0
     });
   } catch (e) {
     console.error('[Referral] info failed:', e.message);
@@ -2016,10 +2021,17 @@ app.post('/referral/enroll/:address', async (req, res) => {
 });
 
 // Manual commission payouts: the program is off-chain and has NO auto
-// withdrawal. A request is a pending ledger row an admin processes.
+// withdrawal. A request is a pending ledger row an admin processes. The
+// request carries the payout route: chain (Arc only for now) and the
+// destination wallet address the user wants the funds on.
 app.post('/referral/withdraw/:address', async (req, res) => {
   try {
-    const result = await profiles.requestRefWithdrawal(req.params.address, req.body?.amount);
+    const result = await profiles.requestRefWithdrawal(
+      req.params.address,
+      req.body?.amount,
+      req.body?.chain,
+      req.body?.destination
+    );
     if (!result.ok) return res.status(result.status).json({ error: result.error });
     res.json(result);
   } catch (e) {
@@ -2048,11 +2060,114 @@ app.get('/admin/referral/withdrawals', requireAdminAuth, async (req, res) => {
 
 app.post('/admin/referral/withdrawals/:id', requireAdminAuth, async (req, res) => {
   try {
-    const result = await profiles.setRefWithdrawalStatus(req.params.id, req.body?.status);
+    const status = req.body?.status;
+    const note = typeof req.body?.note === 'string' ? req.body.note : '';
+    // Capture the request BEFORE flipping the status so the user can be
+    // emailed with the exact amount/destination that was processed.
+    const row = await profiles.getRefWithdrawalById(req.params.id);
+    const result = await profiles.setRefWithdrawalStatus(req.params.id, status, note);
     if (!result.ok) return res.status(result.status).json({ error: result.error });
+
+    // USER EMAIL NOTICE — cancelling a withdrawal request always emails the
+    // user that an administrator cancelled it (and why, when a note was
+    // attached); approving one emails them the approval. Emails go through
+    // Resend with the profile's stored/verified address (skipped silently
+    // when none is on file).
+    if (row?.user_address) {
+      const amount = `$${(Number(row.amount) || 0).toFixed(2)}`;
+      const dest = row.destination_address ? ` to ${row.destination_address}` : '';
+      if (status === 'rejected') {
+        const reason = note ? ` Reason: ${note}` : ' No reason was provided.';
+        notificationService.notifyUser(
+          row.user_address,
+          'Withdrawal Request Cancelled',
+          `Your referral commission withdrawal request of ${amount}${dest} was cancelled by an administrator.${reason} The funds remain in your referral commission balance and can be requested again.`,
+          'error',
+          true
+        ).catch(e => console.warn('[Referral] cancel notice failed:', e.message));
+      } else if (status === 'paid') {
+        notificationService.notifyUser(
+          row.user_address,
+          'Withdrawal Request Approved',
+          `Your referral commission withdrawal request of ${amount}${dest} has been approved. The payout is on its way — check your wallet shortly.`,
+          'success',
+          true
+        ).catch(e => console.warn('[Referral] approval notice failed:', e.message));
+      }
+    }
     res.json({ ok: true });
   } catch (e) {
     console.error('[Referral] admin status failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Referral admin management (migration 010) ─────────────────────────────
+// Enrolled users with their admin-control state for the management tab.
+app.get('/admin/referral/users', requireAdminAuth, async (req, res) => {
+  try {
+    res.json(await profiles.getAdminRefUsers(req.query?.q));
+  } catch (e) {
+    console.error('[Referral] admin users failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Suspend / unsuspend a user from the referral program. Suspended users keep
+// accrued commission but cannot request withdrawals.
+app.post('/admin/referral/suspend', requireAdminAuth, async (req, res) => {
+  try {
+    const address = req.body?.address;
+    const result = await profiles.setReferralSuspension(address, req.body?.suspended === true);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    await profiles.syncToSupabase((address || '').toLowerCase()).catch(() => {});
+    notificationService.notifyUser(
+      (address || '').toLowerCase(),
+      result.suspended ? 'Referral Program Suspended' : 'Referral Program Reinstated',
+      result.suspended
+        ? 'An administrator has suspended your account from the referral program. Withdrawal requests are paused while suspended — contact support if you believe this is a mistake.'
+        : 'Your account has been reinstated in the referral program. Withdrawal requests are available again.',
+      result.suspended ? 'error' : 'success',
+      true
+    ).catch(e => console.warn('[Referral] suspend notice failed:', e.message));
+    res.json(result);
+  } catch (e) {
+    console.error('[Referral] suspend failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Set / clear a per-user commission rate override (percent, null = default).
+app.post('/admin/referral/set-rate', requireAdminAuth, async (req, res) => {
+  try {
+    const address = req.body?.address;
+    const result = await profiles.setReferralRate(address, req.body?.rate ?? null);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    await profiles.syncToSupabase((address || '').toLowerCase()).catch(() => {});
+    res.json(result);
+  } catch (e) {
+    console.error('[Referral] set-rate failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Slash a user's earned commission (permanent deduction).
+app.post('/admin/referral/slash', requireAdminAuth, async (req, res) => {
+  try {
+    const address = String(req.body?.address || '').toLowerCase();
+    const result = await profiles.slashReferralCommission(address, req.body?.amount);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    await profiles.syncToSupabase(address).catch(() => {});
+    notificationService.notifyUser(
+      address,
+      'Referral Commission Slashed',
+      `An administrator has deducted $${(Number(req.body?.amount) || 0).toFixed(2)} from your referral commission balance${req.body?.note ? `. Reason: ${req.body.note}` : '.'}`,
+      'error',
+      true
+    ).catch(e => console.warn('[Referral] slash notice failed:', e.message));
+    res.json(result);
+  } catch (e) {
+    console.error('[Referral] slash failed:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

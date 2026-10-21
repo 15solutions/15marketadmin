@@ -265,6 +265,12 @@ function profileToRow(profile, includeTrades, includeOnboarding = true, includeC
         referred_at: profile.referredAt != null ? profile.referredAt : null,
         referral_enrolled: profile.referralEnrolled ?? false,
         referral_enrolled_at: profile.referralEnrolledAt != null ? profile.referralEnrolledAt : null,
+        // Referral admin controls (migration 010): suspension, per-user
+        // commission-rate override and slashed commission must round-trip or
+        // every admin action would evaporate on restart.
+        referral_suspended: profile.referralSuspended === true,
+        referral_rate_override: profile.referralRateOverride != null ? profile.referralRateOverride : null,
+        referral_slashed: profile.referralSlashed ?? 0,
         updated_at: new Date().toISOString()
     };
     if (includeChainRecon) {
@@ -350,6 +356,9 @@ function rowToProfile(row) {
                     : Date.parse(row.referral_enrolled_at)
             }
             : {}),
+        ...(row.referral_suspended === true ? { referralSuspended: true } : {}),
+        ...(row.referral_rate_override != null ? { referralRateOverride: Number(row.referral_rate_override) } : {}),
+        ...(row.referral_slashed != null ? { referralSlashed: Number(row.referral_slashed) } : {}),
         onboarded: row.onboarded === true || onboardedAt != null || !!row.username,
         onboardedAt,
         chainBaseline: row.chain_baseline != null ? Number(row.chain_baseline) : null,
@@ -538,9 +547,9 @@ class ProfileService {
         // Referral columns (migration 009) probed separately so a missing
         // referral column never forces the wide trade payloads off.
         try {
-            const refRes = await supabaseRequest('/rest/v1/profiles?select=referral_code,referred_by,referred_at,referral_enrolled,referral_enrolled_at&limit=1', { timeout: 20000 });
+            const refRes = await supabaseRequest('/rest/v1/profiles?select=referral_code,referred_by,referred_at,referral_enrolled,referral_enrolled_at,referral_suspended,referral_rate_override,referral_slashed&limit=1', { timeout: 20000 });
             this.sbReferralAvailable = refRes.ok;
-            if (!refRes.ok) console.warn('[Supabase] Referral columns NOT present — run 009_referrals.sql; referral writes are disabled until then.');
+            if (!refRes.ok) console.warn('[Supabase] Referral columns NOT present — run 009_referrals.sql + 010_referral_admin.sql; referral writes are disabled until then.');
         } catch (e) {
             this.sbReferralAvailable = true;
             console.warn('[Supabase] Referral column probe failed:', e.message);
@@ -963,6 +972,9 @@ class ProfileService {
             for (const a of attempts) {
                 delete a.referral_code; delete a.referred_by; delete a.referred_at;
                 delete a.referral_enrolled; delete a.referral_enrolled_at;
+                // 010 admin controls strip with the rest — a payload carrying
+                // them while the columns are gone 400s the entire upsert.
+                delete a.referral_suspended; delete a.referral_rate_override; delete a.referral_slashed;
             }
         }
         // Self-healing column discovery: PostgREST 400s name the missing
@@ -970,7 +982,7 @@ class ProfileService {
         // 'profiles'…"). Strip it from every attempt and retry — covers any
         // migration drift the boot-time probes missed (e.g. a transient probe
         // failure that latched the wrong payload shape).
-        const REFERRAL_COLUMNS = ['referral_code', 'referred_by', 'referred_at', 'referral_enrolled', 'referral_enrolled_at'];
+        const REFERRAL_COLUMNS = ['referral_code', 'referred_by', 'referred_at', 'referral_enrolled', 'referral_enrolled_at', 'referral_suspended', 'referral_rate_override', 'referral_slashed'];
         let lastError = '';
         for (let i = 0; i < attempts.length; i++) {
             for (let retry = 0; retry < 10; retry++) {
@@ -1218,6 +1230,23 @@ class ProfileService {
         const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
         const DEPOSIT_COMMISSION_RATE = 0.10;
         const VOLUME_COMMISSION_RATE = 0.10;
+        // Migration 010 admin controls: a per-user commission-rate override
+        // (percent) replaces BOTH program rates for this referrer, and any
+        // slashed commission is deducted from the total owed.
+        let rateOverride = null;
+        let slashed = 0;
+        let suspended = false;
+        try {
+            const p = this.get(addr) || await this.getAsync(addr);
+            if (p) {
+                rateOverride = p.referralRateOverride != null && Number.isFinite(Number(p.referralRateOverride))
+                    ? Number(p.referralRateOverride) : null;
+                slashed = round2(Math.max(0, Number(p.referralSlashed) || 0));
+                suspended = p.referralSuspended === true;
+            }
+        } catch (e) { /* program defaults apply */ }
+        const depRate = rateOverride != null ? rateOverride / 100 : DEPOSIT_COMMISSION_RATE;
+        const volRate = rateOverride != null ? rateOverride / 100 : VOLUME_COMMISSION_RATE;
 
         // 1) Referred users (memory first, then the durable store by referred_by)
         const referred = new Map();
@@ -1299,8 +1328,8 @@ class ProfileService {
         }
         totalVolume = round2(Object.values(perUserVolume).reduce((s, v) => s + v, 0));
 
-        const depositCommission = round2(totalDeposits * DEPOSIT_COMMISSION_RATE);
-        const volumeCommission = round2(totalVolume * VOLUME_COMMISSION_RATE);
+        const depositCommission = round2(totalDeposits * depRate);
+        const volumeCommission = round2(totalVolume * volRate);
 
         const referrals = addresses
             .map(a => ({
@@ -1309,7 +1338,7 @@ class ProfileService {
                 joinedAt: referred.get(a)?.joinedAt || null,
                 deposits: round2(perUserDeposits[a] || 0),
                 volume: round2(perUserVolume[a] || 0),
-                commission: round2((perUserDeposits[a] || 0) * DEPOSIT_COMMISSION_RATE + (perUserVolume[a] || 0) * VOLUME_COMMISSION_RATE)
+                commission: round2((perUserDeposits[a] || 0) * depRate + (perUserVolume[a] || 0) * volRate)
             }))
             .sort((a, b) => (b.joinedAt || 0) - (a.joinedAt || 0));
 
@@ -1320,7 +1349,11 @@ class ProfileService {
             totalVolume,
             depositCommission,
             volumeCommission,
-            totalCommission: round2(depositCommission + volumeCommission),
+            // Slashed commission (admin action) reduces what is actually owed.
+            totalCommission: round2(Math.max(0, depositCommission + volumeCommission - slashed)),
+            slashed,
+            rateOverride,
+            suspended,
             referrals
         };
     }
@@ -1372,14 +1405,29 @@ class ProfileService {
         return { stats, available: Math.max(0, Math.round((owed - paidOrPending) * 100) / 100) };
     }
 
-    async requestRefWithdrawal(address, amount) {
+    async requestRefWithdrawal(address, amount, chain, destination) {
         const addr = String(address || '').toLowerCase();
         const amt = Math.round((Number(amount) || 0) * 100) / 100;
         if (!addr) return { ok: false, status: 400, error: 'Address required' };
         if (!(amt > 0)) return { ok: false, status: 400, error: 'Enter an amount' };
+        // Withdrawal requests carry a payout route: only Arc is supported
+        // right now (auto-selected), and the funds must land on an explicit
+        // wallet address the user controls.
+        const chainName = String(chain || 'Arc').trim();
+        if (chainName.toLowerCase() !== 'arc') {
+            return { ok: false, status: 400, error: 'Only Arc withdrawals are supported for now' };
+        }
+        const dest = String(destination || '').trim();
+        if (!dest) return { ok: false, status: 400, error: 'Enter the wallet address to withdraw to' };
+        if (!/^0x[a-fA-F0-9]{40}$/.test(dest)) {
+            return { ok: false, status: 400, error: 'Enter a valid Arc wallet address (0x…)' };
+        }
         await this.initSupabase();
         const profile = this.get(addr);
         if (!profile?.referralEnrolled) return { ok: false, status: 403, error: 'Enroll in the referral program first' };
+        if (profile.referralSuspended === true) {
+            return { ok: false, status: 403, error: 'Your account is suspended from the referral program — contact an administrator' };
+        }
         const { available } = await this.refAvailableCommission(addr);
         if (available < ProfileService.REF_MIN_WITHDRAWAL) {
             return { ok: false, status: 400, error: `Minimum withdrawal is $${ProfileService.REF_MIN_WITHDRAWAL}.00 USDC` };
@@ -1390,6 +1438,8 @@ class ProfileService {
         const row = {
             user_address: addr,
             amount: amt,
+            chain: 'Arc',
+            destination_address: dest.toLowerCase(),
             status: 'pending',
             requested_at: new Date().toISOString()
         };
@@ -1407,12 +1457,13 @@ class ProfileService {
                 const rows = await res.json().catch(() => []);
                 return { ok: true, withdrawal: Array.isArray(rows) && rows[0] ? rows[0] : row };
             } catch (e) {
+                console.warn('[Referral] withdrawal insert failed:', e.message);
                 // Memory ledger (fresh deployments before migration) — still
                 // record server-side so the request isn't silently lost.
-                return { ok: false, status: 503, error: 'Withdrawals ledger unavailable — run migration 009' };
+                return { ok: false, status: 503, error: 'Withdrawals ledger unavailable — run migrations 009 + 010' };
             }
         }
-        return { ok: false, status: 503, error: 'Withdrawals ledger unavailable — run migration 009' };
+        return { ok: false, status: 503, error: 'Withdrawals ledger unavailable — run migrations 009 + 010' };
     }
 
     async getRefWithdrawals(address) {
@@ -1442,12 +1493,14 @@ class ProfileService {
                     // Best-effort username decoration from the profile cache/DB.
                     const withNames = await Promise.all(rows.map(async r => {
                         let username = null;
+                        let hasEmail = false;
                         try {
                             const p = this.get(String(r.user_address || '').toLowerCase())
                                 || await this.getAsync(String(r.user_address || '').toLowerCase());
                             username = p?.username || null;
+                            hasEmail = !!(p?.email || p?.verifiedEmail);
                         } catch (e) {}
-                        return { ...r, username };
+                        return { ...r, username, hasEmail };
                     }));
                     return withNames;
                 }
@@ -1457,15 +1510,19 @@ class ProfileService {
         return [];
     }
 
-    async setRefWithdrawalStatus(id, status) {
+    async setRefWithdrawalStatus(id, status, note) {
         if (!['paid', 'rejected'].includes(status)) return { ok: false, status: 400, error: 'Invalid status' };
         if (SUPABASE_ENABLED && this.sbRefWithdrawalsAvailable !== false) {
             try {
+                const patch = { status, processed_at: new Date().toISOString() };
+                // Cancel/reject citations (why the request was cancelled) ride
+                // along so the user's page and any email keep the exact reason.
+                if (typeof note === 'string' && note.trim()) patch.admin_note = note.trim().slice(0, 400);
                 const res = await supabaseRequest(
                     `/rest/v1/referral_withdrawals?id=eq.${encodeURIComponent(id)}`,
                     {
                         method: 'PATCH',
-                        body: JSON.stringify({ status, processed_at: new Date().toISOString() })
+                        body: JSON.stringify(patch)
                     }
                 );
                 if (res.ok) return { ok: true };
@@ -1475,7 +1532,128 @@ class ProfileService {
                 return { ok: false, status: 502, error: e.message };
             }
         }
-        return { ok: false, status: 503, error: 'Withdrawals ledger unavailable — run migration 009' };
+        return { ok: false, status: 503, error: 'Withdrawals ledger unavailable — run migrations 009 + 010' };
+    }
+
+    async getRefWithdrawalById(id) {
+        if (SUPABASE_ENABLED && this.sbRefWithdrawalsAvailable !== false) {
+            try {
+                const res = await supabaseRequest(
+                    `/rest/v1/referral_withdrawals?select=*&id=eq.${encodeURIComponent(id)}&limit=1`,
+                    { timeout: 15000 }
+                );
+                if (res.ok) {
+                    const rows = (await res.json()) || [];
+                    return rows[0] || null;
+                }
+                if (res.status >= 400 && res.status < 500) this.sbRefWithdrawalsAvailable = false;
+            } catch (e) { /* fall through */ }
+        }
+        return null;
+    }
+
+    // ── Referral admin controls (migration 010) ───────────────────────────
+    // Suspend/unsuspend a user from the program. Suspended users keep their
+    // accrued commission but cannot request withdrawals.
+    async setReferralSuspension(address, suspended) {
+        const addr = String(address || '').toLowerCase();
+        if (!addr) return { ok: false, status: 400, error: 'Address required' };
+        this.upsert(addr, { referralSuspended: suspended === true });
+        if (SUPABASE_ENABLED) await this.syncToSupabase(addr).catch(() => false);
+        if (this.sbReferralAvailable === false) {
+            console.warn('[Referral] WARNING: referral admin columns missing in Supabase — suspension is memory/file only. Run 010_referral_admin.sql.');
+        }
+        return { ok: true, suspended: suspended === true };
+    }
+
+    // Set a per-user commission rate override in PERCENT (null clears the
+    // override back to the program default, currently 10%).
+    async setReferralRate(address, ratePercent) {
+        const addr = String(address || '').toLowerCase();
+        if (!addr) return { ok: false, status: 400, error: 'Address required' };
+        let value = null;
+        if (ratePercent != null && String(ratePercent).trim() !== '') {
+            value = Number(ratePercent);
+            if (!(value > 0) || value > 100) return { ok: false, status: 400, error: 'Commission rate must be between 0 and 100 percent' };
+            value = Math.round(value * 100) / 100;
+        }
+        this.upsert(addr, { referralRateOverride: value });
+        if (SUPABASE_ENABLED) await this.syncToSupabase(addr).catch(() => false);
+        return { ok: true, rateOverride: value };
+    }
+
+    // Slash earned commission: permanently deducts $amount from the user's
+    // referral commission balance (derive-on-read subtracts referral_slashed).
+    async slashReferralCommission(address, amount) {
+        const addr = String(address || '').toLowerCase();
+        if (!addr) return { ok: false, status: 400, error: 'Address required' };
+        const amt = Math.round((Number(amount) || 0) * 100) / 100;
+        if (!(amt > 0)) return { ok: false, status: 400, error: 'Enter an amount to slash' };
+        const p = this.get(addr) || await this.getAsync(addr);
+        if (!p) return { ok: false, status: 404, error: 'Profile not found' };
+        const next = Math.round((Math.max(0, Number(p.referralSlashed) || 0) + amt) * 100) / 100;
+        this.upsert(addr, { referralSlashed: next });
+        if (SUPABASE_ENABLED) await this.syncToSupabase(addr).catch(() => false);
+        if (this.sbReferralAvailable === false) {
+            console.warn('[Referral] WARNING: referral admin columns missing in Supabase — slash is memory/file only. Run 010_referral_admin.sql.');
+        }
+        return { ok: true, slashed: next };
+    }
+
+    // Admin referral-management list: every enrolled user with their admin-
+    // control state. Commission figures are fetched on demand per user (they
+    // need the traded-volume/deduction lookups — too heavy for a bulk read).
+    async getAdminRefUsers(q) {
+        await this.initSupabase();
+        const decorate = (p) => ({
+            address: p.address,
+            username: p.username || null,
+            referralCode: p.referralCode || null,
+            referredBy: p.referredBy || null,
+            referredAt: p.referredAt || null,
+            enrolled: p.referralEnrolled === true,
+            enrolledAt: p.referralEnrolledAt || null,
+            suspended: p.referralSuspended === true,
+            rateOverride: p.referralRateOverride != null ? Number(p.referralRateOverride) : null,
+            slashed: Number(p.referralSlashed) || 0,
+            hasEmail: !!(p.email || p.verifiedEmail)
+        });
+        const query = 'select=address,username,referral_code,referred_by,referred_at,referral_enrolled,referral_enrolled_at,referral_suspended,referral_rate_override,referral_slashed,email,verified_email&referral_enrolled=eq.true&order=referral_enrolled_at.desc&limit=200';
+        if (SUPABASE_ENABLED && this.sbReferralAvailable !== false) {
+            try {
+                let path = `/rest/v1/profiles?${query}`;
+                if (q) {
+                    const enc = encodeURIComponent(String(q).trim().replace(/^@/, ''));
+                    path += `&or=(username.ilike.*${enc}*,address.ilike.*${enc}*)`;
+                }
+                const res = await supabaseRequest(path, { timeout: 20000 });
+                if (res.ok) {
+                    return ((await res.json()) || []).map(r => ({
+                        address: r.address,
+                        username: r.username || null,
+                        referralCode: r.referral_code || null,
+                        referredBy: r.referred_by || null,
+                        referredAt: typeof r.referred_at === 'number' ? r.referred_at : (r.referred_at ? Date.parse(r.referred_at) : null),
+                        enrolled: r.referral_enrolled === true,
+                        enrolledAt: typeof r.referral_enrolled_at === 'number' ? r.referral_enrolled_at : (r.referral_enrolled_at ? Date.parse(r.referral_enrolled_at) : null),
+                        suspended: r.referral_suspended === true,
+                        rateOverride: r.referral_rate_override != null ? Number(r.referral_rate_override) : null,
+                        slashed: Number(r.referral_slashed) || 0,
+                        hasEmail: !!(r.email || r.verified_email)
+                    }));
+                }
+                // 400 here means the referral columns are missing (010 not
+                // applied) — fall through to the memory layer with what we have.
+                console.warn('[Referral] admin users query fell back to memory (referral columns missing?)');
+            } catch (e) { /* fall through */ }
+        }
+        const term = q ? String(q).trim().replace(/^@/, '').toLowerCase() : '';
+        return Object.values(this.profiles || {})
+            .filter(p => p.referralEnrolled === true)
+            .filter(p => !term || (p.username || '').toLowerCase().includes(term) || String(p.address || '').includes(term))
+            .sort((a, b) => (b.referralEnrolledAt || 0) - (a.referralEnrolledAt || 0))
+            .slice(0, 200)
+            .map(decorate);
     }
 
     async getHistoryAsync(address) {
