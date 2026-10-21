@@ -31,11 +31,16 @@ export function sessionValid(session = getSession()) {
 /** Email+password sign-in via the Supabase Auth REST endpoint. */
 export async function loginWithPassword(email, password) {
     if (!SUPABASE_ANON_KEY) throw new Error('Supabase Auth is not configured (VITE_SUPABASE_ANON_KEY missing)');
-    const res = await fetch(`${SUPABASE_AUTH_URL}/auth/v1/token?grant_type=password`, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-    });
+    let res;
+    try {
+        res = await fetch(`${SUPABASE_AUTH_URL}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+    } catch (e) {
+        throw new Error('Could not reach Supabase Auth — check the network or the admin app CSP');
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
         const msg = data.error_description || data.error || data.msg || 'Invalid email or password';
