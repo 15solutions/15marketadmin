@@ -16,7 +16,6 @@ import {
     Wifi,
     WifiOff,
     RefreshCw,
-    Activity,
     ArrowLeft,
     Globe,
     TrendingUp,
@@ -916,76 +915,46 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     </div>
                 )}
 
-                {/* BROADCAST — its own menu section: compose and transmit the
-                    live global banner */}
+                {/* BROADCAST — directly on the background: one screen, no scroll,
+                    message + persistence + transmit; current transmission in the head */}
                 {activeNav === 'broadcast' && canBroadcast && (
-                    <div className="w-full flex flex-col min-w-0 max-w-3xl">
-                        <AdminCard title="Broadcast Center" icon={Radio} accent="#1A6140">
-                            <div className="flex flex-col gap-6">
-                                <div>
-                                    <label className={`text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1 ${isLight ? 'text-black' : 'text-white'}`}>Live Message</label>
-                                    <textarea
-                                        value={broadcastText}
-                                        onChange={(e) => setBroadcastText(e.target.value)}
-                                        placeholder="Enter system broadcast message..."
-                                        className={`w-full min-h-[140px] p-6 rounded-3xl border text-sm font-bold resize-none transition-all outline-none ${isLight ? 'bg-white border-[#1A6140]/10 focus:border-[#1A6140]/40' : 'bg-black/40 border-white/10 focus:border-[#1A6140]/30'}`}
-                                    />
-                                </div>
+                    <div className="w-full flex flex-col min-w-0">
+                        <div className="mb-2 flex items-center justify-between gap-3 flex-wrap">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Broadcast</span>
+                            <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 truncate ${isLight ? 'text-black' : 'text-white'}`}>
+                                Live — {platformSettings.systemBanner || "No active manual broadcast. Platform running standard tickers."}
+                            </span>
+                        </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className={`text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1 ${isLight ? 'text-black' : 'text-white'}`}>Persistence (Min)</label>
-                                        <div className="flex items-center gap-3">
-                                            {[1, 10, 60].map(m => (
-                                                <button
-                                                    key={m}
-                                                    onClick={() => setBroadcastDuration(m * 60)}
-                                                    className={`flex-1 py-3 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
-                                                >
-                                                    {m}m
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className={`text-[9px] font-black uppercase opacity-30 tracking-[0.2em] block mb-3 ml-1 ${isLight ? 'text-black' : 'text-white'}`}>Alert Level</label>
-                                        <div className="flex items-center gap-3">
-                                            {['info', 'success', 'warning', 'error'].map(level => (
-                                                <button
-                                                    key={level}
-                                                    onClick={() => updateSettings({ bannerLevel: level })}
-                                                    className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${platformSettings.bannerLevel === level ? 'ring-2 ring-[#1A6140] border-transparent' : 'border-white/10 opacity-30 shadow-sm'}`}
-                                                    style={{ backgroundColor: level === 'info' ? '#3b82f6' : level === 'success' ? '#1A6140' : level === 'warning' ? '#f59e0b' : '#ef4444' }}
-                                                >
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
+                        <textarea
+                            value={broadcastText}
+                            onChange={(e) => setBroadcastText(e.target.value)}
+                            placeholder="Enter system broadcast message…"
+                            className={`w-full h-24 md:h-28 p-4 rounded-2xl border text-sm font-bold resize-none overflow-hidden transition-all outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                        />
 
-                                <button
-                                    onClick={handleUpdateBroadcast}
-                                    disabled={isSaving || !broadcastText}
-                                    className="w-full py-5 bg-[#1A6140] text-white rounded-3xl font-black uppercase tracking-[0.3em] text-[10px] shadow-[0_20px_40px_-10px_rgba(26, 97, 64,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
-                                >
-                                    <div className="flex items-center justify-center gap-3">
-                                        <Radio size={16} />
-                                        <span>Transmit Broadcast</span>
-                                    </div>
-                                </button>
-
-                                <div className={`p-5 rounded-2xl border ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-white/[0.03] border-white/5'}`}>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <Activity size={14} className="text-[#1A6140]" />
-                                        <h4 className="text-[10px] font-black uppercase">Current Transmission</h4>
-                                    </div>
-                                    <p className="text-[11px] font-bold opacity-60 leading-relaxed italic">
-                                        {platformSettings.systemBanner || "No active manual broadcast. Platform running standard tickers."}
-                                    </p>
-                                </div>
+                        <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>Persistence</span>
+                                {[1, 10, 60].map(m => (
+                                    <button
+                                        key={m}
+                                        onClick={() => setBroadcastDuration(m * 60)}
+                                        className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
+                                    >
+                                        {m}m
+                                    </button>
+                                ))}
                             </div>
-                        </AdminCard>
+                            <button
+                                onClick={handleUpdateBroadcast}
+                                disabled={isSaving || !broadcastText}
+                                className="flex items-center justify-center gap-3 py-3 px-6 bg-[#1A6140] text-white rounded-2xl font-black uppercase tracking-[0.25em] text-[10px] shadow-[0_16px_32px_-10px_rgba(26,97,64,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                            >
+                                <Radio size={14} />
+                                <span>{isSaving ? 'Transmitting…' : 'Transmit Broadcast'}</span>
+                            </button>
+                        </div>
                     </div>
                 )}
 
