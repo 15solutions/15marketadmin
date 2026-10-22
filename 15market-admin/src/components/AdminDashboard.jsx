@@ -48,13 +48,14 @@ import { GlobalTradeScroller } from "./GlobalTradeScroller";
 import { socketService } from "../utils/socket";
 import { AdminGlobe, COUNTRY_CENTER } from "./AdminGlobe";
 
-// Sidebar navigation: collapsible icon rail ↔ full menu. "Withdrawal
-// Management" hosts the request queue and the referral controls as
-// sub-tabs; "Security" hosts protocols, broadcasts and the admin roster.
+// Sidebar navigation: collapsible icon rail ↔ full menu. "Referral Program"
+// hosts the participants list (with earnings), the withdrawal request queue
+// and suspension controls as tabs; "Security" hosts protocols, broadcasts
+// and the admin roster.
 const NAV = [
     { key: 'overview', label: 'Overview', hint: 'Metrics · Trade index', icon: LayoutDashboard },
     { key: 'analytics', label: 'Analytics', hint: 'Globe · Reach · Users', icon: Globe },
-    { key: 'withdrawals', label: 'Withdrawal Management', hint: 'Requests · Referral', icon: Landmark },
+    { key: 'referrals', label: 'Referral Program', hint: 'Participants · Earnings · Requests', icon: Users },
     { key: 'security', label: 'Security', hint: 'Protocols · Broadcast · Team', icon: Shield }
 ];
 
@@ -142,7 +143,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             if (!res.ok) throw new Error(data.error || 'Update failed');
             notify(status === 'paid' ? 'Withdrawal approved — user notified by email' : 'Withdrawal cancelled — user notified by email', 'success');
             fetchRefWithdrawals();
-            if (adminTab === 'referral') fetchRefUsers();
+            if (adminTab === 'referrals') fetchRefUsers();
         } catch (e) {
             notify(e.message, 'error');
         } finally {
@@ -150,12 +151,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         }
     };
 
-    // Sidebar section + Withdrawal Management sub-section. Persisted so the
-    // console reopens where the operator left it.
+    // Sidebar section + Referral Program tab. Persisted so the console
+    // reopens where the operator left it. (The pre-referrals key was
+    // "withdrawals" — silently remapped.)
     const [adminTab, setAdminTab] = useState(() => {
-        try { return localStorage.getItem('15m_admin_section') || 'overview'; } catch (e) { return 'overview'; }
+        let t;
+        try { t = localStorage.getItem('15m_admin_section') || 'overview'; } catch (e) { t = 'overview'; }
+        return t === 'withdrawals' ? 'referrals' : t;
     });
-    const [wdSection, setWdSection] = useState('requests');
+    const [wdSection, setWdSection] = useState('participants');
 
     const selectSection = (key) => {
         setAdminTab(key);
@@ -197,25 +201,49 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
     // Expand a user: fetch their commission stats + withdrawals once, lazily —
     // the bulk admin read stays light while still showing real numbers.
+    // The same loader is reused by the participants list's background
+    // earnings prefetch, so totals are visible without expanding rows.
+    const fetchUserEarnings = async (addr) => {
+        try {
+            const [s, w] = await Promise.all([
+                fetch(`${KEEPER_URL_ARC}/referral/stats/${addr}`),
+                fetch(`${KEEPER_URL_ARC}/referral/withdrawals/${addr}`)
+            ]);
+            const sData = s.ok ? await s.json() : null;
+            const wds = w.ok ? (await w.json()) || [] : [];
+            const sumBy = (st) => wds.filter(x => x.status === st).reduce((acc, x) => acc + Number(x.amount || 0), 0);
+            setRefStatCache(prev => ({ ...prev, [addr]: { stats: sData, pending: sumBy('pending'), paid: sumBy('paid') } }));
+        } catch (e) {
+            setRefStatCache(prev => { const c = { ...prev }; delete c[addr]; return c; });
+        }
+    };
+
     const toggleRefUser = async (addr) => {
         const next = openRefUser === addr ? null : addr;
         setOpenRefUser(next);
         if (next && !refStatCache[addr]) {
             setRefStatCache(prev => ({ ...prev, [addr]: 'loading' }));
-            try {
-                const [s, w] = await Promise.all([
-                    fetch(`${KEEPER_URL_ARC}/referral/stats/${addr}`),
-                    fetch(`${KEEPER_URL_ARC}/referral/withdrawals/${addr}`)
-                ]);
-                const sData = s.ok ? await s.json() : null;
-                const wds = w.ok ? (await w.json()) || [] : [];
-                const sumBy = (st) => wds.filter(x => x.status === st).reduce((acc, x) => acc + Number(x.amount || 0), 0);
-                setRefStatCache(prev => ({ ...prev, [addr]: { stats: sData, pending: sumBy('pending'), paid: sumBy('paid') } }));
-            } catch (e) {
-                setRefStatCache(prev => { const c = { ...prev }; delete c[addr]; return c; });
-            }
+            await fetchUserEarnings(addr);
         }
     };
+
+    // Once the participants list is in, resolve each user's earnings
+    // sequentially in the background (cached entries are skipped) so the
+    // Participants tab shows commission, referrals and payout figures
+    // immediately.
+    useEffect(() => {
+        if (adminTab !== 'referrals') return;
+        const uncached = refUsers.filter(u => !refStatCache[u.address]);
+        if (uncached.length === 0) return;
+        let cancelled = false;
+        (async () => {
+            for (const u of uncached) {
+                if (cancelled) return;
+                await fetchUserEarnings(u.address);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [adminTab, refUsers]);
 
     const doRefAction = async (endpoint, payload, successMsg) => {
         setRefActionBusy(`${endpoint}:${payload.address}`);
@@ -237,7 +265,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     };
 
     useEffect(() => {
-        if (adminTab === 'withdrawals' && wdSection === 'referral') fetchRefUsers();
+        if (adminTab === 'referrals') {
+            fetchRefUsers();
+            if (wdSection === 'withdrawals') fetchRefWithdrawals();
+        }
     }, [adminTab, wdSection]);
 
     const fetchProfile = async (addr) => {
@@ -424,8 +455,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const canBroadcast = hasPerm('broadcast.send');
 
     // Sidebar: only sections the signed-in admin is allowed to open.
-    const canWithdrawals = canRequests || canReferral;
-    const visibleNav = NAV.filter(t => (t.key === 'withdrawals' ? canWithdrawals : true));
+    const canReferrals = canRequests || canReferral;
+    const visibleNav = NAV.filter(t => (t.key === 'referrals' ? canReferrals : true));
     // Fall back to Overview if a permission change hid the saved section.
     const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : 'overview';
 
@@ -581,7 +612,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     {visibleNav.map(t => {
                         const Icon = t.icon;
                         const active = activeNav === t.key;
-                        const badge = t.key === 'withdrawals' ? refWithdrawals.filter(w => w.status === 'pending').length : 0;
+                        const badge = t.key === 'referrals' ? refWithdrawals.filter(w => w.status === 'pending').length : 0;
                         return (
                             <button
                                 key={t.key}
@@ -940,23 +971,28 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     </div>
                 )}
 
-                {/* Withdrawal Management — sub-tab switch for the queue and referral */}
-                {activeNav === 'withdrawals' && (
+                {/* Referral Program — tabs: participants (earnings), withdrawal queue, suspensions */}
+                {activeNav === 'referrals' && (
                     <div className="w-full flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar">
-                        {[['requests', 'Withdrawal Requests'], ['referral', 'Referral Program']].map(([k, l]) => (
+                        {[['participants', 'Participants'], ['withdrawals', 'Withdrawal Requests'], ['suspended', 'Suspensions']].map(([k, l]) => (
                             <button
                                 key={k}
                                 onClick={() => setWdSection(k)}
-                                className={`px-4 md:px-5 py-3 rounded-2xl border text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${wdSection === k ? 'bg-[#1A6140] text-white border-[#1A6140] shadow-lg shadow-[#1A6140]/20' : isLight ? 'bg-white/60 border-black/10 text-black/50 hover:text-black' : 'bg-white/5 border-white/10 text-white/40 hover:text-white'}`}
+                                className={`px-4 md:px-5 py-3 rounded-2xl border text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${wdSection === k ? 'bg-[#1A6140] text-white border-[#1A6140] shadow-lg shadow-[#1A6140]/20' : isLight ? 'bg-white/60 border-black/10 text-black/50 hover:text-black' : 'bg-white/5 border-white/10 text-white/40 hover:text-white'}`}
                             >
                                 {l}
+                                {k === 'withdrawals' && refWithdrawals.filter(w => w.status === 'pending').length > 0 && (
+                                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black leading-none ${wdSection === k ? 'bg-white/20 text-white' : 'bg-red-500/15 text-red-500'}`}>
+                                        {refWithdrawals.filter(w => w.status === 'pending').length}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>
                 )}
 
                 {/* Withdrawal Requests tab — approve pays out, cancel emails the user */}
-                {activeNav === 'withdrawals' && wdSection === 'requests' && (
+                {activeNav === 'referrals' && wdSection === 'withdrawals' && (
                     <AdminCard title="Withdrawal Requests" icon={Gift} accent="#1A6140">
                         <div className="flex flex-col gap-4">
                             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1041,11 +1077,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     </AdminCard>
                 )}
 
-                {/* Referral Program Management tab — suspend/rate/slash */}
-                {activeNav === 'withdrawals' && wdSection === 'referral' && (
-                    <AdminCard title="Referral Program Management" icon={Gift} accent="#1A6140">
+                {/* Participants tab — every program participant, their earnings,
+                    and per-user management (suspend · rate · slash) on expand */}
+                {activeNav === 'referrals' && wdSection === 'participants' && (
+                    <AdminCard title="Participants" icon={Users} accent="#1A6140">
                         <div className="flex flex-col gap-4">
-                            {/* Enrolled-user search */}
+                            {/* Search across enrolled participants */}
+                            <p className={`text-[8px] font-bold uppercase tracking-wide ${isLight ? 'text-black/40' : 'text-white/40'}`}>
+                                Enrolled participants, their program earnings, and per-user controls. Expand a row to suspend, re-rate or slash.
+                            </p>
                             <div className="flex items-center gap-3">
                                 <div className="relative flex-1 min-w-0">
                                     <Search size={14} className={`absolute left-4 top-1/2 -translate-y-1/2 ${isLight ? 'text-black/30' : 'text-white/30'}`} />
@@ -1085,6 +1125,25 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0">
+                                                    {(() => {
+                                                        const c = cache;
+                                                        return (
+                                                            <div className="hidden md:flex items-center gap-4 pr-1">
+                                                                <div className="text-right">
+                                                                    <div className={`text-[9px] font-black tracking-tight ${isLight ? 'text-black' : 'text-white'}`}>
+                                                                        {c && c !== 'loading' ? `$${Number(c.stats?.totalCommission || 0).toFixed(2)}` : '…'}
+                                                                    </div>
+                                                                    <div className="text-[7px] font-black uppercase tracking-widest opacity-30">Earned</div>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className={`text-[9px] font-black tracking-tight ${isLight ? 'text-black' : 'text-white'}`}>
+                                                                        {c && c !== 'loading' ? String(c.stats?.count ?? '…') : '…'}
+                                                                    </div>
+                                                                    <div className="text-[7px] font-black uppercase tracking-widest opacity-30">Referrals</div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                     {u.suspended && (
                                                         <span className="px-2 py-1 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest flex items-center gap-1">
                                                             <Ban size={9} /> Suspended
@@ -1187,7 +1246,82 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </div>
                     </AdminCard>
                 )}
-            {/* Admins & Moderators (root-only) — inside Security section */}
+
+                {/* Suspensions tab — everyone currently suspended from the
+                    referral program, with unsuspend and quick-slash control */}
+                {activeNav === 'referrals' && wdSection === 'suspended' && (
+                    <AdminCard title="Suspended Participants" icon={Ban} accent="#1A6140">
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                                <p className={`text-[8px] font-bold uppercase tracking-wide ${isLight ? 'text-black/40' : 'text-white/40'}`}>
+                                    Suspended participants can still browse and place trades, but withdrawal requests are paused until reinstated.
+                                </p>
+                                <button onClick={() => fetchRefUsers()} className="p-3 rounded-2xl bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20 transition-all shrink-0">
+                                    <RefreshCw size={14} />
+                                </button>
+                            </div>
+
+                            {refUsers.filter(u => u.suspended).length === 0 ? (
+                                <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
+                                    No suspended participants
+                                </div>
+                            ) : refUsers.filter(u => u.suspended).map(u => {
+                                const cache = refStatCache[u.address];
+                                const slashVal = slashDrafts[u.address] || '';
+                                const busyKey = (ep) => refActionBusy === `${ep}:${u.address}`;
+                                return (
+                                    <div key={u.address} className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
+                                        <div className="min-w-0">
+                                            <div className={`text-[10px] font-black uppercase ${isLight ? 'text-black' : 'text-white'}`}>
+                                                {u.username ? `@${u.username}` : `${(u.address || '').slice(0, 6)}…${(u.address || '').slice(-4)}`}
+                                            </div>
+                                            <div className={`text-[8px] font-bold uppercase font-mono ${isLight ? 'text-black/40' : 'text-white/40'}`}>
+                                                {u.referralCode ? `Code ${u.referralCode}` : 'No code'}{u.enrolledAt ? ` · ${(new Date(u.enrolledAt)).toLocaleDateString()}` : ''}
+                                            </div>
+                                            <div className={`text-[8px] font-bold uppercase tracking-widest ${isLight ? 'text-black/30' : 'text-white/30'}`}>
+                                                Earned {cache && cache !== 'loading' ? `$${Number(cache.stats?.totalCommission || 0).toFixed(2)}` : '…'} · {cache && cache !== 'loading' ? String(cache.stats?.count ?? '…') : '…'} referrals
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                                            <div className="flex gap-2">
+                                                <div className="relative flex-1 min-w-0 w-28">
+                                                    <Scissors size={12} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-black/30' : 'text-white/30'}`} />
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={slashVal}
+                                                        onChange={e => setSlashDrafts(prev => ({ ...prev, [u.address]: e.target.value }))}
+                                                        placeholder="Slash $"
+                                                        className={`w-full pl-8 pr-2 py-3 rounded-2xl border text-[10px] font-black outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-red-400 text-black' : 'bg-black/40 border-white/10 focus:border-red-400 text-white'}`}
+                                                    />
+                                                </div>
+                                                <button
+                                                    disabled={busyKey('slash')}
+                                                    onClick={() => {
+                                                        const amt = Number(slashVal);
+                                                        if (!(amt > 0)) return notify('Enter an amount to slash', 'error');
+                                                        doRefAction('slash', { address: u.address, amount: amt }, `Slashed $${amt.toFixed(2)} from commission`);
+                                                    }}
+                                                    className="px-3 py-3 rounded-2xl bg-red-500/15 text-red-500 border border-red-500/30 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/25 active:scale-95 transition-all disabled:opacity-50"
+                                                >
+                                                    {busyKey('slash') ? '…' : 'Slash'}
+                                                </button>
+                                            </div>
+                                            <button
+                                                disabled={busyKey('suspend')}
+                                                onClick={() => doRefAction('suspend', { address: u.address, suspended: false }, 'User reinstated in the program')}
+                                                className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                                            >
+                                                <UserCheck size={13} /> {busyKey('suspend') ? '…' : 'Unsuspend'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </AdminCard>
+                )}
             {activeNav === 'security' && isRoot && (
                 <AdminCard title="Admins & Moderators" icon={Shield} accent="#1A6140">
                     <div className="flex flex-col gap-4">
