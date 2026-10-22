@@ -55,7 +55,8 @@ const NAV = [
     { key: 'overview', label: 'Overview', hint: 'Metrics · Trade index', icon: LayoutDashboard },
     { key: 'analytics', label: 'Analytics', hint: 'Globe · Reach · Users', icon: Globe },
     { key: 'referrals', label: 'Referral Program', hint: 'Participants · Earnings · Requests', icon: Users },
-    { key: 'security', label: 'Security', hint: 'Protocols · Broadcast · Team', icon: Shield }
+    { key: 'broadcast', label: 'Broadcast', hint: 'Live banner · Alerts', icon: Radio },
+    { key: 'security', label: 'Security', hint: 'Protocols · Team', icon: Shield }
 ];
 
 // Metrics rendered as plain listed rows (label — live value), not boxes.
@@ -466,7 +467,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
     // Sidebar: only sections the signed-in admin is allowed to open.
     const canReferrals = canRequests || canReferral;
-    const visibleNav = NAV.filter(t => (t.key === 'referrals' ? canReferrals : true));
+    const visibleNav = NAV.filter(t => (t.key === 'referrals' ? canReferrals : t.key === 'broadcast' ? canBroadcast : true));
     // Fall back to Overview if a permission change hid the saved section.
     const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : 'overview';
 
@@ -844,11 +845,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 </div>
                 )}
 
-                {/* SECURITY — protocols & broadcasts; the roster card renders below */}
-                {activeNav === 'security' && (
-                    <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        <div className="lg:col-span-7 flex flex-col gap-8">
-                            {canSettings && (
+                {/* SECURITY — protocols & protocols only; the roster card renders below */}
+                {activeNav === 'security' && canSettings && (
+                    <div className="w-full flex flex-col min-w-0">
                         <AdminCard title="Security Protocols" icon={Shield} accent="#1A6140">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Maintenance Toggle */}
@@ -914,11 +913,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 </div>
                             </div>
                         </AdminCard>
-                            )}
-                        </div>
+                    </div>
+                )}
 
-                        <div className="lg:col-span-5 flex flex-col gap-8">
-                            {canBroadcast && (
+                {/* BROADCAST — its own menu section: compose and transmit the
+                    live global banner */}
+                {activeNav === 'broadcast' && canBroadcast && (
+                    <div className="w-full flex flex-col min-w-0 max-w-3xl">
                         <AdminCard title="Broadcast Center" icon={Radio} accent="#1A6140">
                             <div className="flex flex-col gap-6">
                                 <div>
@@ -985,8 +986,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 </div>
                             </div>
                         </AdminCard>
-                            )}
-                        </div>
                     </div>
                 )}
 
@@ -1010,7 +1009,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     </div>
                 )}
 
-                {/* Withdrawal Requests tab — approve pays out, cancel emails the user */}
                 {/* Withdrawal Requests — plain indexed list on the background
                     (like participants/trades): approve pays out, cancel emails */}
                 {activeNav === 'referrals' && wdSection === 'withdrawals' && (

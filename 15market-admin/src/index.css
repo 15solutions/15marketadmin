@@ -354,3 +354,17 @@ body.light.theme-arc {
     background-position: 0% 50%;
   }
 }
+
+/* ===== Performance: GPU-accelerated ticker (market scroller + broadcast) === */
+/* The scroller references the name via inline style; the user-side app
+   defines these in ITS css — the admin console needs its own copy. */
+@keyframes ticker-move {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Promote animated tickers to their own compositor layer */
+[style*="ticker-move"] {
+  will-change: transform;
+  contain: layout style;
+}
