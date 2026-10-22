@@ -177,6 +177,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         });
     };
     const [refUsers, setRefUsers] = useState([]);
+    const [refUsersError, setRefUsersError] = useState('');
     const [refUsersQ, setRefUsersQ] = useState('');
     const [openRefUser, setOpenRefUser] = useState(null);
     const [refStatCache, setRefStatCache] = useState({});
@@ -195,8 +196,18 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             const params = q ? `?q=${encodeURIComponent(q)}` : '';
             const res = await adminFetch(`${KEEPER_URL_ARC}/admin/referral/users${params}`);
             const data = await res.json().catch(() => []);
-            if (res.ok) setRefUsers(Array.isArray(data) ? data : []);
-        } catch (e) { /* card shows a retry button */ }
+            if (!res.ok) {
+                setRefUsersError(res.status === 403
+                    ? 'Your admin role is missing the referral management permission for the full participants view'
+                    : `Participants failed to load (${res.status})`);
+                setRefUsers([]);
+                return;
+            }
+            setRefUsersError('');
+            setRefUsers(Array.isArray(data) ? data : []);
+        } catch (e) {
+            setRefUsersError('Backend unreachable — check the connection and retry');
+        }
     };
 
     // Expand a user: fetch their commission stats + withdrawals once, lazily —
@@ -692,15 +703,24 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 {activeNav === 'overview' && (
                 <div className="w-full flex flex-col gap-6 min-w-0">
 
-                    {/* Headline ops metrics — listed, real time */}
-                    <div className="w-full">
-                        <div className="text-[9px] font-black uppercase tracking-[0.25em] opacity-40 mb-1 px-1">Live metrics</div>
-                        <MetricList isLight={isLight} items={[
+                    {/* Headline ops metrics — small boxes, one line, leaving room for the trade feed */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
                             { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: DollarSign, color: '#1A6140' },
                             { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, icon: BarChart3, color: '#3b82f6' },
                             { label: 'Users Live Now', value: String(stats.activeCount | 0), icon: Flame, color: '#22c55e' },
                             { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Zap, color: '#f59e0b' }
-                        ]} />
+                        ].map((stat, i) => (
+                            <div key={i} className={`px-4 py-3 rounded-2xl border flex items-center gap-3 min-w-0 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
+                                <div className="p-2 rounded-xl flex-none" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                                    <stat.icon size={14} />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-[7px] font-black uppercase tracking-widest opacity-40 truncate">{stat.label}</div>
+                                    <div className={`text-sm md:text-base font-black tracking-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
                     {/* Platform trade index — plain indexed feed, no boxes behind the rows */}
@@ -1079,30 +1099,38 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                 {/* Participants tab — every program participant, their earnings,
                     and per-user management (suspend · rate · slash) on expand */}
+                {/* Participants — plain indexed list on the background (like the
+                    trade feed): rows, hairlines, earnings inline. */}
                 {activeNav === 'referrals' && wdSection === 'participants' && (
-                    <AdminCard title="Participants" icon={Users} accent="#1A6140">
-                        <div className="flex flex-col gap-4">
-                            {/* Search across enrolled participants */}
-                            <p className={`text-[8px] font-bold uppercase tracking-wide ${isLight ? 'text-black/40' : 'text-white/40'}`}>
-                                Enrolled participants, their program earnings, and per-user controls. Expand a row to suspend, re-rate or slash.
-                            </p>
+                    <div className="w-full flex flex-col min-w-0">
+                        <div className="mb-2 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-4 min-w-0">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Program participants</span>
+                                <span className="text-[8px] font-black uppercase tracking-widest opacity-30">
+                                    {refUsers.length} enrolled{refUsers.filter(u => u.suspended).length > 0 ? ` · ${refUsers.filter(u => u.suspended).length} suspended` : ''}
+                                </span>
+                            </div>
                             <div className="flex items-center gap-3">
-                                <div className="relative flex-1 min-w-0">
-                                    <Search size={14} className={`absolute left-4 top-1/2 -translate-y-1/2 ${isLight ? 'text-black/30' : 'text-white/30'}`} />
+                                <div className="relative w-52 md:w-64 min-w-0">
+                                    <Search size={13} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isLight ? 'text-black/30' : 'text-white/30'}`} />
                                     <input
                                         value={refUsersQ}
                                         onChange={e => setRefUsersQ(e.target.value)}
                                         onKeyDown={e => { if (e.key === 'Enter') fetchRefUsers(); }}
                                         placeholder="Search username or address…"
-                                        className={`w-full pl-11 pr-4 py-3.5 rounded-2xl border text-xs font-bold outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                        className={`w-full pl-10 pr-3 py-2.5 rounded-xl border text-[10px] font-bold outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
                                     />
                                 </div>
-                                <button onClick={() => fetchRefUsers()} className="p-3 rounded-2xl bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20 transition-all shrink-0">
-                                    <RefreshCw size={14} />
+                                <button onClick={() => fetchRefUsers()} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20' : 'bg-[#1A6140]/15 text-[#3CB371] hover:bg-[#1A6140]/25'}`}>
+                                    <RefreshCw size={13} />
                                 </button>
                             </div>
+                        </div>
+                        {refUsersError && (
+                            <p className="text-[9px] font-black uppercase tracking-widest text-amber-500 py-2">{refUsersError}</p>
+                        )}
 
-                            <div className="flex flex-col gap-2 max-h-[560px] overflow-y-auto no-scrollbar">
+                            <div className={`flex flex-col max-h-[620px] overflow-y-auto no-scrollbar divide-y ${isLight ? 'divide-black/5' : 'divide-white/5'}`}>
                                 {refUsers.length === 0 ? (
                                     <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
                                         No enrolled users found
@@ -1114,7 +1142,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     const slashVal = slashDrafts[u.address] || '';
                                     const busyKey = (ep) => refActionBusy === `${ep}:${u.address}`;
                                     return (
-                                        <div key={u.address} className={`rounded-2xl border overflow-hidden ${open ? (isLight ? 'border-[#1A6140]/40' : 'border-[#1A6140]/30') : (isLight ? 'border-black/5' : 'border-white/5')} ${isLight ? 'bg-white' : 'bg-white/5'} transition-colors`}>
+                                        <div key={u.address} className={`px-1 py-3 transition-colors ${isLight ? 'hover:bg-black/[0.02]' : 'hover:bg-white/[0.02]'}`}>
                                             <button onClick={() => toggleRefUser(u.address)} className="w-full flex items-center justify-between gap-3 p-4 text-left">
                                                 <div className="min-w-0">
                                                     <div className={`text-[10px] font-black uppercase ${isLight ? 'text-black' : 'text-white'}`}>
@@ -1161,17 +1189,17 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                                             {open && (
                                                 <div className="px-4 pb-4 flex flex-col gap-4">
-                                                    {/* Commission readout (lazy-fetched) */}
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                    {/* Commission readout (lazy-fetched) — listed, no mini-boxes */}
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2">
                                                         {[
                                                             { label: 'Total Commission', value: cache && cache !== 'loading' ? `$${Number(cache.stats?.totalCommission || 0).toFixed(2)}` : '…' },
                                                             { label: 'Referrals', value: cache && cache !== 'loading' ? String(cache.stats?.count ?? '…') : '…' },
                                                             { label: 'Pending', value: cache && cache !== 'loading' ? `$${Number(cache.pending || 0).toFixed(2)}` : '…' },
                                                             { label: 'Paid Out', value: cache && cache !== 'loading' ? `$${Number(cache.paid || 0).toFixed(2)}` : '…' }
                                                         ].map((s, i) => (
-                                                            <div key={i} className={`p-3 rounded-xl border ${isLight ? 'bg-black/[0.03] border-black/5' : 'bg-black/30 border-white/5'}`}>
-                                                                <div className={`text-[7px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>{s.label}</div>
-                                                                <div className={`text-sm font-black ${isLight ? 'text-black' : 'text-white'}`}>{s.value}</div>
+                                                            <div key={i} className="flex items-center justify-between gap-4">
+                                                                <span className="text-[8px] font-black uppercase tracking-widest opacity-40">{s.label}</span>
+                                                                <span className={`text-[10px] font-black whitespace-nowrap ${isLight ? 'text-black' : 'text-white'}`}>{s.value}</span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -1243,8 +1271,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     );
                                 })}
                             </div>
-                        </div>
-                    </AdminCard>
+                    </div>
                 )}
 
                 {/* Suspensions tab — everyone currently suspended from the

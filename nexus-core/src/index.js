@@ -38,7 +38,7 @@ const OddsEngine = require('./services/OddsEngine');
 const priceService = require('./services/priceService');
 const settlementPriceService = require('./services/settlementPriceService');
 const chainReconciler = require('./services/chainReconciler');
-const { requireAdminAuth, requirePerm, requireRoot, handleAdminAuthStatus, handleAdminBootstrap, handleAdminMe, handleAdminList, handleAdminCreate, handleAdminUpdate, handleAdminDelete } = require('./security');
+const { requireAdminAuth, requirePerm, requireAnyPerm, requireRoot, handleAdminAuthStatus, handleAdminBootstrap, handleAdminMe, handleAdminList, handleAdminCreate, handleAdminUpdate, handleAdminDelete } = require('./security');
 
 // --- DYNAMICALLY DERIVED SOLANA RELAYER ADDRESS ---
 let derivedSolanaRelayerAddress = '11111111111111111111111111111111'; // default fallback
@@ -2129,7 +2129,7 @@ app.post('/admin/referral/withdrawals/:id', requirePerm('ref.withdrawals'), asyn
 
 // â”€â”€ Referral admin management (migration 010) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Enrolled users with their admin-control state for the management tab.
-app.get('/admin/referral/users', requirePerm('ref.manage'), async (req, res) => {
+app.get('/admin/referral/users', requireAnyPerm(['ref.withdrawals', 'ref.manage']), async (req, res) => {
   try {
     res.json(await profiles.getAdminRefUsers(req.query?.q));
   } catch (e) {

@@ -218,6 +218,21 @@ function requirePerm(perm) {
   };
 }
 
+// Read endpoints that matter to both rosters (e.g. the participants list is
+// needed to judge withdrawal requests) accept ANY of the given tags.
+function requireAnyPerm(perms) {
+  const tags = Array.isArray(perms) ? perms : [perms];
+  return (req, res, next) => {
+    requireAdminAuth(req, res, () => {
+      const list = req.admin?.permissions || [];
+      if (!req.admin?.isRoot && !list.includes('*') && !tags.some(t => list.includes(t))) {
+        return res.status(403).json({ error: `Missing permission (any of): ${tags.join(', ')}` });
+      }
+      next();
+    });
+  };
+}
+
 const requireRoot = (req, res, next) => {
   requireAdminAuth(req, res, () => {
     if (req.admin?.role !== 'root') return res.status(403).json({ error: 'Root admin only' });
@@ -649,6 +664,7 @@ module.exports = {
   isEncrypted,
   requireAdminAuth,
   requirePerm,
+  requireAnyPerm,
   requireRoot,
   handleAdminAuthStatus,
   handleAdminBootstrap,
