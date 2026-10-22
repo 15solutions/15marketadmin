@@ -1,8 +1,10 @@
-// Admin Overview geo-globe: the lightswind 3D globe with a green glow.
-// Countries where users are registered become glowing pins sized by count;
-// live trade/onboarding activity flashes extra pins briefly.
+// Admin geo-globe: GlobePulse (from @/components/ui/component) with live
+// data — countries where users are registered become anchored pins sized
+// by count; live trade/onboarding activity flashes listed on top so their
+// halos visibly pulse. Always mounted, full globe whether or not
+// anything is pinging.
 import React, { useMemo } from "react";
-import GlobeLightswind from "./lightswind/globe";
+import { GlobePulse } from "./ui/component";
 
 // Approximate geographic centers per ISO alpha-2 code (enough to place
 // country pins without shipping a full geocoder to the admin bundle).
@@ -36,71 +38,45 @@ export const COUNTRY_CENTER = {
 export function AdminGlobe({ theme = 'dark', countries = {}, pulse = [] }) {
     const isLight = theme === 'light';
 
-    // Registered users per country → permanent pins sized by count.
-    const countryMarkers = useMemo(() => (
-        Object.entries(countries || {})
-            .filter(([iso]) => COUNTRY_CENTER[iso])
-            .map(([iso, count]) => ({
-                iso,
-                count,
-                location: COUNTRY_CENTER[iso],
-                size: 0.055 + Math.min(count, 50) / 50 * 0.14,
-            }))
-    ), [countries]);
-
-    // Transient activity flashes → extra pins on top.
+    // Live activity flashes → first in the marker list, so their anchored
+    // halos visibly pulse (visibleCount covers the flash entries only).
     const pulseMarkers = useMemo(() => (
         (pulse || [])
             .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
             .slice(0, 6)
-            .map(p => ({ location: [p.lat, p.lng], size: 0.14 }))
-    ), [pulse]);
+            .map((p, i) => ({ id: `pulse-${i}`, location: [p.lat, p.lng], delay: i * 0.6, size: 0.04 }))
+    ), [JSON.stringify(pulse || [])]);
 
-    const markers = useMemo(() => [...countryMarkers, ...pulseMarkers], [countryMarkers, pulseMarkers]);
+    // Registered users per country → permanent canvas pins (halos reserved
+    // for live activity; pin size scales gently with user count).
+    const countryMarkers = useMemo(() => (
+        Object.entries(countries || {})
+            .filter(([iso]) => COUNTRY_CENTER[iso])
+            .sort((a, b) => b[1] - a[1])
+            .map(([iso, count]) => ({
+                id: iso,
+                location: COUNTRY_CENTER[iso],
+                size: 0.022 + Math.min(Number(count) || 0, 50) / 50 * 0.02,
+                delay: (pulseMarkers.length + 1) * 0.6,
+            }))
+    ), [countries, pulseMarkers.length]);
 
-    const topCountries = [...countryMarkers].sort((a, b) => b.count - a.count).slice(0, 6);
+    const markers = useMemo(() => [...pulseMarkers, ...countryMarkers], [pulseMarkers, countryMarkers]);
 
     return (
-        <div className="relative w-full h-full flex items-stretch">
-            {/* Green bloom behind the globe */}
+        <div className="relative w-full h-full flex items-center justify-center min-w-0">
+            {/* Soft green bloom behind the globe */}
             <div
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[75%] aspect-square rounded-full pointer-events-none"
-                style={{ background: '#1A6140', filter: 'blur(110px)', opacity: isLight ? 0.13 : 0.22 }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[58%] aspect-square rounded-full pointer-events-none"
+                style={{ background: '#1A6140', filter: 'blur(80px)', opacity: isLight ? 0.12 : 0.22 }}
             />
-            <div className="flex-1 relative min-w-0 flex items-center justify-center">
-                <GlobeLightswind
-                    theta={0.25}
-                    dark={isLight ? 0 : 1}
-                    scale={isLight ? 1.05 : 1.3}
-                    diffuse={isLight ? 1.6 : 1.15}
-                    mapSamples={24000}
-                    mapBrightness={isLight ? 5.5 : 8.5}
-                    baseColor={isLight ? '#203c30' : '#1a1a1a'}
-                    markerColor="#3CB371"
-                    glowColor={isLight ? '#3c9b6e' : '#1A6140'}
-                    markers={markers}
-                    markerDiameter={0.28}
-                />
-                {countryMarkers.length === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center text-[9px] font-black uppercase tracking-widest opacity-30 pointer-events-none">
-                        Waiting for user location data…
-                    </div>
-                )}
-            </div>
-
-            {/* Leaderboard rail: leading countries by users */}
-            <div className={`hidden xl:flex w-44 flex-none flex-col gap-2 justify-center pl-3 border-l ${isLight ? 'border-black/5' : 'border-white/5'}`}>
-                <div className="text-[8px] font-black uppercase tracking-widest opacity-30 px-1 pb-1">Users per country</div>
-                {countryMarkers.length === 0 && (
-                    <div className="px-1 text-[9px] font-bold opacity-40">No data yet</div>
-                )}
-                {topCountries.map(m => (
-                    <div key={m.iso} className={`flex items-center justify-between px-2.5 py-2 rounded-xl border ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
-                        <span className={`text-[10px] font-black tracking-widest ${isLight ? 'text-black' : 'text-white'}`}>{m.iso}</span>
-                        <span className="text-[10px] font-black text-[#3CB371]">{m.count}</span>
-                    </div>
-                ))}
-            </div>
+            <GlobePulse
+                markers={markers}
+                visibleCount={pulseMarkers.length}
+                light={isLight}
+                maxSide={300}
+                className="z-10"
+            />
         </div>
     );
 }
