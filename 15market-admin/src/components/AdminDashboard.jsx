@@ -22,7 +22,6 @@ import {
     TrendingUp,
     DollarSign,
     Users,
-    Gift,
     Calendar,
     Search,
     Ban,
@@ -1012,38 +1011,47 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 )}
 
                 {/* Withdrawal Requests tab — approve pays out, cancel emails the user */}
+                {/* Withdrawal Requests — plain indexed list on the background
+                    (like participants/trades): approve pays out, cancel emails */}
                 {activeNav === 'referrals' && wdSection === 'withdrawals' && (
-                    <AdminCard title="Withdrawal Requests" icon={Gift} accent="#1A6140">
-                        <div className="flex flex-col gap-4">
-                            <div className="flex items-center justify-between gap-3 flex-wrap">
-                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                    <div className="w-full flex flex-col min-w-0">
+                        <div className="mb-2 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-4 min-w-0">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Withdrawal requests</span>
+                                <span className={`text-[8px] font-black uppercase tracking-widest ${refWithdrawals.some(w => w.status === 'pending') ? 'text-amber-500' : 'opacity-30'}`}>
+                                    {refWithdrawals.length} total · {refWithdrawals.filter(w => w.status === 'pending').length} pending
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                                     {[['all', 'All'], ['pending', 'Pending'], ['paid', 'Approved'], ['rejected', 'Cancelled']].map(([k, l]) => (
                                         <button
                                             key={k}
                                             onClick={() => setWdFilter(k)}
-                                            className={`px-4 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${wdFilter === k ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
+                                            className={`px-3 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${wdFilter === k ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
                                         >
                                             {l}
                                         </button>
                                     ))}
                                 </div>
-                                <button onClick={fetchRefWithdrawals} className="p-2 rounded-xl bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20 transition-all">
+                                <button onClick={fetchRefWithdrawals} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20' : 'bg-[#1A6140]/15 text-[#3CB371] hover:bg-[#1A6140]/25'}`}>
                                     <RefreshCw size={13} />
                                 </button>
                             </div>
+                        </div>
 
-                            <div className="flex flex-col gap-2 max-h-[560px] overflow-y-auto no-scrollbar">
-                                {(wdFilter === 'all' ? refWithdrawals : refWithdrawals.filter(w => w.status === wdFilter)).length === 0 ? (
-                                    <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
-                                        No withdrawal requests
-                                    </div>
-                                ) : (wdFilter === 'all' ? refWithdrawals : refWithdrawals.filter(w => w.status === wdFilter)).map(w => (
-                                    <motion.div
-                                        key={w.id}
-                                        initial={{ opacity: 0, y: 8 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}
-                                    >
+                        <div className={`flex flex-col max-h-[600px] overflow-y-auto no-scrollbar divide-y ${isLight ? 'divide-black/5' : 'divide-white/5'}`}>
+                            {(wdFilter === 'all' ? refWithdrawals : refWithdrawals.filter(w => w.status === wdFilter)).length === 0 ? (
+                                <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
+                                    No withdrawal requests
+                                </div>
+                            ) : (wdFilter === 'all' ? refWithdrawals : refWithdrawals.filter(w => w.status === wdFilter)).map(w => (
+                                <motion.div
+                                    key={w.id}
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={`px-1 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 transition-colors ${isLight ? 'hover:bg-black/[0.02]' : 'hover:bg-white/[0.02]'}`}
+                                >
                                         <div className="min-w-0">
                                             <div className={`text-[10px] font-black uppercase ${isLight ? 'text-black' : 'text-white'}`}>
                                                 {w.username ? `@${w.username}` : `${(w.user_address || '').slice(0, 6)}…${(w.user_address || '').slice(-4)}`}
@@ -1089,12 +1097,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         </div>
                                     </motion.div>
                                 ))}
-                            </div>
-                            <p className={`text-[8px] font-bold opacity-30 uppercase tracking-wide ${isLight ? 'text-black' : 'text-white'}`}>
-                                Approving marks the request paid and emails the user. Cancelling releases the hold back to their commission balance and emails them with the reason.
-                            </p>
                         </div>
-                    </AdminCard>
+                        <p className={`text-[8px] font-bold opacity-30 uppercase tracking-wide mt-1 ${isLight ? 'text-black' : 'text-white'}`}>
+                            Approving marks the request paid and emails the user. Cancelling releases the hold back to their commission balance and emails them with the reason.
+                        </p>
+                    </div>
                 )}
 
                 {/* Participants tab — every program participant, their earnings,
