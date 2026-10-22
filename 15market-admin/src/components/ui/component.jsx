@@ -26,11 +26,14 @@ function useFittedSize(wrapperRef) {
     return side;
 }
 
-// The cobe configuration the dots are proven to render with (VIGIL-sourced
-// structure): dark sphere, mapBrightness 6, diffuse 1.5 — brighter bases or
-// higher brightness values kill the landmask shading. The dot color drives
-// from baseColor, so the brand green lives there (dots saturate to a bright
-// mint near the center and stay clearly green toward the rim).
+// The cobe shader has no separate dot color — baseColor paints BOTH the
+// sphere (ocean) and the land dots, so a green base turns the whole globe
+// green. Instead the sphere renders neutral (proven VIGIL structure) and a
+// blend-mode overlay paints the brand green onto the dots only:
+//   dark  — sphere renders near-black; white-hot dots × multiply(green) = brand dots
+//   light — sphere renders white;        dark dots  × lighten(green)  = brand dots
+// Neutral [0.3,...] is load-bearing: darker bases (e.g. 0.1) kill the dots.
+const BRAND = "#3CB371";
 const SCHEMES = {
     dark: {
         cobe: {
@@ -38,14 +41,15 @@ const SCHEMES = {
             diffuse: 1.5,
             mapSamples: 16000,
             mapBrightness: 6,
-            baseColor: [0.24, 0.7, 0.44],        // #3CB371 — brand mint dots
+            baseColor: [0.3, 0.3, 0.3],          // pure-black sphere (do not darken)
             markerColor: [0.24, 0.7, 0.44],
             glowColor: [0.02, 0.1, 0.06],        // deep green rim glow
             opacity: 0.85,
         },
+        tint: { color: BRAND, mode: "multiply" },
         theta: 0.2,
         baseTilt: 0.2,
-        halo: "#3CB371",
+        halo: BRAND,
         haloRing: "#0A0A0F",
     },
     light: {
@@ -54,11 +58,12 @@ const SCHEMES = {
             diffuse: 1.2,
             mapSamples: 16000,
             mapBrightness: 6,
-            baseColor: [0.72, 0.9, 0.78],        // pale mint sphere, darker green land
+            baseColor: [1, 1, 1],                // white sphere
             markerColor: [0.1, 0.38, 0.25],
             glowColor: [0.55, 0.75, 0.6],
-            opacity: 0.85,
+            opacity: 1,
         },
+        tint: { color: BRAND, mode: "lighten" },
         theta: 0.2,
         baseTilt: 0.2,
         halo: "#1A6140",
@@ -199,6 +204,22 @@ export function GlobePulse({
                     cursor: "grab",
                     contain: "layout paint size",
                     touchAction: "none",
+                }}
+            />
+            {/* Brand-green dot tint. Blend modes decouple the country dots from
+                the sphere: multiply turns the white-hot land dots green while
+                the near-black sphere stays black (dark); lighten brightens the
+                dark dots up to green while the white sphere stays white
+                (light). Outside the sphere the canvas is transparent, so the
+                overlay just washes into the page background. */}
+            <div
+                aria-hidden
+                style={{
+                    position: "absolute",
+                    inset: 0,
+                    pointerEvents: "none",
+                    background: scheme.tint.color,
+                    mixBlendMode: scheme.tint.mode,
                 }}
             />
             {shown.map((m) => (
