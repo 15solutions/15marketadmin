@@ -89,6 +89,11 @@ export function GlobePulse({
     const isPausedRef = useRef(false);
     const side = useFittedSize(wrapperRef);
     const scheme = SCHEMES[light ? "light" : "dark"];
+    // Scheme identity gate: the globe creation effect below must restart when
+    // the colors change (dark/light theme toggle, scheme tuning) — otherwise
+    // the canvas keeps spinning with the colors it booted with and scheme
+    // changes look like they did nothing.
+    const schemeKey = JSON.stringify(scheme.cobe);
     const visible = visibleCount == null ? markers.length : visibleCount;
     const visibleRef = useRef(visible);
     visibleRef.current = visible;
@@ -167,7 +172,7 @@ export function GlobePulse({
             globe.destroy();
             globeRef.current = null;
         };
-    }, [side, markersKey]);
+    }, [side, markersKey, schemeKey]);
 
     // Marker set changes (new country, live flash) don't rebuild the globe.
     useEffect(() => {
