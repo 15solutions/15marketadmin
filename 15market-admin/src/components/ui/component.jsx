@@ -80,6 +80,7 @@ export function GlobePulse({
 }) {
     const wrapperRef = useRef(null);
     const canvasRef = useRef(null);
+    const tintRef = useRef(null);
     const globeRef = useRef(null);
     const phiRef = useRef(0);
     const pointerInteracting = useRef(null);
@@ -157,15 +158,45 @@ export function GlobePulse({
         globeRef.current = globe;
 
         let animationId;
+        // Deterministic brand-green tint: cobe's shader colors the ocean and
+        // the land dots from the same baseColor, so the sphere renders neutral
+        // and a second 2D canvas recomposites each frame — multiply turns the
+        // white-hot dots green while the black sphere stays black (dark);
+        // lighten lifts the dark dots to green while the white sphere stays
+        // white (light). NO CSS blend modes — mix-blend-mode over a WebGL
+        // canvas is unreliable and painted as a solid green square on some
+        // displays.
+        const tint = tintRef.current && tintRef.current.getContext("2d");
+        function drawTint() {
+            if (!tint) return;
+            const w = canvas.width, h = canvas.height;
+            if (tint.canvas.width !== w || tint.canvas.height !== h) {
+                tint.canvas.width = w;
+                tint.canvas.height = h;
+            }
+            tint.globalCompositeOperation = "source-over";
+            tint.clearRect(0, 0, w, h);
+            tint.drawImage(canvas, 0, 0);
+            tint.globalCompositeOperation = scheme.tint.mode;
+            tint.fillStyle = scheme.tint.color;
+            tint.fillRect(0, 0, w, h);
+            // clamp the fill back to the sphere's alpha so the page background
+            // shows through the transparent corners untouched
+            tint.globalCompositeOperation = "destination-in";
+            tint.drawImage(canvas, 0, 0);
+            tint.globalCompositeOperation = "source-over";
+        }
         function animate() {
             if (!isPausedRef.current) phiRef.current += 0.003;   // the globe always turns
             globe.update({
                 phi: phiRef.current + phiOffsetRef.current + dragOffset.current.phi,
                 theta: scheme.baseTilt + thetaOffsetRef.current + dragOffset.current.theta,
             });
+            drawTint();
             animationId = requestAnimationFrame(animate);
         }
         animate();
+        drawTint();
 
         return () => {
             cancelAnimationFrame(animationId);
@@ -211,20 +242,18 @@ export function GlobePulse({
                     touchAction: "none",
                 }}
             />
-            {/* Brand-green dot tint. Blend modes decouple the country dots from
-                the sphere: multiply turns the white-hot land dots green while
-                the near-black sphere stays black (dark); lighten brightens the
-                dark dots up to green while the white sphere stays white
-                (light). Outside the sphere the canvas is transparent, so the
-                overlay just washes into the page background. */}
-            <div
+            {/* Deterministic tint canvas (see drawTint above) — recomposites
+                the globe frame each tick with the brand green; replaces the
+                flaky mix-blend-mode overlay. */}
+            <canvas
+                ref={tintRef}
                 aria-hidden
                 style={{
                     position: "absolute",
                     inset: 0,
+                    width: "100%",
+                    height: "100%",
                     pointerEvents: "none",
-                    background: scheme.tint.color,
-                    mixBlendMode: scheme.tint.mode,
                 }}
             />
             {shown.map((m) => (
