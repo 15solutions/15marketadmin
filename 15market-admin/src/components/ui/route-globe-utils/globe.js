@@ -1,7 +1,8 @@
-// Math + rendering engine for RouteGlobe. The land cloud comes from
-// src/assets/landDots.json — 30k lon/lat pairs generated offline from the
-// world atlas (rejection-sampled per polygon area, holes respected), so there
-// is no runtime work beyond decoding.
+// Math + rendering engine for RouteGlobe, matching the reference design:
+// a sphere of fine slate land dots over a near-black ground, wrapped in a
+// soft blue rim glow, with no filler disc. The land cloud comes from
+// src/assets/landDots.json — lon/lat pairs generated offline from the world
+// atlas, so there is no runtime geocoding work beyond decoding.
 import LAND_DATA from "../../../assets/landDots.json";
 
 const RAD = Math.PI / 180;
@@ -33,7 +34,8 @@ export function slerp(a, b, t) {
 
 let landCache = null;
 
-// Returns up to `count` unit vectors of land, cached process-wide.
+// Returns up to `count` unit vectors of land, cached process-wide. The lattice
+// is ordered, so slicing the first N keeps an even sub-sampling.
 export function landDots(count = 30000) {
     if (!landCache) {
         const { ld } = LAND_DATA;
@@ -46,21 +48,13 @@ export function landDots(count = 30000) {
     return count >= landCache.length ? landCache : landCache.slice(0, count);
 }
 
-// Sphere shading + rim glow + the front-facing land dot cloud.
-export function drawGlobe(ctx, dots, vp, land, dotSize, glow) {
+// Sphere rendering: rim glow + front-facing land dot cloud. Dots are their
+// brightest dead-center and fall off toward the limb like real optics.
+export function drawGlobe(ctx, dots, vp, land, grain, glow) {
     const { cx, cy, r, yaw, tilt } = vp;
     ctx.globalAlpha = 1;
 
-    // ambient disc so the globe reads as a solid sphere on any background
-    const disc = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r);
-    disc.addColorStop(0, "rgba(255,255,255,0.045)");
-    disc.addColorStop(1, "rgba(0,0,0,0.30)");
-    ctx.fillStyle = disc;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // rim glow ring just outside the sphere
+    // atmospheric rim glow — a ring just outside the sphere
     ctx.save();
     const halo = ctx.createRadialGradient(cx, cy, r * 0.94, cx, cy, r * 1.24);
     halo.addColorStop(0, glow);
@@ -72,12 +66,11 @@ export function drawGlobe(ctx, dots, vp, land, dotSize, glow) {
     ctx.fill();
     ctx.restore();
 
-    // land dots — subtle, so the shape reads instead of blinding: fine grains,
-    // low base alpha, only front-facing dots visible, gentle limb darkening.
+    // land dots — front hemisphere only, quad-squared falloff so the limb
+    // reads dim and the face reads solid
     const cY = Math.cos(yaw), sY = Math.sin(yaw);
     const cT = Math.cos(tilt), sT = Math.sin(tilt);
     ctx.fillStyle = land;
-    const grain = Math.max(1.15, r / 190);
     for (let i = 0; i < dots.length; i++) {
         const v = dots[i];
         const x1 = v[0] * cY + v[2] * sY;
@@ -86,7 +79,7 @@ export function drawGlobe(ctx, dots, vp, land, dotSize, glow) {
         const z2 = y1 * sT + z1 * cT;
         if (z2 < 0) continue;
         const y2 = y1 * cT - z1 * sT;
-        ctx.globalAlpha = 0.22 + 0.42 * z2;
+        ctx.globalAlpha = 0.3 + 0.7 * z2 * z2;
         ctx.fillRect(cx + x1 * r, cy - y2 * r, grain, grain);
     }
     ctx.globalAlpha = 1;

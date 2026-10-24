@@ -46,7 +46,6 @@ import { GlobalTradeScroller } from "./GlobalTradeScroller";
 import { socketService } from "../utils/socket";
 import { COUNTRY_CENTER } from "./ui/places";
 import { RouteGlobe } from "./ui/route-globe";
-import WORLD from "../assets/worldPaths.json";
 
 // Sidebar navigation: collapsible icon rail ↔ full menu. "Referral Program"
 // hosts the participants list (with earnings), the withdrawal request queue
@@ -100,58 +99,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     });
     const [pulse, setPulse] = useState([]); // transient globe flashes {id, lat, lng}
 
-    // --- RouteGlobe data wiring -------------------------------------------
-    // ISO -> display name (from the offline atlas asset), memoized once.
-    const isoNames = useMemo(() => {
-        const m = {};
-        for (const c of (WORLD.countries || [])) m[String(c.iso2 || '').toUpperCase()] = c.name;
-        return m;
-    }, []);
+    // RouteGlobe renders the reference design stock (Muscat hub, flight-city
+    // arcs, NIGHT theme) — no props, exactly like the source component.
 
-    // Top user countries become the globe's route destinations. Memoized on a
-    // serialized key so 10s stat refreshes don't restart the globe animation.
-    const globePlaces = useMemo(() => {
-        const entries = Object.entries(stats.userCountries || {})
-            .filter(([iso]) => COUNTRY_CENTER[String(iso).toUpperCase()])
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 10);
-        const key = JSON.stringify(entries);
-        void key; // eslint wants deps; the JSON IS the dependency
-        return entries.map(([iso, count], i) => {
-            const c = COUNTRY_CENTER[String(iso).toUpperCase()];
-            return { name: isoNames[iso] || iso, lon: c[1], lat: c[0], note: `${Number(count).toLocaleString()} users · ${iso}` };
-        });
-    }, [JSON.stringify(stats.userCountries || {}), isoNames]);
-
-    // The busiest country is the hub routes fly from.
-    const globeHub = useMemo(() => {
-        if (globePlaces.length) {
-            const { name, lon, lat } = globePlaces[0];
-            return { name: `${name} · HQ`, lon, lat };
-        }
-        // Neutral fallback so the globe still spins before data lands.
-        return { name: "Global", lon: 0, lat: 20 };
-    }, [globePlaces]);
-
-    // Brand tint on both themes. Module-identical objects keep the RouteGlobe
-    // effect from re-initializing on unrelated renders.
-    const globeTheme = isLight ? {
-        ground: "transparent",
-        land: "#7E9A8C",
-        arc: "#1A6140",
-        glow: "rgba(26, 97, 64, 0.12)",
-        text: "#0A261A",
-        muted: "#52705E",
-    } : {
-        // Muted slate-sage so continents read quietly, like the reference's
-        // gray-blue land — the arcs carry the color instead.
-        ground: "transparent",
-        land: "#48695A",
-        arc: "#4FB57F",
-        glow: "rgba(60, 179, 113, 0.10)",
-        text: "#EAF7EF",
-        muted: "#7FB396",
-    };
     // -----------------------------------------------------------------------
 
     // THE metric rows, shared by the desktop side panels and the mobile strip.
@@ -775,14 +725,24 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
             {/* Sidebar — desktop operations menu (mobile gets the tab bar) */}
             <nav className={`relative z-50 flex-none hidden md:flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-white/60 border-[#1A6140]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
-                {/* Brand head */}
-                <div className="flex-none px-5 pt-5 pb-4 flex items-center gap-3 overflow-hidden">
-                    <img src="/logo.png" alt="15market" className="w-10 h-10 rounded-2xl object-contain flex-none" />
-                    {sidebarOpen && (
-                        <div className="flex flex-col min-w-0">
-                            <span className={`text-base font-black uppercase tracking-tighter truncate ${isLight ? 'text-black' : 'text-white'}`}>15market</span>
-                            <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#1A6140]">Operations</span>
-                        </div>
+                {/* Brand head — same wordmark as the user side, ADMIN beside it */}
+                <div className="flex-none px-4 pt-5 pb-4 flex items-center gap-3 overflow-hidden">
+                    {sidebarOpen ? (
+                        <>
+                            <img
+                                src={isLight ? '/goblogo.png' : '/gowlogo.png'}
+                                alt="15market"
+                                className="h-[34px] w-[120px] object-cover object-center flex-none"
+                            />
+                            <span className={`w-px h-9 flex-none ${isLight ? 'bg-black/10' : 'bg-white/15'}`} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#1A6140]">Admin</span>
+                        </>
+                    ) : (
+                        <img
+                            src={isLight ? '/goblogo.png' : '/gowlogo.png'}
+                            alt="15market"
+                            className="h-[25px] w-[25px] object-contain flex-none mx-auto"
+                        />
                     )}
                 </div>
 
@@ -863,11 +823,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                 {/* MOBILE top bar — brand + quick identity, above the scroller */}
                 <div className={`md:hidden flex-none flex items-center gap-3 px-4 py-2.5 border-b backdrop-blur-3xl z-40 ${isLight ? 'bg-white/60 border-black/5' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
-                    <img src="/logo.png" alt="15market" className="w-8 h-8 rounded-xl object-contain flex-none" />
-                    <div className="flex flex-col min-w-0">
-                        <span className={`text-sm font-black uppercase tracking-tighter truncate ${isLight ? 'text-black' : 'text-white'}`}>15market</span>
-                        <span className="text-[7px] font-black uppercase tracking-[0.3em] text-[#1A6140]">Operations</span>
-                    </div>
+                    <img
+                        src={isLight ? '/goblogo.png' : '/gowlogo.png'}
+                        alt="15market"
+                        className="h-[25px] w-[90px] object-cover object-center flex-none"
+                    />
+                    <span className={`w-px h-7 flex-none ${isLight ? 'bg-black/10' : 'bg-white/15'}`} />
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#1A6140] flex-none">Admin</span>
                     <div className="ml-auto flex items-center gap-2">
                         <button
                             onClick={toggleTheme}
@@ -1041,13 +1003,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         {/* CENTER — the globe comes FIRST on phones, panels after it */}
                         <div className="order-first lg:order-none lg:col-span-8 xl:col-span-6 min-w-0">
                             <div className="relative w-full h-[320px] sm:h-[420px] xl:h-[540px]">
-                                <RouteGlobe hub={globeHub} places={globePlaces} theme={globeTheme} />
+                                <RouteGlobe />
                             </div>
-                            <div className="flex items-center justify-center gap-2 mt-1 pointer-events-none">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#3CB371] animate-pulse" />
-                                <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Users by country · live trade flashes</span>
-                            </div>
-
                             {/* MOBILE — one metrics line under the globe (the desktop
                                 side panels are hidden below lg) */}
                             <div className="lg:hidden mt-3 flex items-stretch gap-3 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">

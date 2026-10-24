@@ -197,15 +197,18 @@ export function AdminPortal({ onBack, notify }) {
                 <div className="w-full max-w-md flex flex-col items-center m-auto">
                     <AnimatePresence mode="wait">
                         <motion.div key={needsBootstrap ? 'bootstrap' : 'login'} {...stepAnim} className="w-full flex flex-col items-center">
-                            <img
-                                src="/logo.png"
-                                alt="15market"
-                                className="w-24 h-24 object-contain mb-5"
-                                style={{ filter: 'drop-shadow(0 0 26px rgba(26,97,64,0.45))' }}
-                            />
-                            <h1 className={`text-3xl font-black uppercase tracking-tighter text-center ${ink}`}>
-                                15market
-                            </h1>
+                            {/* Brand — the same wordmark the user app uses, theme-picked,
+                                with an ADMIN badge split off by a vertical hairline */}
+                            <div className="flex items-center gap-4 mb-8">
+                                <img
+                                    src={isLight ? '/goblogo.png' : '/gowlogo.png'}
+                                    alt="15market"
+                                    className="h-[40px] w-[140px] object-cover object-center flex-none md:h-[46px] md:w-[160px]"
+                                    style={{ filter: 'drop-shadow(0 0 26px rgba(26,97,64,0.45))' }}
+                                />
+                                <span className={`w-px h-10 flex-none ${isLight ? 'bg-black/15' : 'bg-white/20'}`} />
+                                <span className="text-[11px] font-black uppercase tracking-[0.35em] text-[#1A6140] flex-none">Admin</span>
+                            </div>
 
                             <div className="w-full flex flex-col gap-3">
                                 {needsBootstrap ? (

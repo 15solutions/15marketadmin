@@ -29,8 +29,8 @@
     gap: 2px;
     padding: 8px 12px;
     border-radius: 10px;
-    background: rgba(6, 18, 12, 0.86);
-    border: 1px solid rgba(60, 179, 113, 0.4);
+    background: rgba(6, 8, 13, 0.9);
+    border: 1px solid var(--rg-arc);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
     pointer-events: none;
     z-index: 3;
