@@ -33,9 +33,12 @@ export function slerp(a, b, t) {
 }
 
 let landCache = null;
+const subsampleCache = new Map();
 
-// Returns up to `count` unit vectors of land, cached process-wide. The lattice
-// is ordered, so slicing the first N keeps an even sub-sampling.
+// Returns `count` unit vectors of land, evenly sub-sampled from the lattice
+// and cached process-wide. Stride-sampling (never slicing!) keeps the full
+// latitude/longitude coverage — a slice of an ordered lattice drops entire
+// latitude bands, which reads as "countries missing from the map".
 export function landDots(count = 30000) {
     if (!landCache) {
         const { ld } = LAND_DATA;
@@ -45,38 +48,37 @@ export function landDots(count = 30000) {
         }
         landCache = pts;
     }
-    return count >= landCache.length ? landCache : landCache.slice(0, count);
+    if (count >= landCache.length) return landCache;
+    const key = count | 0;
+    let out = subsampleCache.get(key);
+    if (!out) {
+        const step = landCache.length / count;
+        out = new Array(count);
+        for (let i = 0; i < count; i++) {
+            out[i] = landCache[Math.min(landCache.length - 1, Math.floor(i * step))];
+        }
+        subsampleCache.set(key, out);
+    }
+    return out;
 }
 
-// Sphere rendering: blooming atmosphere + front-facing land dot cloud.
-// The globe's edge is a GLOW that starts at the limb and melts outward,
-// with a faint haze inside the limb too — never a hard ring or solid disc.
+// Sphere rendering: tight limb bloom + green land dot cloud. The ball itself
+// stays black (transparent over the page canvas) — only the countries and
+// the hair-thin glow at the edge carry color.
 export function drawGlobe(ctx, dots, vp, land, grain, glow) {
     const { cx, cy, r, yaw, tilt } = vp;
     ctx.globalAlpha = 1;
 
-    // Outer bloom — the glow circle: holds its light right at the limb,
-    // then decays fast within a thin band of air around it (~0.28r).
+    // Limb bloom — a whisper-thin band of glow riding right on the edge,
+    // gone by ~1.12r. No interior fill: the ball reads black.
     ctx.save();
-    const bloom = ctx.createRadialGradient(cx, cy, r * 0.98, cx, cy, r * 1.26);
+    const bloom = ctx.createRadialGradient(cx, cy, r * 0.99, cx, cy, r * 1.12);
     bloom.addColorStop(0, glow);
-    bloom.addColorStop(0.3, glow);
+    bloom.addColorStop(0.35, glow);
     bloom.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = bloom;
     ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.26, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // Inner haze — transparent through most of the ball, whisper of blue
-    // rising toward the limb so the edge reads luminous from inside.
-    ctx.save();
-    const haze = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r);
-    haze.addColorStop(0.7, "rgba(0,0,0,0)");
-    haze.addColorStop(1, glow);
-    ctx.fillStyle = haze;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r * 1.12, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 

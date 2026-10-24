@@ -31,13 +31,15 @@ const DEST = [
   { name: "Manila", lon: 120.98, lat: 14.6, note: "8h 40m" },
 ];
 
+// NIGHT is rendered straight from the reference's structure, recolored to the
+// brand's green: mint (#3CB371) atmosphere, sage land, #4FB57F arcs.
 const NIGHT = {
-  ground: "#06080d",
-  land: "#9fb4d6",
-  arc: "#ffb547",
-  glow: "rgb(90 140 255 / 0.18)",
-  text: "#eef2fb",
-  muted: "#7c8aa5",
+  ground: "transparent",
+  land: "#98c9ae",
+  arc: "#4FB57F",
+  glow: "rgb(60 179 113 / 0.2)",
+  text: "#eaf7ef",
+  muted: "#7fb396",
 };
 
 export function RouteGlobe({
