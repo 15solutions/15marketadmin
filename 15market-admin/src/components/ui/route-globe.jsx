@@ -37,7 +37,7 @@ const NIGHT = {
   ground: "transparent",
   land: "#98c9ae",
   arc: "#4FB57F",
-  glow: "rgb(60 179 113 / 0.2)",
+  glow: "rgb(60 179 113 / 0.13)",
   text: "#eaf7ef",
   muted: "#7fb396",
 };

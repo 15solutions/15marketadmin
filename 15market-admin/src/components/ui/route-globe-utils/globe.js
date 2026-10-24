@@ -82,11 +82,12 @@ export function drawGlobe(ctx, dots, vp, land, grain, glow) {
     ctx.fill();
     ctx.restore();
 
-    // land dots — front hemisphere only, quad-squared falloff so the limb
-    // reads dim and the face reads solid
+    // land dots — round grains, front hemisphere only, soft quadratic falloff
+    // so the ball stays black and only the continents carry the green
     const cY = Math.cos(yaw), sY = Math.sin(yaw);
     const cT = Math.cos(tilt), sT = Math.sin(tilt);
     ctx.fillStyle = land;
+    const dotR = Math.max(0.6, grain * 0.5);
     for (let i = 0; i < dots.length; i++) {
         const v = dots[i];
         const x1 = v[0] * cY + v[2] * sY;
@@ -95,8 +96,10 @@ export function drawGlobe(ctx, dots, vp, land, grain, glow) {
         const z2 = y1 * sT + z1 * cT;
         if (z2 < 0) continue;
         const y2 = y1 * cT - z1 * sT;
-        ctx.globalAlpha = 0.3 + 0.7 * z2 * z2;
-        ctx.fillRect(cx + x1 * r, cy - y2 * r, grain, grain);
+        ctx.globalAlpha = 0.28 + 0.62 * z2 * z2;
+        ctx.beginPath();
+        ctx.arc(cx + x1 * r, cy - y2 * r, dotR, 0, Math.PI * 2);
+        ctx.fill();
     }
     ctx.globalAlpha = 1;
 }

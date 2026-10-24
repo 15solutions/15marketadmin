@@ -776,21 +776,43 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     })}
                 </div>
 
-                {/* Bottom rail: identity + collapse toggle */}
-                <div className={`flex-none p-3 flex flex-col gap-1.5 border-t ${isLight ? 'border-black/5' : 'border-white/5'}`}>
-                    <button
-                        onClick={toggleTheme}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/30 hover:text-white hover:bg-white/5'}`}
-                    >
-                        {isLight ? <Moon size={14} /> : <Sun size={14} />}
-                        {sidebarOpen && <span>{isLight ? 'Dark mode' : 'Light mode'}</span>}
-                    </button>
+                {/* Bottom rail: theme switch + collapse toggle + identity */}
+                <div className={`flex-none p-3 flex flex-col gap-1.5 border-t ${isLight ? 'border-black/5' : 'bg-transparent border-white/5'}`}>
+                    {sidebarOpen ? (
+                        <button
+                            onClick={toggleTheme}
+                            className={`flex items-center gap-3 px-3 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${isLight ? 'text-black/70 hover:text-black' : 'text-white/70 hover:text-white'}`}
+                        >
+                            {isLight ? <Moon size={14} /> : <Sun size={14} />}
+                            <span>Theme</span>
+                            {/* the pill switch — ON = light, knob slides on toggle */}
+                            <span
+                                className={`ml-auto relative w-9 h-5 rounded-full p-0.5 flex-none transition-colors ${isLight ? 'bg-[#3CB371]' : 'bg-white/15'}`}
+                                role="switch"
+                                aria-checked={isLight}
+                            >
+                                <motion.div
+                                    animate={{ x: isLight ? 16 : 0 }}
+                                    transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                                    className="w-4 h-4 rounded-full bg-white shadow"
+                                />
+                            </span>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={toggleTheme}
+                            title="Switch theme"
+                            className={`self-center p-2.5 rounded-xl transition-all active:scale-95 ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                        >
+                            {isLight ? <Moon size={14} /> : <Sun size={14} />}
+                        </button>
+                    )}
                     <button
                         onClick={toggleSidebar}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/30 hover:text-white hover:bg-white/5'}`}
+                        title={sidebarOpen ? 'Collapse menu' : 'Expand menu'}
+                        className={`self-center p-2.5 rounded-xl transition-all active:scale-95 ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                     >
                         {sidebarOpen ? <ChevronsLeft size={15} /> : <ChevronsRight size={15} />}
-                        {sidebarOpen && <span>Collapse menu</span>}
                     </button>
                     {auth?.email && (
                         <div
