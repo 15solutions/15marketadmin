@@ -18,22 +18,41 @@ export function RouteGlobe({
     const canvas = useRef(null);
     const [hover, setHover] = useState(null);
 
+    // Hub/routes live in refs so incoming stat pushes (new user counts every
+    // few seconds) update the art IN PLACE instead of tearing down the whole
+    // canvas loop — that restart was reading as a glitch on mobile.
+    const hubRef = useRef(hub);
+    const placesRef = useRef(places);
+    const geoRef = useRef({ hs: null, routes: [], hsHubLon: null, hsHubLat: null, yawDirty: false });
+    useEffect(() => {
+        hubRef.current = hub;
+        placesRef.current = places;
+        const prev = geoRef.current;
+        // Track whether the hub actually moved so the loop re-centers ONCE.
+        const hubChanged = prev.hsHubLon !== (hub ? hub.lon : null) || prev.hsHubLat !== (hub ? hub.lat : null);
+        geoRef.current = {
+            hs: hub ? toVec(hub.lon, hub.lat) : null,
+            routes: (places || []).map((p, i) => ({
+                p,
+                v: toVec(p.lon, p.lat),
+                offset: (places.length ? i / places.length : 0),
+            })),
+            hsHubLon: hub ? hub.lon : null,
+            hsHubLat: hub ? hub.lat : null,
+            yawDirty: prev.yawDirty || hubChanged,
+        };
+    }, [hub, places]);
+
     useEffect(() => {
         const el = host.current, cv = canvas.current;
         if (!el || !cv) return;
         const ctx = cv.getContext("2d");
         const reduced = motion === "reduced" || matchMedia("(prefers-reduced-motion: reduce)").matches;
         const dots = landDots(window.innerWidth < 640 ? 15000 : 30000);
-        const hs = hub ? toVec(hub.lon, hub.lat) : null;
-        const routes = (places || []).map((p, i) => ({
-            p,
-            v: toVec(p.lon, p.lat),
-            offset: (places.length ? i / places.length : 0),
-        }));
         const RAD = Math.PI / 180;
         const st = {
             // center the hub on the viewer, offset a touch for style
-            yaw: (hub ? hub.lon : 0) * RAD - Math.PI / 2 + 0.35,
+            yaw: (hubRef.current ? (hubRef.current.lon) * RAD - Math.PI / 2 + 0.35 : 0.35),
             tilt: 18 * RAD,
             vy: 0, vt: 0, drag: false, px: 0, py: 0, last: 0, idle: 0,
         };
@@ -61,6 +80,13 @@ export function RouteGlobe({
             const t = (now - t0) / 1000;
             pins.length = 0;
             ctx.lineCap = "round";
+            const geo = geoRef.current;
+            const hs = geo.hs, routes = geo.routes;
+            if (st.yawDirty && !st.drag) {
+                // re-center the spin on a genuinely changed hub (skip mid-drag)
+                st.yaw = (hubRef.current.lon) * RAD - Math.PI / 2 + 0.35;
+                st.yawDirty = false;
+            }
             if (hs) for (const rt of routes) {
                 const ang = Math.acos(Math.max(-1, Math.min(1, hs[0] * rt.v[0] + hs[1] * rt.v[1] + hs[2] * rt.v[2])));
                 const height = 0.06 + ang * 0.12;
@@ -211,7 +237,10 @@ export function RouteGlobe({
             cv.removeEventListener("pointerup", onUp);
             cv.removeEventListener("pointercancel", onUp);
         };
-    }, [hub, places, theme, motion]);
+    // One engine run per theme/motion change only — hub & places flow in
+    // through geoRef above, so stat pushes never tear down the canvas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [theme, motion]);
 
     return (
         <div

@@ -154,6 +154,20 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     };
     // -----------------------------------------------------------------------
 
+    // THE metric rows, shared by the desktop side panels and the mobile strip.
+    const platformStats = useMemo(() => ([
+        { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7' },
+        { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6' },
+        { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' },
+        { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, color: '#3CB371' }
+    ]), [stats.totalWallets, stats.totalTrades, stats.activeStakesTotal, stats.treasuryBalance]);
+    const pulseStats = useMemo(() => ([
+        { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
+        { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371' },
+        { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), color: '#ef4444' },
+        { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, color: '#3CB371' }
+    ]), [stats.activeCount, stats.totalVolume, stats.pendingDisputes, stats.bullBearRatio]);
+
     const [recentActivity, setRecentActivity] = useState([]);
 
     // Realtime beam clock — ticks only while a trade in the feed is pending.
@@ -1013,14 +1027,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-w-0 items-start">
 
-                        {/* LEFT — HUD readouts floating directly on the background */}
-                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 grid grid-cols-2 gap-3 lg:flex lg:flex-col lg:justify-between lg:gap-4 xl:pr-2">
-                            {[
-                                { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7' },
-                                { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6' },
-                                { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' },
-                                { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, color: '#3CB371' }
-                            ].map((stat, i) => (
+                        {/* LEFT — HUD readouts (desktop side panel; on phones the
+                            metrics sit in one line UNDER the globe instead) */}
+                        <div className="hidden lg:flex lg:col-span-2 xl:col-span-3 lg:flex-col min-w-0 justify-between gap-4 xl:pr-2">
+                            {platformStats.map((stat, i) => (
                                 <div key={i} className="border-l-2 pl-3 min-w-0" style={{ borderColor: `${stat.color}55` }}>
                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
                                     <div className={`text-lg xl:text-2xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
@@ -1028,8 +1038,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             ))}
                         </div>
 
-                        {/* CENTER — the big route globe, no card, on the raw background */}
-                        <div className="lg:col-span-8 xl:col-span-6 min-w-0">
+                        {/* CENTER — the globe comes FIRST on phones, panels after it */}
+                        <div className="order-first lg:order-none lg:col-span-8 xl:col-span-6 min-w-0">
                             <div className="relative w-full h-[320px] sm:h-[420px] xl:h-[540px]">
                                 <RouteGlobe hub={globeHub} places={globePlaces} theme={globeTheme} />
                             </div>
@@ -1037,16 +1047,22 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div className="w-1.5 h-1.5 rounded-full bg-[#3CB371] animate-pulse" />
                                 <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Users by country · live trade flashes</span>
                             </div>
+
+                            {/* MOBILE — one metrics line under the globe (the desktop
+                                side panels are hidden below lg) */}
+                            <div className="lg:hidden mt-3 flex items-stretch gap-3 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+                                {[...platformStats, ...pulseStats].map((stat, i) => (
+                                    <div key={i} className="border-l-2 pl-2.5 py-0.5 flex-none min-w-[84px]" style={{ borderColor: `${stat.color}55` }}>
+                                        <div className="text-[6.5px] font-black uppercase tracking-[0.15em] opacity-40 whitespace-nowrap">{stat.label}</div>
+                                        <div className={`text-sm font-black tracking-tight tabular-nums leading-tight whitespace-nowrap ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
-                        {/* RIGHT — HUD readouts floating directly on the background */}
-                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 grid grid-cols-2 gap-3 lg:flex lg:flex-col lg:justify-between lg:gap-4 xl:pl-2">
-                            {[
-                                { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
-                                { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371' },
-                                { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), color: '#ef4444' },
-                                { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, color: '#3CB371' }
-                            ].map((stat, i) => (
+                        {/* RIGHT — HUD readouts (desktop side panel) */}
+                        <div className="hidden lg:flex lg:col-span-2 xl:col-span-3 lg:flex-col min-w-0 justify-between gap-4 xl:pl-2">
+                            {pulseStats.map((stat, i) => (
                                 <div key={i} className="border-l-2 pl-3 min-w-0" style={{ borderColor: `${stat.color}55` }}>
                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
                                     <div className={`text-lg xl:text-2xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
