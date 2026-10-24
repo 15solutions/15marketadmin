@@ -44,9 +44,9 @@ const SCHEMES = {
             baseColor: [0.3, 0.3, 0.3],          // pure-black sphere (do not darken)
             markerColor: [0.24, 0.7, 0.44],
             glowColor: [0.02, 0.02, 0.03],       // neutral rim glow — no green haze around the ball
-            opacity: 0.85,
+            opacity: 1,
         },
-        tint: { color: BRAND, mode: "multiply" },
+        tint: { color: BRAND, mode: "color-burn" },
         theta: 0.2,
         baseTilt: 0.2,
         halo: BRAND,
@@ -63,7 +63,7 @@ const SCHEMES = {
             glowColor: [0.55, 0.75, 0.6],
             opacity: 1,
         },
-        tint: { color: BRAND, mode: "lighten" },
+        tint: { color: BRAND, mode: "color-dodge" },
         theta: 0.2,
         baseTilt: 0.2,
         halo: "#1A6140",
@@ -160,12 +160,13 @@ export function GlobePulse({
         let animationId;
         // Deterministic brand-green tint: cobe's shader colors the ocean and
         // the land dots from the same baseColor, so the sphere renders neutral
-        // and a second 2D canvas recomposites each frame — multiply turns the
-        // white-hot dots green while the black sphere stays black (dark);
-        // lighten lifts the dark dots to green while the white sphere stays
-        // white (light). NO CSS blend modes — mix-blend-mode over a WebGL
-        // canvas is unreliable and painted as a solid green square on some
-        // displays.
+        // and a second 2D canvas recomposites each frame. Dark uses
+        // color-burn: every non-black pixel maps exactly — black sphere stays
+        // PURE black (no green cast), dot whites land exactly on the brand
+        // green, and in-between shades ramp smoothly. Light uses color-dodge:
+        // the white sphere is untouched and the dark land dots lift to green.
+        // NO CSS blend modes and no plain multiply — both leave a green cast
+        // on the sphere.
         const tint = tintRef.current && tintRef.current.getContext("2d");
         function drawTint() {
             if (!tint) return;
