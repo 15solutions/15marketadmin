@@ -13,6 +13,11 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
     });
     const [profiles, setProfiles] = useState({});
     const [activeBroadcast, setActiveBroadcast] = useState(null);
+    // True only when the broadcast arrived LIVE (admin just pushed it) —
+    // drives the one-shot arrival beam/pop. Persisted broadcasts restore
+    // quietly instead.
+    const [freshPush, setFreshPush] = useState(false);
+    const arrivalTimer = useRef(null);
     const lastFetchRef = useRef(0);
 
     const isLight = theme === 'light';
@@ -69,10 +74,14 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
         fetchGlobalData();
         const interval = setInterval(fetchGlobalData, 12000);
 
-        // Real-time Socket Listener for Zero-Latency Broadcasts
+        // Real-time Socket Listener for Zero-Latency Broadcasts. A live push
+        // triggers the unique arrival animation; later cleanup re-flags off.
         const unbindBroadcast = socketService.on('new_broadcast', (msg) => {
             if (msg && msg.text && msg.expiry > Date.now()) {
                 setActiveBroadcast(msg);
+                setFreshPush(true);
+                if (arrivalTimer.current) clearTimeout(arrivalTimer.current);
+                arrivalTimer.current = setTimeout(() => setFreshPush(false), 2200);
             }
         });
 
@@ -113,6 +122,7 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
             clearInterval(interval);
             clearInterval(bInterval);
             unbindBroadcast();
+            if (arrivalTimer.current) clearTimeout(arrivalTimer.current);
         };
     }, []);
 
@@ -169,19 +179,33 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
                 {activeBroadcast ? (
                     <motion.div
                         key="broadcast-ticker"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={freshPush ? { opacity: 0, y: -28, scaleY: 1.35 } : { opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0, scaleY: 1 }}
                         exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.5, ease: "circOut" }}
+                        transition={freshPush
+                            ? { type: "spring", stiffness: 420, damping: 26 }
+                            : { duration: 0.5, ease: "circOut" }}
                         className="absolute inset-0 flex items-center"
                     >
+                        {/* One-shot warm flash — only for a live admin push */}
+                        {freshPush && (
+                            <div key={`flash-${activeBroadcast.id || 'fresh'}`} className="announce-flash" />
+                        )}
+                        {/* Skewed beam sweeping across the strip on arrival */}
+                        {freshPush && (
+                            <div key={`beam-${activeBroadcast.id || 'fresh'}`} className="announce-sweep-beam" />
+                        )}
                         <div
                             className={`flex items-center gap-10 whitespace-nowrap px-10 ${isV1 ? 'bg-amber-500/10' : ''}`}
                             style={{ animation: 'ticker-move 60s linear infinite', willChange: 'transform' }}
                         >
                             {[...Array(15)].map((_, i) => (
-                                <div key={i} className="flex items-center gap-2">
-                                    <Megaphone size={isV1 ? 14 : 12} className={`${isV1 ? 'text-amber-500' : isLight ? 'text-white' : 'text-black'}`} />
+                                <div key={i} className="flex items-center gap-2.5">
+                                    <Megaphone
+                                        size={isV1 ? 14 : 12}
+                                        className={`${isV1 ? 'text-amber-500' : isLight ? 'text-white' : 'text-black'} ${freshPush ? 'announce-pop' : ''}`}
+                                        style={freshPush ? { animationDelay: `${Math.min(i, 3) * 0.05}s` } : undefined}
+                                    />
                                     <span className={`${isV1 ? 'text-[11px] font-black' : 'text-[10px]'} uppercase tracking-[0.2em] ${isV1 ? 'text-amber-500' : inkClass}`}>
                                         {activeBroadcast.text}
                                     </span>

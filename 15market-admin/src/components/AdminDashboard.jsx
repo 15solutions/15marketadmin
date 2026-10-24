@@ -199,6 +199,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     });
     const [wdSection, setWdSection] = useState('participants');
 
+    // Security section: internal tabs (roster / protocols), persisted.
+    const [secTab, setSecTab] = useState(() => {
+        try { return localStorage.getItem('15m_sec_tab') === 'protocols' ? 'protocols' : 'team'; } catch (e) { return 'team'; }
+    });
+    const selectSecTab = (key) => {
+        setSecTab(key);
+        try { localStorage.setItem('15m_sec_tab', key); } catch (e) {}
+    };
+
     const selectSection = (key) => {
         setAdminTab(key);
         try { localStorage.setItem('15m_admin_section', key); } catch (e) {}
@@ -741,22 +750,17 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 {activeNav === 'overview' && (
                 <div className="w-full flex flex-col gap-6 min-w-0">
 
-                    {/* Headline ops metrics — small boxes, one line, leaving room for the trade feed */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Headline ops metrics — HUD readouts, directly on the background */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                         {[
-                            { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: DollarSign, color: '#1A6140' },
-                            { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, icon: BarChart3, color: '#3b82f6' },
-                            { label: 'Users Live Now', value: String(stats.activeCount | 0), icon: Flame, color: '#22c55e' },
-                            { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Zap, color: '#f59e0b' }
+                            { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371' },
+                            { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, color: '#3b82f6' },
+                            { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
+                            { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' }
                         ].map((stat, i) => (
-                            <div key={i} className={`px-4 py-3 rounded-2xl border flex items-center gap-3 min-w-0 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
-                                <div className="p-2 rounded-xl flex-none" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
-                                    <stat.icon size={14} />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="text-[7px] font-black uppercase tracking-widest opacity-40 truncate">{stat.label}</div>
-                                    <div className={`text-sm md:text-base font-black tracking-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
-                                </div>
+                            <div key={i} className="border-l-2 pl-3 min-w-0" style={{ borderColor: `${stat.color}55` }}>
+                                <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
+                                <div className={`text-lg md:text-xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
                             </div>
                         ))}
                     </div>
@@ -843,23 +847,17 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-w-0 items-start">
 
-                        {/* LEFT panel — core platform metrics as compact boxes */}
-                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 flex flex-col gap-3">
-                            <div className="text-[9px] font-black uppercase tracking-[0.25em] opacity-40 px-1">Platform</div>
+                        {/* LEFT — HUD readouts floating directly on the background */}
+                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 flex flex-col justify-between gap-4 xl:pr-2">
                             {[
-                                { label: 'Registered Users', value: String(stats.totalWallets | 0), icon: Users, color: '#a855f7' },
-                                { label: 'Total Trades', value: String(stats.totalTrades | 0), icon: TrendingUp, color: '#14b8a6' },
-                                { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Zap, color: '#f59e0b' },
-                                { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, icon: Landmark, color: '#1A6140' }
+                                { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7' },
+                                { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6' },
+                                { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' },
+                                { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, color: '#3CB371' }
                             ].map((stat, i) => (
-                                <div key={i} className={`px-4 py-3 rounded-2xl border flex items-center gap-3 min-w-0 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
-                                    <div className="p-2 rounded-xl flex-none" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
-                                        <stat.icon size={14} />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="text-[7px] font-black uppercase tracking-widest opacity-40 truncate">{stat.label}</div>
-                                        <div className={`text-sm font-black tracking-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
-                                    </div>
+                                <div key={i} className="border-l-2 pl-3 min-w-0" style={{ borderColor: `${stat.color}55` }}>
+                                    <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
+                                    <div className={`text-lg xl:text-2xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
                                 </div>
                             ))}
                         </div>
@@ -875,22 +873,17 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         </div>
 
-                        {/* RIGHT panel — market pulse stack */}
-                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 flex flex-col gap-3">
+                        {/* RIGHT — HUD readouts floating directly on the background */}
+                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 flex flex-col justify-between gap-4 xl:pl-2">
                             {[
-                                { label: 'Users Live Now', value: String(stats.activeCount | 0), icon: Flame, color: '#22c55e' },
-                                { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: DollarSign, color: '#1A6140' },
-                                { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), icon: AlertTriangle, color: '#ef4444' },
-                                { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, icon: BarChart3, color: '#1A6140' }
+                                { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
+                                { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371' },
+                                { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), color: '#ef4444' },
+                                { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, color: '#3CB371' }
                             ].map((stat, i) => (
-                                <div key={i} className={`px-4 py-3 rounded-2xl border flex items-center gap-3 min-w-0 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
-                                    <div className="p-2 rounded-xl flex-none" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
-                                        <stat.icon size={14} />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="text-[7px] font-black uppercase tracking-widest opacity-40 truncate">{stat.label}</div>
-                                        <div className={`text-sm font-black tracking-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
-                                    </div>
+                                <div key={i} className="border-l-2 pl-3 min-w-0" style={{ borderColor: `${stat.color}55` }}>
+                                    <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
+                                    <div className={`text-lg xl:text-2xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
                                 </div>
                             ))}
                         </div>
@@ -914,74 +907,233 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 </div>
                 )}
 
-                {/* SECURITY — protocols & protocols only; the roster card renders below */}
-                {activeNav === 'security' && canSettings && (
-                    <div className="w-full flex flex-col min-w-0">
-                        <AdminCard title="Security Protocols" icon={Shield} accent="#1A6140">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Maintenance Toggle */}
-                                <div className={`p-6 rounded-[24px] border ${platformSettings.maintenanceMode ? 'bg-[#1A6140]/10 border-[#1A6140]/40' : 'bg-white/5 border-white/5'} transition-all`}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`p-3 rounded-2xl ${platformSettings.maintenanceMode ? 'bg-[#1A6140] text-white' : isLight ? 'bg-black/[0.04] text-black/40' : 'bg-white/5 text-white/40'}`}>
-                                                <Settings size={20} className={platformSettings.maintenanceMode ? 'animate-spin-slow' : ''} />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-[11px] font-black uppercase">Maintenance Mode</h4>
-                                                <p className="text-[9px] opacity-40 font-bold uppercase mt-1">Full System Lock</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => updateSettings({ maintenanceMode: !platformSettings.maintenanceMode })}
-                                            className={`w-14 h-8 rounded-full relative p-1 transition-all ${platformSettings.maintenanceMode ? 'bg-[#1A6140]' : 'bg-white/10'}`}
-                                        >
-                                            <motion.div
-                                                animate={{ x: platformSettings.maintenanceMode ? 24 : 0 }}
-                                                className="w-6 h-6 rounded-full bg-white shadow-lg"
-                                            />
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] opacity-50 leading-relaxed font-medium">
-                                        Redirects all users to a maintenance screen. Prevents any interactions with the protocol.
-                                    </p>
-                                </div>
+                {/* SECURITY — everything in one section, two internal tabs,
+                    fills the screen: no page scroll */}
+                {activeNav === 'security' && (canSettings || isRoot) && (
+                    <div className="w-full flex flex-col min-w-0 flex-1">
+                        {/* header + tab switch, boxless like the other sections */}
+                        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+                            <p className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black' : 'text-white'}`}>
+                                Identity: Supabase Auth · permissions are granular · protocols propagate live
+                            </p>
+                            <div className={`flex items-center gap-1 p-1 rounded-2xl border ${isLight ? 'bg-black/[0.03] border-black/10' : 'bg-white/5 border-white/5'}`}>
+                                {isRoot && (
+                                    <button
+                                        onClick={() => selectSecTab('team')}
+                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${secTab === 'team' ? 'bg-[#1A6140] text-white shadow' : 'opacity-40 hover:opacity-70'}`}
+                                    >
+                                        Admins &amp; Moderators
+                                    </button>
+                                )}
+                                {canSettings && (
+                                    <button
+                                        onClick={() => selectSecTab('protocols')}
+                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${secTab === 'protocols' ? 'bg-[#1A6140] text-white shadow' : 'opacity-40 hover:opacity-70'}`}
+                                    >
+                                        Security Protocols
+                                    </button>
+                                )}
+                            </div>
+                        </div>
 
-                                {/* Trading Halted Toggle */}
-                                <div className={`p-6 rounded-[24px] border ${platformSettings.tradingHalted ? 'bg-red-500/10 border-red-500/40' : 'bg-white/5 border-white/5'} transition-all`}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`p-3 rounded-2xl ${platformSettings.tradingHalted ? 'bg-red-500 text-white' : isLight ? 'bg-black/[0.04] text-black/40' : 'bg-white/5 text-white/40'}`}>
-                                                <Lock size={20} />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-[11px] font-black uppercase">Trading Halted</h4>
-                                                <p className="text-[9px] opacity-40 font-bold uppercase mt-1">Kill Switch</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => updateSettings({ tradingHalted: !platformSettings.tradingHalted })}
-                                            className={`w-14 h-8 rounded-full relative p-1 transition-all ${platformSettings.tradingHalted ? 'bg-red-500' : 'bg-white/10'}`}
-                                        >
-                                            <motion.div
-                                                animate={{ x: platformSettings.tradingHalted ? 24 : 0 }}
-                                                className="w-6 h-6 rounded-full bg-white shadow-lg"
-                                            />
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] opacity-50 leading-relaxed font-medium">
-                                        Freezes all trading execution. Users can browse but cannot place bets.
-                                    </p>
-                                </div>
+                        {/* TAB — ADMINS & MODERATORS (root only) */}
+                        {secTab === 'team' && isRoot && (
+                        <div className="flex flex-col gap-3 min-h-0 flex-1">
+                            <div className="flex items-center justify-end">
+                                <button
+                                    onClick={() => setShowCreateAdmin(v => !v)}
+                                    className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${showCreateAdmin ? 'bg-white/5 border border-white/10 text-white/60' : 'bg-[#1A6140] text-white hover:brightness-110'}`}
+                                >
+                                    {showCreateAdmin ? 'Close form' : '+ New admin / mod'}
+                                </button>
                             </div>
 
-                            <div className="mt-8 p-6 bg-amber-500/5 border border-amber-500/20 rounded-[28px] flex items-center gap-6">
-                                <AlertTriangle size={32} className="text-amber-500 flex-none" />
-                                <div>
-                                    <h4 className="text-[10px] font-black uppercase text-amber-500 mb-1">Warning: Admin Authority</h4>
-                                    <p className="text-[9px] font-medium opacity-60">Changes to security protocols propagate globally in real-time. Ensure node synchronization before proceeding with major maintenance windows.</p>
-                                </div>
+                            {showCreateAdmin && (
+                                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 border-l-2 border-[#1A6140]/50 pl-3 py-1">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <input
+                                            value={newAdmin.email}
+                                            onChange={e => setNewAdmin(prev => ({ ...prev, email: e.target.value }))}
+                                            placeholder="email"
+                                            className={`px-4 py-2.5 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                        />
+                                        <input
+                                            type="password"
+                                            value={newAdmin.password}
+                                            onChange={e => setNewAdmin(prev => ({ ...prev, password: e.target.value }))}
+                                            placeholder="temp password (min 8)"
+                                            className={`px-4 py-2.5 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                        />
+                                        <div className="flex gap-2">
+                                            {[['admin', 'Admin'], ['moderator', 'Moderator']].map(([r, l]) => (
+                                                <button
+                                                    key={r}
+                                                    onClick={() => setNewAdmin(prev => ({ ...prev, role: r, permissions: ROLE_PRESETS[r] }))}
+                                                    className={`flex-1 py-2.5 rounded-2xl border text-[9px] font-black uppercase tracking-widest transition-all ${newAdmin.role === r ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
+                                                >
+                                                    {l}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {GRANTABLE_PERMS.map(p => {
+                                            const active = newAdmin.permissions.includes(p.tag);
+                                            return (
+                                                <button
+                                                    key={p.tag}
+                                                    onClick={() => setNewAdmin(prev => ({
+                                                        ...prev,
+                                                        permissions: active ? prev.permissions.filter(x => x !== p.tag) : [...prev.permissions, p.tag]
+                                                    }))}
+                                                    className={`px-3 py-2 rounded-xl border text-[8px] font-black uppercase tracking-widest transition-all ${active ? 'bg-[#1A6140]/15 text-[#1A6140] border-[#1A6140]/40' : isLight ? 'bg-white border-black/10 text-black/30' : 'bg-white/5 border-white/10 text-white/30'}`}
+                                                >
+                                                    {active && <Check size={9} className="inline mr-1" />} {p.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <button
+                                        onClick={createAdmin}
+                                        disabled={createAdminBusy || !newAdmin.email.trim() || newAdmin.password.length < 8}
+                                        className="w-full py-3 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                                    >
+                                        {createAdminBusy ? 'Creating…' : 'Create account'}
+                                    </button>
+                                </motion.div>
+                            )}
+
+                            <div className={`flex flex-col flex-1 min-h-0 overflow-y-auto no-scrollbar divide-y ${isLight ? 'divide-black/5' : 'divide-white/5'}`}>
+                                {rosterBusy && adminRoster.length === 0 ? (
+                                    <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">Loading roster…</div>
+                                ) : adminRoster.length === 0 ? (
+                                    <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">No admins found</div>
+                                ) : adminRoster.map(row => {
+                                    const isRootRow = row.role === 'root';
+                                    return (
+                                        <div key={row.id} className={`py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2 ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.05]'}`}>
+                                            <div className="min-w-0">
+                                                <div className={`text-[10px] font-black uppercase flex items-center gap-2 ${isLight ? 'text-black' : 'text-white'}`}>
+                                                    {row.email}
+                                                    {isRootRow ? (
+                                                        <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 text-[7px] font-black uppercase tracking-widest">Root</span>
+                                                    ) : (
+                                                        <span className={`px-2 py-0.5 rounded-full border text-[7px] font-black uppercase tracking-widest ${row.role === 'admin' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>{row.role}</span>
+                                                    )}
+                                                    {row.suspended && (
+                                                        <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest">Suspended</span>
+                                                    )}
+                                                </div>
+                                                <div className={`text-[8px] font-bold uppercase font-mono opacity-40 mt-0.5 ${isLight ? 'text-black' : 'text-white'}`}>
+                                                    {(row.permissions || []).includes('*') ? 'All permissions' : (row.permissions || []).map(p => GRANTABLE_PERMS.find(g => g.tag === p)?.label || p).join(' · ') || '—'}
+                                                </div>
+                                            </div>
+                                            {!isRootRow ? (
+                                                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                                                    {GRANTABLE_PERMS.map(p => {
+                                                        const active = (row.permissions || []).includes(p.tag);
+                                                        return (
+                                                            <button
+                                                                key={p.tag}
+                                                                onClick={() => setAdminPermission(row, p.tag)}
+                                                                title={p.label}
+                                                                className={`px-2 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-wide transition-all ${active ? 'bg-[#1A6140]/15 text-[#1A6140] border-[#1A6140]/40' : isLight ? 'bg-black/[0.03] border-black/10 text-black/25 hover:text-black/50' : 'bg-white/5 border-white/10 text-white/25 hover:text-white/50'}`}
+                                                            >
+                                                                {active && <Check size={8} className="inline mr-0.5" />} {p.tag.split('.')[1]}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                    <button
+                                                        onClick={() => setAdminRole(row, row.role === 'admin' ? 'moderator' : 'admin')}
+                                                        className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${isLight ? 'bg-black/[0.03] border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
+                                                    >
+                                                        {row.role === 'admin' ? '→ Mod' : '→ Admin'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setAdminSuspension(row, !row.suspended)}
+                                                        className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${row.suspended ? 'bg-[#1A6140] text-white border-[#1A6140]' : 'bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20'}`}
+                                                    >
+                                                        {row.suspended ? 'Unsuspend' : 'Suspend'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => removeAdmin(row)}
+                                                        className="px-2.5 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span className={`shrink-0 text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>Locked</span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        </AdminCard>
+                            <p className={`text-[8px] font-bold ${isLight ? 'text-black/30' : 'text-white/30'}`}>
+                                Permission toggles apply instantly. Removing an admin deletes their Supabase Auth account. Passwords are managed by Supabase Auth.
+                            </p>
+                        </div>
+                        )}
+
+                        {/* TAB — SECURITY PROTOCOLS */}
+                        {secTab === 'protocols' && canSettings && (
+                        <div className={`flex flex-col min-w-0 divide-y ${isLight ? 'divide-black/5' : 'divide-white/5'}`}>
+                            {/* Maintenance row */}
+                            <div className="py-4 flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <Settings size={18} className={`flex-none ${platformSettings.maintenanceMode ? 'text-[#1A6140]' : 'opacity-30'} ${platformSettings.maintenanceMode ? 'animate-spin-slow' : ''}`} />
+                                    <div className="min-w-0">
+                                        <h4 className={`text-[11px] font-black uppercase flex items-center gap-2 ${isLight ? 'text-black' : 'text-white'}`}>
+                                            Maintenance Mode
+                                            {platformSettings.maintenanceMode && <span className="px-2 py-0.5 rounded-full bg-[#1A6140]/10 text-[#1A6140] border border-[#1A6140]/30 text-[7px] font-black uppercase tracking-widest">Active</span>}
+                                        </h4>
+                                        <p className="text-[9px] opacity-40 font-medium mt-0.5">Full system lock — redirects all users to the maintenance screen. Prevents any interactions with the protocol.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => updateSettings({ maintenanceMode: !platformSettings.maintenanceMode })}
+                                    className={`w-14 h-8 rounded-full relative p-1 flex-none transition-all ${platformSettings.maintenanceMode ? 'bg-[#1A6140]' : isLight ? 'bg-black/20' : 'bg-white/10'}`}
+                                >
+                                    <motion.div
+                                        animate={{ x: platformSettings.maintenanceMode ? 24 : 0 }}
+                                        className="w-6 h-6 rounded-full bg-white shadow-lg"
+                                    />
+                                </button>
+                            </div>
+
+                            {/* Trading Halted row */}
+                            <div className="py-4 flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <Lock size={18} className={`flex-none ${platformSettings.tradingHalted ? 'text-red-500' : 'opacity-30'}`} />
+                                    <div className="min-w-0">
+                                        <h4 className={`text-[11px] font-black uppercase flex items-center gap-2 ${isLight ? 'text-black' : 'text-white'}`}>
+                                            Trading Halted
+                                            {platformSettings.tradingHalted && <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest">Frozen</span>}
+                                        </h4>
+                                        <p className="text-[9px] opacity-40 font-medium mt-0.5">Kill switch — freezes all trading execution. Users can browse but cannot place bets.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => updateSettings({ tradingHalted: !platformSettings.tradingHalted })}
+                                    className={`w-14 h-8 rounded-full relative p-1 flex-none transition-all ${platformSettings.tradingHalted ? 'bg-red-500' : isLight ? 'bg-black/20' : 'bg-white/10'}`}
+                                >
+                                    <motion.div
+                                        animate={{ x: platformSettings.tradingHalted ? 24 : 0 }}
+                                        className="w-6 h-6 rounded-full bg-white shadow-lg"
+                                    />
+                                </button>
+                            </div>
+
+                            {/* Admin authority note — plain on the background */}
+                            <div className="py-4 flex items-center gap-4">
+                                <AlertTriangle size={20} className="text-amber-500 flex-none" />
+                                <p className="text-[9px] font-medium opacity-50">
+                                    <span className="text-amber-500 font-black uppercase tracking-widest mr-2">Admin authority</span>
+                                    Changes propagate globally in real-time. Ensure node synchronization before proceeding with major maintenance windows.
+                                </p>
+                            </div>
+                        </div>
+                        )}
                     </div>
                 )}
 
@@ -1393,148 +1545,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </div>
                     </AdminCard>
                 )}
-            {activeNav === 'security' && isRoot && (
-                <AdminCard title="Admins & Moderators" icon={Shield} accent="#1A6140">
-                    <div className="flex flex-col gap-4">
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <p className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black' : 'text-white'}`}>
-                                Identity: Supabase Auth · root is permanent · permissions are granular
-                            </p>
-                            <button
-                                onClick={() => setShowCreateAdmin(v => !v)}
-                                className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${showCreateAdmin ? 'bg-white/5 border border-white/10 text-white/60' : 'bg-[#1A6140] text-white hover:brightness-110'}`}
-                            >
-                                {showCreateAdmin ? 'Close form' : '+ New admin / mod'}
-                            </button>
-                        </div>
-
-                        {showCreateAdmin && (
-                            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className={`p-5 rounded-3xl border flex flex-col gap-4 ${isLight ? 'bg-black/[0.03] border-black/10' : 'bg-black/30 border-white/10'}`}>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <input
-                                        value={newAdmin.email}
-                                        onChange={e => setNewAdmin(prev => ({ ...prev, email: e.target.value }))}
-                                        placeholder="email"
-                                        className={`px-4 py-3 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
-                                    />
-                                    <input
-                                        type="password"
-                                        value={newAdmin.password}
-                                        onChange={e => setNewAdmin(prev => ({ ...prev, password: e.target.value }))}
-                                        placeholder="temp password (min 8)"
-                                        className={`px-4 py-3 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
-                                    />
-                                    <div className="flex gap-2">
-                                        {[['admin', 'Admin'], ['moderator', 'Moderator']].map(([r, l]) => (
-                                            <button
-                                                key={r}
-                                                onClick={() => setNewAdmin(prev => ({ ...prev, role: r, permissions: ROLE_PRESETS[r] }))}
-                                                className={`flex-1 py-3 rounded-2xl border text-[9px] font-black uppercase tracking-widest transition-all ${newAdmin.role === r ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
-                                            >
-                                                {l}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {GRANTABLE_PERMS.map(p => {
-                                        const active = newAdmin.permissions.includes(p.tag);
-                                        return (
-                                            <button
-                                                key={p.tag}
-                                                onClick={() => setNewAdmin(prev => ({
-                                                    ...prev,
-                                                    permissions: active ? prev.permissions.filter(x => x !== p.tag) : [...prev.permissions, p.tag]
-                                                }))}
-                                                className={`px-3 py-2 rounded-xl border text-[8px] font-black uppercase tracking-widest transition-all ${active ? 'bg-[#1A6140]/15 text-[#1A6140] border-[#1A6140]/40' : isLight ? 'bg-white border-black/10 text-black/30' : 'bg-white/5 border-white/10 text-white/30'}`}
-                                            >
-                                                {active && <Check size={9} className="inline mr-1" />} {p.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <button
-                                    onClick={createAdmin}
-                                    disabled={createAdminBusy || !newAdmin.email.trim() || newAdmin.password.length < 8}
-                                    className="w-full py-3.5 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
-                                >
-                                    {createAdminBusy ? 'Creating…' : 'Create account'}
-                                </button>
-                            </motion.div>
-                        )}
-
-                        <div className="flex flex-col gap-2 max-h-[540px] overflow-y-auto no-scrollbar">
-                            {rosterBusy && adminRoster.length === 0 ? (
-                                <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">Loading roster…</div>
-                            ) : adminRoster.length === 0 ? (
-                                <div className="py-8 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">No admins found</div>
-                            ) : adminRoster.map(row => {
-                                const isRootRow = row.role === 'root';
-                                return (
-                                    <div key={row.id} className={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
-                                        <div className="min-w-0">
-                                            <div className={`text-[10px] font-black uppercase flex items-center gap-2 ${isLight ? 'text-black' : 'text-white'}`}>
-                                                {row.email}
-                                                {isRootRow ? (
-                                                    <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 text-[7px] font-black uppercase tracking-widest">Root</span>
-                                                ) : (
-                                                    <span className={`px-2 py-0.5 rounded-full border text-[7px] font-black uppercase tracking-widest ${row.role === 'admin' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>{row.role}</span>
-                                                )}
-                                                {row.suspended && (
-                                                    <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest">Suspended</span>
-                                                )}
-                                            </div>
-                                            <div className={`text-[8px] font-bold uppercase font-mono opacity-40 mt-1 ${isLight ? 'text-black' : 'text-white'}`}>
-                                                {(row.permissions || []).includes('*') ? 'All permissions' : (row.permissions || []).map(p => GRANTABLE_PERMS.find(g => g.tag === p)?.label || p).join(' · ') || '—'}
-                                            </div>
-                                        </div>
-                                        {!isRootRow ? (
-                                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                                                {GRANTABLE_PERMS.map(p => {
-                                                    const active = (row.permissions || []).includes(p.tag);
-                                                    return (
-                                                        <button
-                                                            key={p.tag}
-                                                            onClick={() => setAdminPermission(row, p.tag)}
-                                                            title={p.label}
-                                                            className={`px-2 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-wide transition-all ${active ? 'bg-[#1A6140]/15 text-[#1A6140] border-[#1A6140]/40' : isLight ? 'bg-black/[0.03] border-black/10 text-black/25 hover:text-black/50' : 'bg-white/5 border-white/10 text-white/25 hover:text-white/50'}`}
-                                                        >
-                                                            {active && <Check size={8} className="inline mr-0.5" />} {p.tag.split('.')[1]}
-                                                        </button>
-                                                    );
-                                                })}
-                                                <button
-                                                    onClick={() => setAdminRole(row, row.role === 'admin' ? 'moderator' : 'admin')}
-                                                    className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${isLight ? 'bg-black/[0.03] border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
-                                                >
-                                                    {row.role === 'admin' ? '→ Mod' : '→ Admin'}
-                                                </button>
-                                                <button
-                                                    onClick={() => setAdminSuspension(row, !row.suspended)}
-                                                    className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${row.suspended ? 'bg-[#1A6140] text-white border-[#1A6140]' : 'bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20'}`}
-                                                >
-                                                    {row.suspended ? 'Unsuspend' : 'Suspend'}
-                                                </button>
-                                                <button
-                                                    onClick={() => removeAdmin(row)}
-                                                    className="px-2.5 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all"
-                                                >
-                                                    Remove
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <span className={`shrink-0 text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>Locked</span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <p className={`text-[8px] font-bold ${isLight ? 'text-black/30' : 'text-white/30'}`}>
-                            Permission toggles apply instantly. Removing an admin deletes their Supabase Auth account. Passwords are managed by Supabase Auth.
-                        </p>
-                    </div>
-                </AdminCard>
-            )}
             <AnimatePresence>
                 {cancelFor != null && (
                     <motion.div
