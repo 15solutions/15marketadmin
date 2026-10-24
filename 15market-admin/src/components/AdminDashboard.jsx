@@ -752,15 +752,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     );
 
     return (
-        <div className={`h-screen w-full flex overflow-hidden relative ${isLight ? 'bg-[#F4F7F5] text-black' : 'bg-[#050505] text-white'}`}>
+        <div className={`h-[100dvh] md:h-screen w-full flex overflow-hidden relative ${isLight ? 'bg-[#F4F7F5] text-black' : 'bg-[#050505] text-white'}`}>
             {/* Background Flair */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#1A6140]/5 rounded-full blur-[120px]" />
                 <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#1A6140]/3 rounded-full blur-[120px]" />
             </div>
 
-            {/* Sidebar — the extendable operations menu */}
-            <nav className={`relative z-50 flex-none flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-white/60 border-[#1A6140]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
+            {/* Sidebar — desktop operations menu (mobile gets the tab bar) */}
+            <nav className={`relative z-50 flex-none hidden md:flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-white/60 border-[#1A6140]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
                 {/* Brand head */}
                 <div className="flex-none px-5 pt-5 pb-4 flex items-center gap-3 overflow-hidden">
                     <img src="/logo.png" alt="15market" className="w-10 h-10 rounded-2xl object-contain flex-none" />
@@ -847,12 +847,39 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             {/* Main column */}
             <div className="flex-1 flex flex-col min-w-0">
 
+                {/* MOBILE top bar — brand + quick identity, above the scroller */}
+                <div className={`md:hidden flex-none flex items-center gap-3 px-4 py-2.5 border-b backdrop-blur-3xl z-40 ${isLight ? 'bg-white/60 border-black/5' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
+                    <img src="/logo.png" alt="15market" className="w-8 h-8 rounded-xl object-contain flex-none" />
+                    <div className="flex flex-col min-w-0">
+                        <span className={`text-sm font-black uppercase tracking-tighter truncate ${isLight ? 'text-black' : 'text-white'}`}>15market</span>
+                        <span className="text-[7px] font-black uppercase tracking-[0.3em] text-[#1A6140]">Operations</span>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                        <button
+                            onClick={toggleTheme}
+                            title="Switch theme"
+                            className={`p-2.5 rounded-xl transition-all active:scale-95 ${isLight ? 'bg-black/[0.04] text-black/50' : 'bg-white/5 text-white/50'}`}
+                        >
+                            {isLight ? <Moon size={15} /> : <Sun size={15} />}
+                        </button>
+                        {auth?.email && (
+                            <button
+                                onClick={auth.signOut || auth.onSignOut}
+                                title={auth.email}
+                                className={`p-2.5 rounded-xl transition-all active:scale-95 ${isLight ? 'bg-black/[0.04] text-black/40 hover:text-red-500' : 'bg-white/5 text-white/40 hover:text-red-500'}`}
+                            >
+                                <LogOut size={15} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
                 {/* Market scroller — full-bleed across the screen, under the menu */}
                 <div className={`flex-none w-full overflow-hidden relative border-b ${isLight ? 'border-black/5' : 'border-white/5'}`}>
                     <GlobalTradeScroller theme={themeState} />
                 </div>
 
-            <main className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-6 lg:p-8 z-10">
+            <main className="flex-1 overflow-y-auto no-scrollbar p-4 pb-32 md:pb-6 md:p-6 lg:p-8 lg:pb-6 z-10">
 
                 {activeNav === 'overview' && (
                 <div className="w-full flex flex-col gap-6 min-w-0">
@@ -940,7 +967,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             {act.direction === 'UP' ? '▲ Up' : '▼ Down'}
                                         </div>
                                         <div className={`lg:block text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</div>
-                                        <div className="min-w-0 w-[92px]">
+                                        <div className="min-w-0 w-full sm:w-[92px] sm:flex-none">
                                             {act.pending && act.settleAt && !act.settled ? (
                                                 (() => {
                                                     const start = Number(act.timestamp || act.createdAt) || (act.settleAt - 15000);
@@ -987,7 +1014,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-w-0 items-start">
 
                         {/* LEFT — HUD readouts floating directly on the background */}
-                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 flex flex-col justify-between gap-4 xl:pr-2">
+                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 grid grid-cols-2 gap-3 lg:flex lg:flex-col lg:justify-between lg:gap-4 xl:pr-2">
                             {[
                                 { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7' },
                                 { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6' },
@@ -1003,7 +1030,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
                         {/* CENTER — the big route globe, no card, on the raw background */}
                         <div className="lg:col-span-8 xl:col-span-6 min-w-0">
-                            <div className="relative w-full h-[440px] xl:h-[540px]">
+                            <div className="relative w-full h-[320px] sm:h-[420px] xl:h-[540px]">
                                 <RouteGlobe hub={globeHub} places={globePlaces} theme={globeTheme} />
                             </div>
                             <div className="flex items-center justify-center gap-2 mt-1 pointer-events-none">
@@ -1013,7 +1040,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </div>
 
                         {/* RIGHT — HUD readouts floating directly on the background */}
-                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 flex flex-col justify-between gap-4 xl:pl-2">
+                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 grid grid-cols-2 gap-3 lg:flex lg:flex-col lg:justify-between lg:gap-4 xl:pl-2">
                             {[
                                 { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
                                 { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371' },
@@ -1733,8 +1760,34 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
              </AnimatePresence>
              </main>
 
+            {/* MOBILE bottom tab bar — the five sections, glass strip, safe-area aware.
+                Badges (pending withdrawals) show as amber dots. */}
+            <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] flex items-stretch border-t backdrop-blur-3xl px-1.5 pt-1 overflow-x-auto no-scrollbar ${isLight ? 'bg-white/85 border-black/10' : 'bg-[#0A0A0A]/90 border-white/10'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
+                {visibleNav.map(t => {
+                    const Icon = t.icon;
+                    const active = activeNav === t.key;
+                    const badge = t.key === 'referrals' ? refWithdrawals.filter(w => w.status === 'pending').length : 0;
+                    return (
+                        <button
+                            key={t.key}
+                            onClick={() => selectSection(t.key)}
+                            className={`relative flex-1 min-w-[64px] flex flex-col items-center gap-1 py-2 rounded-2xl transition-all active:scale-95 ${active
+                                ? 'text-[#3CB371]'
+                                : isLight ? 'text-black/40' : 'text-white/40'}`}
+                        >
+                            {active && <motion.div layoutId="mob-tab-dot" className="absolute top-0 h-[3px] w-7 rounded-full bg-[#3CB371]" />}
+                            <Icon size={18} className="flex-none" />
+                            <span className="text-[6.5px] font-black uppercase tracking-widest truncate max-w-full">{t.label}</span>
+                            {badge > 0 && (
+                                <span className="absolute top-1 right-2 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[7px] font-black leading-none">{badge}</span>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+
             {/* Persistence Layer Status — slim strip inside the main column */}
-            <footer className={`flex-none px-6 py-2.5 border-t backdrop-blur-3xl flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#0A0A0A]/60 border-white/5'}`}>
+            <footer className={`hidden md:flex flex-none px-6 py-2.5 border-t backdrop-blur-3xl flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#0A0A0A]/60 border-white/5'}`}>
                 <div className="flex items-center gap-5 min-w-0">
                     <div className="flex items-center gap-2">
                         <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[#1A6140]' : 'bg-red-500'} animate-pulse`} />
