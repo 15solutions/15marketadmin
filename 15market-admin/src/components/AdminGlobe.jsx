@@ -65,11 +65,6 @@ export function AdminGlobe({ theme = 'dark', countries = {}, pulse = [] }) {
 
     return (
         <div className="relative w-full h-full flex items-center justify-center min-w-0">
-            {/* Soft green bloom behind the globe */}
-            <div
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[58%] aspect-square rounded-full pointer-events-none"
-                style={{ background: '#1A6140', filter: 'blur(80px)', opacity: isLight ? 0.12 : 0.22 }}
-            />
             <GlobePulse
                 markers={markers}
                 visibleCount={pulseMarkers.length}

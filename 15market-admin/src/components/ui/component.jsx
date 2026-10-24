@@ -43,7 +43,7 @@ const SCHEMES = {
             mapBrightness: 6,
             baseColor: [0.3, 0.3, 0.3],          // pure-black sphere (do not darken)
             markerColor: [0.24, 0.7, 0.44],
-            glowColor: [0.02, 0.1, 0.06],        // deep green rim glow
+            glowColor: [0.02, 0.02, 0.03],       // neutral rim glow — no green haze around the ball
             opacity: 0.85,
         },
         tint: { color: BRAND, mode: "multiply" },
