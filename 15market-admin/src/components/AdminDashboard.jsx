@@ -155,6 +155,16 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     // -----------------------------------------------------------------------
 
     const [recentActivity, setRecentActivity] = useState([]);
+
+    // Realtime beam clock — ticks only while a trade in the feed is pending.
+    const [feedNow, setFeedNow] = useState(() => Date.now());
+    const pendingFeedCount = useMemo(() => recentActivity.filter(t => t.pending && t.settleAt && !t.settled).length, [recentActivity]);
+    const feedAt = pendingFeedCount ? feedNow : 0;
+    useEffect(() => {
+        if (!pendingFeedCount) return;
+        const iv = setInterval(() => setFeedNow(Date.now()), 250);
+        return () => clearInterval(iv);
+    }, [pendingFeedCount]);
     const [userProfiles, setUserProfiles] = useState({});
     // Referral commission withdrawal requests (manual payouts — not on-chain).
     const [refWithdrawals, setRefWithdrawals] = useState([]);
@@ -382,11 +392,90 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 .catch(() => {});
         };
 
-        // 2. New Trade (Sub-second Indexing)
-        const unbindTrades = socketService.on('new_trade', (trade) => {
-            setRecentActivity(prev => [trade, ...prev].slice(0, 50));
-            if (trade.userAddr) fetchProfile(trade.userAddr);
-            pingUserCountry(trade.userAddr || trade.owner);
+        // 2. Trade Index (fully event-driven, realtime)
+        // The backend broadcasts global_trade_executed the moment a user's
+        // POST /session/execute lands (full trade object with settleAt), and
+        // global_trade_settled when the verdict locks. The admin rows mirror
+        // that lifecycle: entry -> countdown beam -> WON/LOST + payout.
+        const normalizeIncomingTrade = (t) => {
+            if (!t) return null;
+            const createdAt = t.createdAt || t.timestamp || Date.now();
+            const duration = Number(t.duration) > 0 ? Number(t.duration) : 15;
+            const settleAt = t.settleAt || (createdAt + duration * 1000);
+            const dirRaw = String(t.direction ?? t.dir ?? '').toUpperCase();
+            return {
+                id: String(t.id || t.betId || `${Date.now()}:${Math.random()}`),
+                betId: String(t.betId || t.id || ''),
+                userAddr: t.userAddr || t.owner || '',
+                owner: t.userAddr || t.owner || '',
+                symbol: String(t.symbol || 'BTC').toUpperCase(),
+                amount: t.amount,
+                shares: t.shares || t.amount,
+                entryPrice: t.entryPrice ?? null,
+                direction: dirRaw === '1' || dirRaw === 'UP' || dirRaw === 'LONG' ? 'UP' : 'DOWN',
+                timestamp: createdAt,
+                duration,
+                settleAt,
+                type: 'TRADE_PLACED',
+                pending: true,
+                settled: false,
+                won: null,
+                payout: null,
+                exitPrice: null,
+            };
+        };
+
+        const upsertIndexedTrade = (row) => {
+            setRecentActivity(prev => {
+                const key = row.betId || row.id;
+                const rest = prev.filter(x => (x.betId || x.id) !== key);
+                return [row, ...rest].slice(0, 60);
+            });
+        };
+
+        const bindExecuted = socketService.on('global_trade_executed', (trade) => {
+            const row = normalizeIncomingTrade(trade);
+            if (!row) return;
+            upsertIndexedTrade(row);
+            if (row.userAddr) fetchProfile(row.userAddr);
+            pingUserCountry(row.userAddr || row.owner);
+        });
+        // Back-compat alias (orig design event; harmless if the backend never fires it)
+        const unbindTradesLegacy = socketService.on('new_trade', (trade) => {
+            const row = normalizeIncomingTrade(trade);
+            if (!row) return;
+            upsertIndexedTrade(row);
+            if (row.userAddr) fetchProfile(row.userAddr);
+            pingUserCountry(row.userAddr || row.owner);
+        });
+
+        // Settlement: merge the verdict into the exact indexed row (matched by
+        // betId). If the entry push was missed (admin connected mid-flight),
+        // settle merges into any snapshot row or the head instead of vanishing.
+        const bindSettled = socketService.on('global_trade_settled', (res) => {
+            if (!res) return;
+            const key = String(res.betId || res.tradeId || res.id || '');
+            setRecentActivity(prev => {
+                const idx = prev.findIndex(x => String(x.betId || x.id) === key);
+                if (idx === -1) {
+                    // Result without a witnessed entry: still index it.
+                    const row = normalizeIncomingTrade(res);
+                    if (!row) return prev;
+                    return [{ ...row, pending: false, settled: true, won: !!res.won, payout: res.payout ?? 0, exitPrice: res.exitPrice ?? null, timestamp: Date.now(), type: 'TRADE_SETTLED' }, ...prev].slice(0, 60);
+                }
+                const next = [...prev];
+                next[idx] = {
+                    ...next[idx],
+                    pending: false,
+                    settled: true,
+                    settledAt: Date.now(),
+                    won: !!res.won,
+                    status: res.status || (res.won ? 'WON' : 'LOST'),
+                    payout: res.payout ?? next[idx].payout ?? 0,
+                    exitPrice: res.exitPrice ?? null,
+                };
+                return next;
+            });
         });
 
         // 3. User Onboarding (Geo Pin)
@@ -395,14 +484,30 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             pingUserCountry(user.address);
         });
 
-        // 4. Recent activity history for the Overview feed.
+        // 4. Recent activity history for the Overview feed (snapshot; the
+        //    socket pushes above keep it live afterwards).
         const fetchHistory = async () => {
             try {
                 const histRes = await fetch(`${KEEPER_URL_ARC}/history`);
                 if (histRes.ok) {
                     const histData = await histRes.json();
-                    setRecentActivity(histData.slice(0, 50));
-                    histData.slice(0, 20).forEach(h => {
+                    const seen = new Set();
+                    const rows = (histData || []).slice(0, 60).map(h => {
+                        const row = normalizeIncomingTrade(h);
+                        if (row && row.betId) seen.add(row.betId);
+                        // Snapshot rows are finished trades unless settleAt is in the future.
+                        if (row && (h.won === true || h.won === false || h.settledAt)) {
+                            row.pending = false;
+                            row.settled = true;
+                            row.type = 'TRADE_SETTLED';
+                            row.won = !!h.won;
+                            row.payout = h.payout ?? null;
+                            row.exitPrice = h.exitPrice ?? null;
+                        }
+                        return row;
+                    });
+                    setRecentActivity(rows);
+                    (histData || []).slice(0, 20).forEach(h => {
                         if (h.owner) fetchProfile(h.owner);
                         if (h.userAddr) fetchProfile(h.userAddr);
                     });
@@ -414,7 +519,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         return () => {
             unbindMetrics();
             unbindMetrics2();
-            unbindTrades();
+            bindExecuted();
+            bindSettled();
+            unbindTradesLegacy();
             unbindUsers();
         };
     }, []);
@@ -823,13 +930,45 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 <div className="text-[8px] opacity-40 font-bold uppercase font-mono truncate lg:hidden">{act.symbol} • ${act.amount}</div>
                                             </div>
                                         </div>
-                                        <div className={`hidden lg:block text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black' : 'text-white'}`}>{act.symbol || '—'}</div>
+                                        <div className="hidden lg:flex flex-col min-w-0">
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black' : 'text-white'}`}>{act.symbol || '—'}</span>
+                                            {act.entryPrice != null && (
+                                                <span className="text-[7px] font-mono opacity-40 uppercase">entry {Number(act.entryPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+                                            )}
+                                        </div>
                                         <div className={`hidden lg:flex items-center justify-center px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
                                             {act.direction === 'UP' ? '▲ Up' : '▼ Down'}
                                         </div>
                                         <div className={`lg:block text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</div>
-                                        <div className={`text-[10px] font-black lg:text-[10px] ${act.won ? 'text-[#1A6140]' : (act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
-                                            {act.type === 'TRADE_PLACED' ? 'PENDING' : (act.won ? `WON +$${act.payout}` : 'LOST')}
+                                        <div className="min-w-0 w-[92px]">
+                                            {act.pending && act.settleAt && !act.settled ? (
+                                                (() => {
+                                                    const start = Number(act.timestamp || act.createdAt) || (act.settleAt - 15000);
+                                                    const span = Math.max(1000, act.settleAt - start);
+                                                    const beamPct = Math.max(0, Math.min(100, ((feedAt - start) / span) * 100));
+                                                    const gone = feedAt >= act.settleAt;
+                                                    const secsLeft = Math.max(1, Math.ceil((act.settleAt - feedAt) / 1000));
+                                                    return (
+                                                        <>
+                                                            <div className={`h-1 rounded-full overflow-hidden ${isLight ? 'bg-black/10' : 'bg-white/10'}`}>
+                                                                <div
+                                                                    className="h-full rounded-full bg-amber-500 transition-[width] duration-200 ease-linear"
+                                                                    style={{ width: `${beamPct}%` }}
+                                                                />
+                                                            </div>
+                                                            <div className={`text-[8px] font-black uppercase tracking-widest mt-1 ${gone ? 'text-red-500 animate-pulse' : 'text-amber-500'}`}>
+                                                                {gone ? 'Resolving…' : `${secsLeft}s`}
+                                                            </div>
+                                                        </>
+                                                    );
+                                                })()
+                                            ) : (
+                                                <div className={`text-[10px] font-black uppercase tracking-wide ${act.won ? 'text-[#1A6140]' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
+                                                    {act.won
+                                                        ? <span>WON +${Number(act.payout || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}{act.exitPrice ? <span className="opacity-50 font-mono text-[8px] ml-1">exit {act.exitPrice}</span> : null}</span>
+                                                        : (act.settled ? 'LOST' : (act.pending ? 'PENDING' : (act.type === 'TRADE_PLACED' ? 'PENDING' : 'LOST')))}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="text-[8px] opacity-30 font-mono">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                     </motion.div>
