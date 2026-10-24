@@ -137,16 +137,18 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     // effect from re-initializing on unrelated renders.
     const globeTheme = isLight ? {
         ground: "transparent",
-        land: "#2E6B49",
+        land: "#7E9A8C",
         arc: "#1A6140",
-        glow: "rgba(26, 97, 64, 0.18)",
+        glow: "rgba(26, 97, 64, 0.12)",
         text: "#0A261A",
         muted: "#52705E",
     } : {
+        // Muted slate-sage so continents read quietly, like the reference's
+        // gray-blue land — the arcs carry the color instead.
         ground: "transparent",
-        land: "#57C790",
-        arc: "#3CB371",
-        glow: "rgba(60, 179, 113, 0.16)",
+        land: "#48695A",
+        arc: "#4FB57F",
+        glow: "rgba(60, 179, 113, 0.10)",
         text: "#EAF7EF",
         muted: "#7FB396",
     };

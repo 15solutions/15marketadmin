@@ -72,10 +72,12 @@ export function drawGlobe(ctx, dots, vp, land, dotSize, glow) {
     ctx.fill();
     ctx.restore();
 
-    // land dots, backface-culled, limb-darkened
+    // land dots — subtle, so the shape reads instead of blinding: fine grains,
+    // low base alpha, only front-facing dots visible, gentle limb darkening.
     const cY = Math.cos(yaw), sY = Math.sin(yaw);
     const cT = Math.cos(tilt), sT = Math.sin(tilt);
     ctx.fillStyle = land;
+    const grain = Math.max(1.15, r / 190);
     for (let i = 0; i < dots.length; i++) {
         const v = dots[i];
         const x1 = v[0] * cY + v[2] * sY;
@@ -84,8 +86,8 @@ export function drawGlobe(ctx, dots, vp, land, dotSize, glow) {
         const z2 = y1 * sT + z1 * cT;
         if (z2 < 0) continue;
         const y2 = y1 * cT - z1 * sT;
-        ctx.globalAlpha = 0.32 + 0.68 * z2;
-        ctx.fillRect(cx + x1 * r, cy - y2 * r, dotSize, dotSize);
+        ctx.globalAlpha = 0.22 + 0.42 * z2;
+        ctx.fillRect(cx + x1 * r, cy - y2 * r, grain, grain);
     }
     ctx.globalAlpha = 1;
 }
