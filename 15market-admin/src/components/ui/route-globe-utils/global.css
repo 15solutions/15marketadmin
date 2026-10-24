@@ -1,0 +1,69 @@
+/* RouteGlobe host styles — imports automatically via route-globe.jsx */
+.rg {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 24px;
+    font-family: "Comfortaa", ui-sans-serif, system-ui, sans-serif;
+}
+
+.rg__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+}
+
+.rg[data-dragging] .rg__canvas {
+    cursor: grabbing;
+}
+
+.rg__tip {
+    position: absolute;
+    transform: translate(14px, -50%);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(6, 18, 12, 0.86);
+    border: 1px solid rgba(60, 179, 113, 0.4);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    z-index: 3;
+    white-space: nowrap;
+}
+
+.rg__tip strong {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.rg__tip span {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--rg-muted);
+}
+
+/* Screen-reader route list — present in the DOM but never painted. */
+.rg__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+}
+
+.rg__sr li {
+    list-style: none;
+    margin: 0;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Shield,
@@ -44,7 +44,9 @@ import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
 import { GlobalTradeScroller } from "./GlobalTradeScroller";
 import { socketService } from "../utils/socket";
-import { AdminMap, COUNTRY_CENTER } from "./AdminMap";
+import { COUNTRY_CENTER } from "./ui/places";
+import { RouteGlobe } from "./ui/route-globe";
+import WORLD from "../assets/worldPaths.json";
 
 // Sidebar navigation: collapsible icon rail ↔ full menu. "Referral Program"
 // hosts the participants list (with earnings), the withdrawal request queue
@@ -97,6 +99,58 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         userCountries: {}
     });
     const [pulse, setPulse] = useState([]); // transient globe flashes {id, lat, lng}
+
+    // --- RouteGlobe data wiring -------------------------------------------
+    // ISO -> display name (from the offline atlas asset), memoized once.
+    const isoNames = useMemo(() => {
+        const m = {};
+        for (const c of (WORLD.countries || [])) m[String(c.iso2 || '').toUpperCase()] = c.name;
+        return m;
+    }, []);
+
+    // Top user countries become the globe's route destinations. Memoized on a
+    // serialized key so 10s stat refreshes don't restart the globe animation.
+    const globePlaces = useMemo(() => {
+        const entries = Object.entries(stats.userCountries || {})
+            .filter(([iso]) => COUNTRY_CENTER[String(iso).toUpperCase()])
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+        const key = JSON.stringify(entries);
+        void key; // eslint wants deps; the JSON IS the dependency
+        return entries.map(([iso, count], i) => {
+            const c = COUNTRY_CENTER[String(iso).toUpperCase()];
+            return { name: isoNames[iso] || iso, lon: c[1], lat: c[0], note: `${Number(count).toLocaleString()} users · ${iso}` };
+        });
+    }, [JSON.stringify(stats.userCountries || {}), isoNames]);
+
+    // The busiest country is the hub routes fly from.
+    const globeHub = useMemo(() => {
+        if (globePlaces.length) {
+            const { name, lon, lat } = globePlaces[0];
+            return { name: `${name} · HQ`, lon, lat };
+        }
+        // Neutral fallback so the globe still spins before data lands.
+        return { name: "Global", lon: 0, lat: 20 };
+    }, [globePlaces]);
+
+    // Brand tint on both themes. Module-identical objects keep the RouteGlobe
+    // effect from re-initializing on unrelated renders.
+    const globeTheme = isLight ? {
+        ground: "transparent",
+        land: "#2E6B49",
+        arc: "#1A6140",
+        glow: "rgba(26, 97, 64, 0.18)",
+        text: "#0A261A",
+        muted: "#52705E",
+    } : {
+        ground: "transparent",
+        land: "#57C790",
+        arc: "#3CB371",
+        glow: "rgba(60, 179, 113, 0.16)",
+        text: "#EAF7EF",
+        muted: "#7FB396",
+    };
+    // -----------------------------------------------------------------------
 
     const [recentActivity, setRecentActivity] = useState([]);
     const [userProfiles, setUserProfiles] = useState({});
@@ -780,11 +834,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 </div>
                 )}
 
-                {/* ANALYTICS — glowing 3D world map center; the metrics panels wrap around it */}
+                {/* ANALYTICS — big glowing route globe center; data panels and
+                    charts hug it on the background */}
                 {activeNav === 'analytics' && (
                 <div className="w-full flex flex-col gap-6 min-w-0">
 
-                    {/* the world map headline boxes: four panels hug the map left/right */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-w-0 items-start">
 
                         {/* LEFT panel — core platform metrics as compact boxes */}
@@ -808,10 +862,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             ))}
                         </div>
 
-                        {/* CENTER — the glowing 3D world map */}
+                        {/* CENTER — the big route globe, no card, on the raw background */}
                         <div className="lg:col-span-8 xl:col-span-6 min-w-0">
-                            <div className="relative w-full h-[300px] lg:h-[360px]">
-                                <AdminMap theme={themeState} countries={stats.userCountries} pulse={pulse} />
+                            <div className="relative w-full h-[440px] xl:h-[540px]">
+                                <RouteGlobe hub={globeHub} places={globePlaces} theme={globeTheme} />
                             </div>
                             <div className="flex items-center justify-center gap-2 mt-1 pointer-events-none">
                                 <div className="w-1.5 h-1.5 rounded-full bg-[#3CB371] animate-pulse" />
@@ -819,7 +873,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         </div>
 
-                        {/* RIGHT panel — market pulse + top countries */}
+                        {/* RIGHT panel — market pulse stack */}
                         <div className="lg:col-span-2 xl:col-span-3 min-w-0 flex flex-col gap-3">
                             {[
                                 { label: 'Users Live Now', value: String(stats.activeCount | 0), icon: Flame, color: '#22c55e' },
