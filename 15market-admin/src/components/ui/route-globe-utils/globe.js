@@ -48,21 +48,35 @@ export function landDots(count = 30000) {
     return count >= landCache.length ? landCache : landCache.slice(0, count);
 }
 
-// Sphere rendering: rim glow + front-facing land dot cloud. Dots are their
-// brightest dead-center and fall off toward the limb like real optics.
+// Sphere rendering: blooming atmosphere + front-facing land dot cloud.
+// The globe's edge is a GLOW that starts at the limb and melts outward,
+// with a faint haze inside the limb too — never a hard ring or solid disc.
 export function drawGlobe(ctx, dots, vp, land, grain, glow) {
     const { cx, cy, r, yaw, tilt } = vp;
     ctx.globalAlpha = 1;
 
-    // atmospheric rim glow — a ring just outside the sphere
+    // Outer bloom — the glow circle: holds its light right at the limb,
+    // then decays fast within a thin band of air around it (~0.28r).
     ctx.save();
-    const halo = ctx.createRadialGradient(cx, cy, r * 0.94, cx, cy, r * 1.24);
-    halo.addColorStop(0, glow);
-    halo.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = halo;
+    const bloom = ctx.createRadialGradient(cx, cy, r * 0.98, cx, cy, r * 1.26);
+    bloom.addColorStop(0, glow);
+    bloom.addColorStop(0.3, glow);
+    bloom.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = bloom;
     ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.24, 0, Math.PI * 2);
-    ctx.arc(cx, cy, r * 0.94, 0, Math.PI * 2, true);
+    ctx.arc(cx, cy, r * 1.26, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Inner haze — transparent through most of the ball, whisper of blue
+    // rising toward the limb so the edge reads luminous from inside.
+    ctx.save();
+    const haze = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r);
+    haze.addColorStop(0.7, "rgba(0,0,0,0)");
+    haze.addColorStop(1, glow);
+    ctx.fillStyle = haze;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
