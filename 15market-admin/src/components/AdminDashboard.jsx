@@ -44,7 +44,7 @@ import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
 import { GlobalTradeScroller } from "./GlobalTradeScroller";
 import { socketService } from "../utils/socket";
-import { AdminGlobe, COUNTRY_CENTER } from "./AdminGlobe";
+import { AdminMap, COUNTRY_CENTER } from "./AdminMap";
 
 // Sidebar navigation: collapsible icon rail ↔ full menu. "Referral Program"
 // hosts the participants list (with earnings), the withdrawal request queue
@@ -801,10 +801,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 {activeNav === 'analytics' && (
                 <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 min-w-0 items-start">
 
-                    {/* Globe — always fully visible, nothing boxed around it */}
+                    {/* World map — dot-matrix continents, brand-tinted user
+                        countries, ISO pins, info cards and live-trade pulses */}
                     <div className="lg:col-span-5 min-w-0">
                         <div className="relative w-full h-[330px] lg:h-[380px]">
-                            <AdminGlobe theme={themeState} countries={stats.userCountries} pulse={pulse} />
+                            <AdminMap theme={themeState} countries={stats.userCountries} pulse={pulse} />
                         </div>
                         <div className="flex items-center justify-center gap-2 mt-2 pointer-events-none">
                             <div className="w-1.5 h-1.5 rounded-full bg-[#3CB371] animate-pulse" />
