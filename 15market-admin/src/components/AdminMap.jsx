@@ -1,14 +1,13 @@
-// Admin flat world map ("reference dashboard" style): dot-matrix world on the
-// background, brand-tinted blobs over countries with registered users, ISO
-// badge pins sized by user count, glass info cards for the top countries,
-// animated arcs and live-trade pulse rings.
+// Admin flat world map, reference-dashboard style: SOLID extruded continents
+// (floating-island 3D look), glowing along the coastlines, biome-shaded by
+// latitude like the reference (lush tropics, dry mid-belt, cold poles).
+// Countries with registered users glow brand green; ISO badge pins, glass info
+// cards, animated arcs and live-trade pulse rings sit on top.
 //
-// Built on the bundled dotted-map landmass dataset (no network, no assets):
-// its projection is x = (lng + 180) / 360 * COLS with a curved latitude axis,
-// inverted below through a runtime lookup table so every land dot knows its own
-// lat/lng (needed to tint countries without per-country polygon data).
+// The geometry is preprojected offline into src/assets/worldPaths.json
+// (equirectangular 360x140 viewbox, keyed by ISO-2) — zero network at runtime.
 import { useMemo } from "react";
-import DottedMap from "dotted-map";
+import WORLD from "../assets/worldPaths.json";
 
 // Approximate geographic centers per ISO alpha-2 code (enough to pin
 // countries without shipping a full geocoder to the admin bundle).
@@ -39,117 +38,89 @@ export const COUNTRY_CENTER = {
     AU: [-25.3, 133.8], NZ: [-40.9, 174.9], FJ: [-17.7, 178.0],
 };
 
-const HEIGHT = 56;          // lattice rows of the dot matrix
-const COLS = 118;           // lattice columns (dotted-map at height 56)
-const VB_W = COLS + 2;      // viewBox width (1 unit padding each side)
-const VB_H = HEIGHT + 2;    // viewBox height
+const { vbW: VMW, vbH: VMH } = WORLD;
 
-// Binned color strengths for user-country blobs (closer = stronger).
+// Equirectangular projection matching the prebuilt asset: x = lon + 180, y = 84 - lat.
+export function project(lon, lat) {
+    return { x: lon + 180, y: 84 - lat };
+}
+
+function mix(c1, c2, t) {
+    const a = [parseInt(c1.slice(1, 3), 16), parseInt(c1.slice(3, 5), 16), parseInt(c1.slice(5, 7), 16)];
+    const b = [parseInt(c2.slice(1, 3), 16), parseInt(c2.slice(3, 5), 16), parseInt(c2.slice(5, 7), 16)];
+    const r = a.map((v, i) => Math.round(v + (b[i] - v) * t));
+    return `rgb(${r[0]},${r[1]},${r[2]})`;
+}
+
 export function AdminMap({ theme = 'dark', countries = {}, pulse = [] }) {
     const isLight = theme === 'light';
-    const accent = isLight ? '#1A6140' : '#3CB371';
 
-    // One dotted-map instance + inverted projection: every land dot gets its
-    // own lat/lng so registered countries can be tinted precisely.
-    const world = useMemo(() => {
-        const map = new DottedMap({ height: HEIGHT });
-        // Piecewise y -> lat table built from the lib's own projection.
-        const yToLat = new Map();
-        for (let lat = -60; lat <= 85.001; lat += 0.25) {
-            const y = map.getPin({ lat, lng: 0 }).y;
-            if (!yToLat.has(y)) yToLat.set(y, []);
-            yToLat.get(y).push(lat);
+    const active = useMemo(() => {
+        const m = {};
+        Object.entries(countries || {}).forEach(([iso, count]) => {
+            if (COUNTRY_CENTER[iso] && count > 0) m[iso] = count;
+        });
+        return m;
+    }, [JSON.stringify(countries || {})]);
+
+    // Biome fill by absolute latitude, like the reference's terrain shades.
+    const biomeFill = (item) => {
+        const a = Math.min(Math.abs(item.lat), 60);
+        if (isLight) {
+            if (a < 12) return mix('#7DBB8F', '#A8CFAe'.slice(0, 7), a / 12);
+            if (a < 33) return mix('#CFCf9B'.slice(0, 7), '#D9BB7F', (a - 12) / 21);
+            return mix('#DFE7EE', '#CFD8E4', Math.min(1, (a - 33) / 40));
         }
-        const invert = (y) => {
-            const list = yToLat.get(y);
-            if (!list || !list.length) return null;
-            return list[Math.floor(list.length / 2)];
-        };
-        const dots = map.getPoints().map((p) => {
-            const lat = invert(p.y);
-            return { x: p.x + 1, y: p.y + 1, lat, lng: ((p.x / COLS) * 360) - 180 };
-        }).filter(d => d.lat != null);
-        return { dots };
-    }, []);
-
-    // Active countries (users per ISO) projected onto the lattice.
-    const actives = useMemo(() => {
-        return Object.entries(countries || {})
-            .filter(([iso]) => COUNTRY_CENTER[iso])
-            .sort((a, b) => b[1] - a[1])
-            .map(([iso, count]) => {
-                const [lat, lng] = COUNTRY_CENTER[iso];
-                const x = ((lng + 180) / 360) * COLS + 1;
-                const y = latToY(lat);
-                return { iso, count: Number(count) || 0, x, y, lat, lng };
-            });
-    }, [countries, world]);
-
-    // Match the dots to their nearest active country -> tinted blob.
-    const shaded = useMemo(() => {
-        const byIso = {};
-        if (!actives.length) return { byIso, defaultDots: world.dots };
-        const defaultDots = [];
-        for (const dot of world.dots) {
-            let best = null, bestScore = Infinity;
-            for (const a of actives) {
-                const dxi = (dot.lng - a.lng) * Math.cos((dot.lat + a.lat) / 2 * Math.PI / 180);
-                const dyi = dot.lat - a.lat;
-                const dist = Math.sqrt(dxi * dxi + dyi * dyi);
-                if (dist < bestScore) { bestScore = dist; best = a; }
-            }
-            // ~3.2 lattice units of influence (lattice ≈ 3° lng per column at the equator)
-            if (best && bestScore <= 3.4) {
-                const strength = Math.max(0, 1 - bestScore / 3.4);
-                (byIso[best.iso] = byIso[best.iso] || []).push({ ...dot, strength });
-            } else {
-                defaultDots.push(dot);
-            }
-        }
-        return { byIso, defaultDots };
-    }, [actives, world]);
-
-    // Live-trade pulses projected for the rings.
-    const pulsePins = useMemo(() => {
-        return (pulse || [])
-            .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
-            .slice(0, 6)
-            .map((p, i) => ({
-                id: p.id || `p${i}`,
-                x: ((p.lng + 180) / 360) * COLS + 1,
-                y: latToY(p.lat),
-                delay: i * 0.5,
-                first: i === 0,
-            }));
-    }, [JSON.stringify(pulse || [])]);
-
-    // Top countries get the reference-style glass info cards.
-    const topCards = actives.filter(a => a.count > 0).slice(0, 3);
-    const cardPos = (a) => {
-        let cx = a.x + 4.5, cy = a.y - 4.5;
-        cx = Math.min(Math.max(cx, 8), VB_W - 12);
-        cy = Math.min(Math.max(cy, 6.5), VB_H - 6);
-        return { cx, cy };
+        if (a < 12) return mix('#1C5638', '#27744A', a / 12);
+        if (a < 33) return mix('#2F3B29', '#3D4030', (a - 12) / 21);
+        return mix('#22303C'.slice(0, 7), '#2A364A', Math.min(1, (a - 33) / 40));
     };
 
-    const dotBase = isLight ? '#B7C4BB' : '#22382E';
-    const dotActive = isLight ? '#1A6140' : '#3CB371';
-    const cardBg = isLight ? 'rgba(255,255,255,0.88)' : 'rgba(6,18,12,0.78)';
-    const cardBorder = isLight ? 'rgba(26,97,64,0.35)' : 'rgba(60,179,113,0.35)';
-    const cardText = isLight ? '#0A261A' : '#FFFFFF';
+    const activeList = Object.keys(active);
+    const topISOs = activeList
+        .map(iso => ({ iso, count: Number(active[iso]) || 0 }))
+        .sort((a, b) => b.count - a.count);
 
-    const arcPairs = useMemo(() => {
-        const tops = actives.filter(a => a.count > 0).slice(0, 4);
+    const pins = topISOs.map((t) => {
+        const [lat, lon] = COUNTRY_CENTER[t.iso];
+        const c = project(lon, lat);
+        return { ...t, x: c.x, y: c.y };
+    });
+
+    const pulses = (pulse || [])
+        .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+        .slice(0, 6)
+        .map((p, i) => {
+            const c = project(p.lng, p.lat);
+            return { id: p.id || `p${i}`, x: c.x, y: c.y, delay: i * 0.5, first: i === 0 };
+        });
+
+    const arcs = useMemo(() => {
         const out = [];
-        for (let i = 0; i < tops.length - 1 && out.length < 3; i++) {
-            const a = tops[i], b = tops[i + 1];
+        for (let i = 0; i < Math.min(4, pins.length - 1) && out.length < 3; i++) {
+            const a = pins[i], b = pins[i + 1];
             const mx = (a.x + b.x) / 2;
-            // lift the arc toward the top of the map (lat curves up)
-            const lift = Math.min(10, Math.abs(b.x - a.x) * 0.16 + 2);
-            out.push({ d: `M ${a.x} ${a.y} Q ${mx} ${Math.max(a.y, b.y) - lift} ${b.x} ${b.y}`, key: `${a.iso}-${b.iso}` });
+            const lift = Math.min(34, Math.abs(b.x - a.x) * 0.16 + 8);
+            out.push({ d: `M ${a.x} ${a.y} Q ${mx} ${Math.max(a.y, b.y) - lift} ${b.x} ${b.y}`, i });
         }
         return out;
-    }, [actives]);
+    }, [active]);
+
+    const infoCards = pins.slice(0, 3);
+    const cardBox = (p) => {
+        const w = 64, h = 27;
+        let x = p.x + 24, y = p.y - 34;
+        x = Math.min(Math.max(x, 66), VMW - w - 6);
+        y = Math.min(Math.max(y, 10), VMH - h - 4);
+        return { x, y, w, h };
+    };
+
+    const accent = isLight ? '#1A6140' : '#3CB371';
+    const sideFill = isLight ? '#93A69D' : '#06130D';
+    const cardBg = isLight ? 'rgba(255,255,255,0.9)' : 'rgba(6,18,12,0.85)';
+    const cardBorder = isLight ? 'rgba(26,97,64,0.4)' : 'rgba(60,179,113,0.4)';
+    const cardText = isLight ? '#0A261A' : '#FFFFFF';
+    const strokeTop = isLight ? 'rgba(255,255,255,0.22)' : 'rgba(140,255,190,0.12)';
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
@@ -159,85 +130,115 @@ export function AdminMap({ theme = 'dark', countries = {}, pulse = [] }) {
                     100% { transform: scale(2.1); opacity: 0; }
                 }
                 @keyframes admin-map-dash {
-                    to { stroke-dashoffset: -26; }
+                    to { stroke-dashoffset: -36; }
+                }
+                @keyframes admin-map-glow {
+                    0%, 100% { opacity: 0.45; }
+                    50%      { opacity: 0.85; }
                 }
             `}</style>
-            <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet"
+            <svg viewBox={`0 0 ${VMW} ${VMH}`} preserveAspectRatio="xMidYMid meet"
                 style={{ width: '100%', height: '100%', display: 'block' }}>
+                <defs>
+                    {/* one glow filter for the whole landmass group — cheap */}
+                    <filter id="mapGlow" x="-6%" y="-18%" width="112%" height="136%">
+                        <feGaussianBlur stdDeviation="2.6" />
+                    </filter>
+                    <linearGradient id="mapFace" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor="#FFFFFF" stopOpacity={isLight ? 0.32 : 0.14} />
+                        <stop offset="0.55" stopColor="#FFFFFF" stopOpacity="0" />
+                        <stop offset="1" stopColor="#000000" stopOpacity="0.16" />
+                    </linearGradient>
+                    <radialGradient id="mapUserGlow" cx="0.5" cy="0.42" r="0.62">
+                        <stop offset="0" stopColor={isLight ? '#5FBF8F' : '#7BFFC4'} stopOpacity="0.95" />
+                        <stop offset="1" stopColor={isLight ? '#1A6140' : '#1F8F5F'} stopOpacity="0.6" />
+                    </radialGradient>
+                </defs>
 
-                {/* soft drop shadow under the "floating island" like the reference */}
-                <ellipse cx={VB_W / 2} cy={VB_H - 1.2} rx={VB_W / 2.6} ry={2.4}
-                    fill={isLight ? 'rgba(26,97,64,0.10)' : 'rgba(60,179,113,0.07)'} style={{ filter: 'blur(3px)' }} />
+                {/* soft shadow under the floating island */}
+                <ellipse cx={VMW / 2} cy={VMH + 1.2} rx={VMW / 2.7} ry={3.4}
+                    fill={isLight ? 'rgba(26,97,64,0.14)' : 'rgba(60,179,113,0.10)'} style={{ filter: 'blur(4px)' }} />
 
-                {/* default land dots */}
-                <g>
-                    {shaded.defaultDots.map((d, i) => (
-                        <circle key={i} cx={d.x} cy={d.y} r={0.42} fill={dotBase} opacity={isLight ? 0.75 : 0.5} />
+                {/* breathing glow around every landmass */}
+                <g filter="url(#mapGlow)" style={{ animation: 'admin-map-glow 5s ease-in-out infinite' }}>
+                    {WORLD.countries.map((c) => (
+                        <path key={c.iso2} d={c.d} fill={active[c.iso2] ? accent : isLight ? 'rgba(60,179,113,0.4)' : 'rgba(60,179,113,0.28)'} stroke={accent} strokeWidth={1.1} strokeOpacity={0.55} />
                     ))}
                 </g>
 
-                {/* active-country blobs: brand-tinted dots, brighter near the center */}
-                {Object.entries(shaded.byIso).map(([iso, dots]) => (
-                    <g key={iso}>
-                        {dots.map((d, i) => (
-                            <circle key={i} cx={d.x} cy={d.y} r={0.46} fill={dotActive}
-                                opacity={0.28 + d.strength * 0.72}
-                                style={{ filter: d.strength > 0.6 ? 'saturate(1.2)' : 'none' }} />
-                        ))}
-                    </g>
-                ))}
+                {/* extruded sides (the 2.5D depth of the floating island) */}
+                <g transform="translate(0, 2.8)">
+                    {WORLD.countries.map((c) => (
+                        <path key={c.iso2} d={c.d} fill={sideFill} />
+                    ))}
+                </g>
+
+                {/* top faces: biome shading; user countries glow brand green */}
+                <g>
+                    {WORLD.countries.map((c) => {
+                        const isActive = !!active[c.iso2];
+                        return (
+                            <g key={c.iso2}>
+                                <path d={c.d}
+                                    fill={isActive ? 'url(#mapUserGlow)' : biomeFill(c)}
+                                    stroke={isActive ? '#7BFFC4' : strokeTop} strokeWidth={0.8} />
+                            </g>
+                        );
+                    })}
+                </g>
+
+                {/* subtle top-edge lighting over the whole landmass */}
+                <g style={{ pointerEvents: 'none' }}>
+                    {WORLD.countries.map((c) => (
+                        <path key={c.iso2} d={c.d} fill="url(#mapFace)" />
+                    ))}
+                </g>
 
                 {/* animated arcs between the strongest user countries */}
-                {arcPairs.map((a, i) => (
-                    <path key={a.key} d={a.d} fill="none" stroke={dotActive} strokeOpacity={0.4}
-                        strokeWidth={0.16} strokeDasharray="1.2 1.4"
-                        style={{ animation: `admin-map-dash ${3 + i}s linear infinite` }} />
+                {arcs.map((a) => (
+                    <path key={a.i} d={a.d} fill="none" stroke={accent} strokeOpacity={0.5}
+                        strokeWidth={0.8} strokeDasharray="5 7" strokeLinecap="round"
+                        style={{ animation: `admin-map-dash ${3 + a.i}s linear infinite` }} />
                 ))}
 
                 {/* live-trade pulse rings (dotted, like the reference) */}
-                {pulsePins.map((p) => (
-                    <g key={p.id} style={{ transform: `translate(${p.x}px, ${p.y}px)` }}>
-                        <circle r={1.05} fill="none" stroke={p.first ? '#F59E0B' : dotActive} strokeWidth={0.16}
-                            strokeDasharray="0.18 0.42" strokeLinecap="round"
+                {pulses.map((p) => (
+                    <g key={p.id} transform={`translate(${p.x},${p.y})`}>
+                        <circle r={5} fill="none" stroke={p.first ? '#F59E0B' : accent} strokeWidth={0.9}
+                            strokeDasharray="1 2.4" strokeLinecap="round"
                             style={{ transformOrigin: 'center', transformBox: 'fill-box', animation: `admin-map-ring 2.4s ease-out infinite ${p.delay}s` }} />
-                        <circle r={0.34} fill={p.first ? '#F59E0B' : dotActive} opacity={0.9} />
+                        <circle r={1.6} fill={p.first ? '#F59E0B' : accent} opacity={0.9} />
                     </g>
                 ))}
 
                 {/* country pins: ISO badge sized by user count */}
-                {actives.filter(a => a.count > 0).map((a) => {
-                    const r = 1.0 + Math.min(a.count, 60) / 60 * 0.9;
+                {pins.map((p) => {
+                    const r = 9 + Math.min(p.count, 80) / 80 * 5;
                     return (
-                        <g key={a.iso} style={{ transform: `translate(${a.x}px, ${a.y}px)` }}>
-                            <circle r={r + 0.45} fill={isLight ? '#FFFFFF' : '#04140C'} stroke={dotActive} strokeWidth={0.18} opacity={0.9} />
-                            <circle r={r} fill={dotActive} />
-                            <text textAnchor="middle" dominantBaseline="central" y={0.04}
-                                style={{ fontSize: Math.min(1.05, r * 0.78), fontWeight: 900, letterSpacing: 0.02, fill: isLight ? '#FFFFFF' : '#04140C', fontFamily: 'Comfortaa, sans-serif' }}>
-                                {a.iso}
+                        <g key={p.iso} transform={`translate(${p.x},${p.y})`}>
+                            <circle r={r + 2.4} fill={isLight ? '#FFFFFF' : '#04140C'} stroke={accent} strokeWidth={1.1} opacity={0.92} />
+                            <circle r={r} fill={accent} />
+                            <text textAnchor="middle" dominantBaseline="central" y={0.3}
+                                style={{ fontSize: r * 0.82, fontWeight: 900, letterSpacing: 0.6, fill: isLight ? '#FFFFFF' : '#04140C', fontFamily: 'Comfortaa, sans-serif' }}>
+                                {p.iso}
                             </text>
                         </g>
                     );
                 })}
 
                 {/* leader lines + glass cards for the top countries */}
-                {topCards.map((a) => {
-                    const { cx, cy } = cardPos(a);
-                    const cardW = 7.6, cardH = 3.4;
+                {infoCards.map((p) => {
+                    const { x, y, w, h } = cardBox(p);
                     return (
-                        <g key={a.iso}>
-                            <line x1={a.x} y1={a.y} x2={cx} y2={cy + cardH / 2}
-                                stroke={dotActive} strokeOpacity={0.5} strokeWidth={0.12} />
-                            <rect x={cx - cardW / 2} y={cy - cardH / 2} width={cardW} height={cardH} rx={0.8}
-                                fill={cardBg} stroke={cardBorder} strokeWidth={0.12} />
-                            <rect x={cx - cardW / 2} y={cy - cardH / 2} width={cardW} height={1.0} rx={0.8}
-                                fill={dotActive} opacity={0.16} />
-                            <text x={cx - cardW / 2 + 0.55} y={cy - cardH / 2 + 0.7}
-                                style={{ fontSize: 0.55, fontWeight: 800, letterSpacing: 0.06, fill: cardText, opacity: 0.6, fontFamily: 'Comfortaa, sans-serif' }}>
-                                {a.iso} · USERS
+                        <g key={p.iso}>
+                            <line x1={p.x} y1={p.y} x2={x + w / 2} y2={y + h} stroke={accent} strokeOpacity={0.55} strokeWidth={0.7} />
+                            <rect x={x} y={y} width={w} height={h} rx={4} fill={cardBg} stroke={cardBorder} strokeWidth={0.7} />
+                            <rect x={x} y={y} width={w} height={7.5} rx={4} fill={accent} opacity={0.16} />
+                            <text x={x + 4} y={y + 5.4} style={{ fontSize: 4.4, fontWeight: 800, letterSpacing: 0.4, fill: cardText, opacity: 0.62, fontFamily: 'Comfortaa, sans-serif' }}>
+                                {p.iso} · USERS
                             </text>
-                            <text x={cx - cardW / 2 + 0.5} y={cy + cardH / 2 - 0.55}
-                                style={{ fontSize: 1.25, fontWeight: 900, fill: cardText, fontFamily: 'Comfortaa, sans-serif' }}>
-                                {a.count.toLocaleString()}
+                            <text x={x + 3.4} y={y + h - 3.4} style={{ fontSize: 10, fontWeight: 900, fill: cardText, fontFamily: 'Comfortaa, sans-serif' }}>
+                                {p.count.toLocaleString()}
                             </text>
                         </g>
                     );
@@ -245,26 +246,4 @@ export function AdminMap({ theme = 'dark', countries = {}, pulse = [] }) {
             </svg>
         </div>
     );
-}
-
-// Latitude -> lattice row along dotted-map's curved axis, cached per instance
-// height. Probed against getPin so the curve is exact, not approximated.
-let latCurve = null;
-function latToY(lat) {
-    if (!latCurve) {
-        const map = new DottedMap({ height: HEIGHT });
-        const pts = [];
-        for (let l = -60; l <= 85.001; l += 0.5) pts.push([l, map.getPin({ lat: l, lng: 0 }).y]);
-        latCurve = pts;
-    }
-    // find the segment containing this lat (monotonic descending y with lat)
-    for (let i = 1; i < latCurve.length; i++) {
-        const [l1, y1] = latCurve[i - 1];
-        const [l2, y2] = latCurve[i];
-        if (lat <= l1 && lat >= l2) {
-            const t = l1 === l2 ? 0 : (l1 - lat) / (l1 - l2);
-            return y1 + (y2 - y1) * t + 1;
-        }
-    }
-    return lat > 0 ? 2 : VB_H - 2;
 }

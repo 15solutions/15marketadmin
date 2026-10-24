@@ -58,23 +58,6 @@ const NAV = [
     { key: 'security', label: 'Security', hint: 'Protocols · Team', icon: Shield }
 ];
 
-// Metrics rendered as plain listed rows (label — live value), not boxes.
-function MetricList({ items, isLight }) {
-    return (
-        <div>
-            {items.map((m, i) => (
-                <div key={i} className={`flex items-center justify-between gap-4 py-2.5 ${i > 0 ? (isLight ? 'border-t border-black/5' : 'border-t border-white/5') : ''}`}>
-                    <div className="flex items-center gap-3 min-w-0">
-                        <m.icon size={13} style={{ color: m.color }} className="flex-none" />
-                        <span className="text-[9px] font-black uppercase tracking-widest opacity-50 truncate">{m.label}</span>
-                    </div>
-                    <span className={`text-sm font-black whitespace-nowrap ${isLight ? 'text-black' : 'text-white'}`}>{m.value}</span>
-                </div>
-            ))}
-        </div>
-    );
-}
-
 export function AdminDashboard({ onBack, theme, notify, platformSettings: initialSettings, auth }) {
     // Live theme state — the sidebar switch flips it in place.
     const [themeState, setThemeState] = useState(() => {
@@ -797,50 +780,80 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 </div>
                 )}
 
-                {/* ANALYTICS — smaller boxless globe on the left; listed real-time metrics on the right */}
+                {/* ANALYTICS — glowing 3D world map center; the metrics panels wrap around it */}
                 {activeNav === 'analytics' && (
-                <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 min-w-0 items-start">
+                <div className="w-full flex flex-col gap-6 min-w-0">
 
-                    {/* World map — dot-matrix continents, brand-tinted user
-                        countries, ISO pins, info cards and live-trade pulses */}
-                    <div className="lg:col-span-5 min-w-0">
-                        <div className="relative w-full h-[330px] lg:h-[380px]">
-                            <AdminMap theme={themeState} countries={stats.userCountries} pulse={pulse} />
-                        </div>
-                        <div className="flex items-center justify-center gap-2 mt-2 pointer-events-none">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#3CB371] animate-pulse" />
-                            <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Users by country · live trade flashes</span>
-                        </div>
-                    </div>
+                    {/* the world map headline boxes: four panels hug the map left/right */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-w-0 items-start">
 
-                    {/* Listed live metrics */}
-                    <div className="lg:col-span-7 min-w-0 flex flex-col gap-8">
-                        <div>
-                            <div className="text-[9px] font-black uppercase tracking-[0.25em] opacity-40 mb-1 px-1">Live metrics</div>
-                            <MetricList isLight={isLight} items={[
+                        {/* LEFT panel — core platform metrics as compact boxes */}
+                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 flex flex-col gap-3">
+                            <div className="text-[9px] font-black uppercase tracking-[0.25em] opacity-40 px-1">Platform</div>
+                            {[
                                 { label: 'Registered Users', value: String(stats.totalWallets | 0), icon: Users, color: '#a855f7' },
                                 { label: 'Total Trades', value: String(stats.totalTrades | 0), icon: TrendingUp, color: '#14b8a6' },
                                 { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: Zap, color: '#f59e0b' },
-                                { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, icon: Landmark, color: '#1A6140' },
-                                { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), icon: AlertTriangle, color: '#ef4444' },
-                                { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, icon: BarChart3, color: '#1A6140' }
-                            ]} />
-                        </div>
-
-                        <div>
-                            <div className="text-[9px] font-black uppercase tracking-[0.25em] opacity-40 mb-1 px-1">Users by country</div>
-                            {Object.entries(stats.userCountries || {}).length === 0 ? (
-                                <p className="text-[9px] font-black uppercase tracking-widest opacity-30 py-2.5">No user location data yet</p>
-                            ) : Object.entries(stats.userCountries || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([iso, count], i) => (
-                                <div key={iso} className={`flex items-center justify-between gap-4 py-2.5 ${i > 0 ? (isLight ? 'border-t border-black/5' : 'border-t border-white/5') : ''}`}>
-                                    <div className="flex items-center gap-3">
-                                        <span className={`w-8 py-1 rounded-lg text-[8px] font-black uppercase flex items-center justify-center ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-[#1A6140]/15 text-[#3CB371]'}`}>{iso}</span>
-                                        <span className="text-[9px] font-black uppercase tracking-widest opacity-50">Users</span>
+                                { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, icon: Landmark, color: '#1A6140' }
+                            ].map((stat, i) => (
+                                <div key={i} className={`px-4 py-3 rounded-2xl border flex items-center gap-3 min-w-0 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
+                                    <div className="p-2 rounded-xl flex-none" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                                        <stat.icon size={14} />
                                     </div>
-                                    <span className="text-sm font-black text-[#3CB371] whitespace-nowrap">{count}</span>
+                                    <div className="min-w-0">
+                                        <div className="text-[7px] font-black uppercase tracking-widest opacity-40 truncate">{stat.label}</div>
+                                        <div className={`text-sm font-black tracking-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
+
+                        {/* CENTER — the glowing 3D world map */}
+                        <div className="lg:col-span-8 xl:col-span-6 min-w-0">
+                            <div className="relative w-full h-[300px] lg:h-[360px]">
+                                <AdminMap theme={themeState} countries={stats.userCountries} pulse={pulse} />
+                            </div>
+                            <div className="flex items-center justify-center gap-2 mt-1 pointer-events-none">
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#3CB371] animate-pulse" />
+                                <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Users by country · live trade flashes</span>
+                            </div>
+                        </div>
+
+                        {/* RIGHT panel — market pulse + top countries */}
+                        <div className="lg:col-span-2 xl:col-span-3 min-w-0 flex flex-col gap-3">
+                            {[
+                                { label: 'Users Live Now', value: String(stats.activeCount | 0), icon: Flame, color: '#22c55e' },
+                                { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: DollarSign, color: '#1A6140' },
+                                { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), icon: AlertTriangle, color: '#ef4444' },
+                                { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, icon: BarChart3, color: '#1A6140' }
+                            ].map((stat, i) => (
+                                <div key={i} className={`px-4 py-3 rounded-2xl border flex items-center gap-3 min-w-0 ${isLight ? 'bg-white border-black/5' : 'bg-white/5 border-white/5'}`}>
+                                    <div className="p-2 rounded-xl flex-none" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+                                        <stat.icon size={14} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-[7px] font-black uppercase tracking-widest opacity-40 truncate">{stat.label}</div>
+                                        <div className={`text-sm font-black tracking-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Users by country — indexed rows under the map, plain on the background */}
+                    <div className="flex flex-col min-w-0">
+                        <div className="text-[9px] font-black uppercase tracking-[0.25em] opacity-40 mb-1 px-1">Users by country</div>
+                        {Object.entries(stats.userCountries || {}).length === 0 ? (
+                            <p className="text-[9px] font-black uppercase tracking-widest opacity-30 py-2.5">No user location data yet</p>
+                        ) : Object.entries(stats.userCountries || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([iso, count], i) => (
+                            <div key={iso} className={`flex items-center justify-between gap-4 py-2.5 ${i > 0 ? (isLight ? 'border-t border-black/5' : 'border-t border-white/5') : ''}`}>
+                                <div className="flex items-center gap-3">
+                                    <span className={`w-8 py-1 rounded-lg text-[8px] font-black uppercase flex items-center justify-center ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-[#1A6140]/15 text-[#3CB371]'}`}>{iso}</span>
+                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-50">Users</span>
+                                </div>
+                                <span className="text-sm font-black text-[#3CB371] whitespace-nowrap">{count}</span>
+                            </div>
+                        ))}
                     </div>
                 </div>
                 )}
