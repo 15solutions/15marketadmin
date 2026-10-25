@@ -1,4 +1,4 @@
-﻿// ==================================================================================
+// ==================================================================================
 // NEXUS CORE - SYSTEM ARCHITECTURE (UNIFIED ENTRY POINT)
 // ==================================================================================
 // This is the primary backend controller for the 15MARKET trading platform. 
@@ -2081,6 +2081,19 @@ app.post('/referral/enroll/:address', async (req, res) => {
     const result = await profiles.enrollReferral(req.params.address);
     if (!result.ok) return res.status(result.status).json({ error: result.error });
     await profiles.syncToSupabase((req.params.address || '').toLowerCase()).catch(() => {});
+    // Push the new participant to all connected admin dashboards immediately.
+    try {
+      const profile = profiles.get((req.params.address || '').toLowerCase());
+      io.emit('referral_enrolled', {
+        address: (req.params.address || '').toLowerCase(),
+        username: profile?.username || null,
+        referralCode: result.referralCode || profile?.referralCode || null,
+        referredBy: result.referredBy || profile?.referredBy || null,
+        enrolledAt: Date.now(),
+      });
+    } catch (emitErr) {
+      console.warn('[Referral] referral_enrolled emit failed:', emitErr.message);
+    }
     res.json(result);
   } catch (e) {
     console.error('[Referral] enroll failed:', e.message);

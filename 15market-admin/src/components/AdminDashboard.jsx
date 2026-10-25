@@ -113,7 +113,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7' },
         { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6' },
         { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' },
-        { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, color: '#3CB371' }
+        { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true }
     ]), [stats.totalWallets, stats.totalTrades, stats.activeStakesTotal, stats.treasuryBalance]);
     const pulseStats = useMemo(() => ([
         { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
@@ -527,6 +527,28 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             bumpEpoch();
         });
 
+        // 3b. Referral enrollment — append the new participant immediately so
+        // the Participants list reflects enrolments without a page reload.
+        const unbindRefEnroll = socketService.on('referral_enrolled', (payload) => {
+            if (!payload?.address) return;
+            const newUser = {
+                address: payload.address,
+                username: payload.username || null,
+                referralCode: payload.referralCode || null,
+                referredBy: payload.referredBy || null,
+                enrolledAt: payload.enrolledAt || Date.now(),
+                suspended: false,
+                rateOverride: null,
+                slashed: 0,
+            };
+            setRefUsers(prev => {
+                // Avoid duplicates if a re-fetch already added the row.
+                if (prev.some(u => u.address === newUser.address)) return prev;
+                return [newUser, ...prev];
+            });
+            bumpEpoch();
+        });
+
         // 3.5 SIEM — backend pushes HIGH/CRITICAL security events live so bad
         // actors are surfaced on the console the moment they act.
         const unbindSiem = socketService.on('siem_alert', (ev) => {
@@ -648,6 +670,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             bindSettled();
             unbindTradesLegacy();
             unbindUsers();
+            unbindRefEnroll();
         };
     }, []);
 
@@ -1073,12 +1096,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, color: '#3b82f6' },
                             { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
                             { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' },
-                            { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, color: '#3CB371' },
+                            { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true },
                             { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#a78bfa' }
                         ].map((stat, i) => (
                             <div key={i} className="border-l-2 pl-3 min-w-0 flex-none w-[128px] snap-start md:w-auto md:flex-1" style={{ borderColor: `${stat.color}55` }}>
                                 <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
-                                <div className={`text-lg md:text-xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                <div className={`text-lg md:text-xl font-black tracking-tight tabular-nums leading-tight truncate flex items-center gap-1 ${isLight ? 'text-black' : 'text-white'}`}>
+                                    {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-4 h-4 flex-none" style={{ filter: isLight ? 'brightness(0) saturate(100%) invert(27%) sepia(60%) saturate(600%) hue-rotate(110deg) brightness(90%)' : 'brightness(0) invert(1)' }} />}
+                                    {stat.value}
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -1166,28 +1192,37 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 (() => {
                                                     const start = Number(act.timestamp || act.createdAt) || (act.settleAt - 15000);
                                                     const span = Math.max(1000, act.settleAt - start);
-                                                    const beamPct = Math.max(0, Math.min(100, ((feedAt - start) / span) * 100));
+                                                    const elapsed = feedAt - start;
+                                                    const beamPct = Math.max(0, Math.min(100, (elapsed / span) * 100));
                                                     const gone = feedAt >= act.settleAt;
-                                                    const secsLeft = Math.max(1, Math.ceil((act.settleAt - feedAt) / 1000));
+                                                    const secsLeft = Math.max(0, Math.ceil((act.settleAt - feedAt) / 1000));
                                                     return (
-                                                        <>
-                                                            <div className={`h-1 rounded-full overflow-hidden ${isLight ? 'bg-black/10' : 'bg-white/10'}`}>
+                                                        <div className="flex flex-col items-end lg:items-start gap-1 w-full min-w-[92px]">
+                                                            {/* Progress beam — identical mechanics to the user side */}
+                                                            <div className={`relative w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-black/10' : 'bg-white/10'}`}>
                                                                 <div
-                                                                    className="h-full rounded-full bg-amber-500 transition-[width] duration-200 ease-linear"
+                                                                    className={`absolute left-0 top-0 h-full rounded-full transition-[width] duration-200 ease-linear ${gone ? 'bg-red-500 animate-pulse' : 'bg-amber-400'}`}
                                                                     style={{ width: `${beamPct}%` }}
                                                                 />
+                                                                {/* Glow tip */}
+                                                                {!gone && beamPct < 100 && (
+                                                                    <div
+                                                                        className="absolute top-0 h-full w-4 rounded-full blur-sm bg-amber-300/60 pointer-events-none"
+                                                                        style={{ left: `calc(${beamPct}% - 8px)` }}
+                                                                    />
+                                                                )}
                                                             </div>
-                                                            <div className={`text-[8px] font-black uppercase tracking-widest mt-1 text-right lg:text-left ${gone ? 'text-red-500 animate-pulse' : 'text-amber-500'}`}>
+                                                            <div className={`text-[8px] font-black uppercase tracking-widest text-right lg:text-left ${gone ? 'text-red-500 animate-pulse' : 'text-amber-400'}`}>
                                                                 {gone ? 'Resolving…' : `${secsLeft}s`}
                                                             </div>
-                                                        </>
+                                                        </div>
                                                     );
                                                 })()
                                             ) : (
                                                 <div className="flex flex-col items-end lg:items-start gap-1 min-w-0">
                                                     <div className={`text-[10px] font-black uppercase tracking-wide text-right lg:text-left ${act.won ? 'text-[#1A6140]' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
                                                         {act.won
-                                                            ? <span>WON +${Number(act.payout || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}{act.exitPrice ? <span className="opacity-50 font-mono text-[8px] ml-1">exit {act.exitPrice}</span> : null}</span>
+                                                            ? <span>+${Number(act.payout || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                                                             : (act.settled ? 'LOST' : (act.pending ? 'PENDING' : (act.type === 'TRADE_PLACED' ? 'PENDING' : 'LOST')))}
                                                     </div>
                                                     {/* Paid state: every settled win shows whether the
@@ -1234,7 +1269,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             {platformStats.map((stat, i) => (
                                 <div key={i} className="border-l-2 pl-3 min-w-0" style={{ borderColor: `${stat.color}55` }}>
                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
-                                    <div className={`text-lg xl:text-2xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                    <div className={`text-lg xl:text-2xl font-black tracking-tight tabular-nums leading-tight truncate flex items-center gap-1.5 ${isLight ? 'text-black' : 'text-white'}`}>
+                                        {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-4 h-4 flex-none" style={{ filter: isLight ? 'brightness(0) saturate(100%) invert(27%) sepia(60%) saturate(600%) hue-rotate(110deg) brightness(90%)' : 'brightness(0) invert(1)' }} />}
+                                        {stat.value}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -1250,7 +1288,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 {[...platformStats, ...pulseStats].map((stat, i) => (
                                     <div key={i} className="border-l-2 pl-2.5 py-0.5 flex-none min-w-[84px]" style={{ borderColor: `${stat.color}55` }}>
                                         <div className="text-[6.5px] font-black uppercase tracking-[0.15em] opacity-40 whitespace-nowrap">{stat.label}</div>
-                                        <div className={`text-sm font-black tracking-tight tabular-nums leading-tight whitespace-nowrap ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                        <div className={`text-sm font-black tracking-tight tabular-nums leading-tight whitespace-nowrap flex items-center gap-1 ${isLight ? 'text-black' : 'text-white'}`}>
+                                            {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-3 h-3 flex-none" style={{ filter: isLight ? 'brightness(0) saturate(100%) invert(27%) sepia(60%) saturate(600%) hue-rotate(110deg) brightness(90%)' : 'brightness(0) invert(1)' }} />}
+                                            {stat.value}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
