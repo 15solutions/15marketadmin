@@ -66,12 +66,22 @@ const NAV = [
 export function AdminDashboard({ onBack, theme, notify, platformSettings: initialSettings, auth }) {
     // Live theme state — the sidebar switch flips it in place.
     const [themeState, setThemeState] = useState(() => {
-        try { return localStorage.getItem('15market_theme') || theme || 'dark'; } catch (e) { return theme || 'dark'; }
+        const saved = (() => { try { return localStorage.getItem('15market_theme') || theme || 'dark'; } catch (e) { return theme || 'dark'; } })();
+        // Apply immediately so the body background is correct before first paint.
+        try {
+            document.documentElement.classList.toggle('light', saved === 'light');
+            document.body.classList.toggle('light', saved === 'light');
+        } catch (_) {}
+        return saved;
     });
     const isLight = themeState === 'light';
     const toggleTheme = () => {
         const next = isLight ? 'dark' : 'light';
-        try { localStorage.setItem('15market_theme', next); } catch (e) {}
+        try {
+            localStorage.setItem('15market_theme', next);
+            document.documentElement.classList.toggle('light', next === 'light');
+            document.body.classList.toggle('light', next === 'light');
+        } catch (e) {}
         setThemeState(next);
     };
 
@@ -610,13 +620,27 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         //    "Resolving…" forever. Never clobbers live socket rows.
         const fetchHistory = async () => {
             try {
-                const histRes = await fetch(`${KEEPER_URL_ARC}/history`);
+                const histRes = await fetch(`${KEEPER_URL_ARC}/admin/trades`);
                 if (histRes.ok) {
                     const histData = await histRes.json();
                     (histData || []).slice(0, 20).forEach(h => {
                         if (h.owner) fetchProfile(h.owner);
                         if (h.userAddr) fetchProfile(h.userAddr);
                     });
+
+                    // If any PENDING trade in the snapshot has a settleAt that
+                    // passed >30 s ago, the engine itself is stuck — trigger
+                    // resolve-stuck so the backend assigns a terminal status and
+                    // re-emits global_trade_settled, which will flip the row.
+                    const now = Date.now();
+                    const hasStuck = (histData || []).some(h =>
+                        (String(h.status || '').toUpperCase() === 'PENDING' || String(h.status || '').toUpperCase() === 'RESOLVING') &&
+                        h.settleAt && Number(h.settleAt) < now - 30000
+                    );
+                    if (hasStuck) {
+                        adminFetch(`${KEEPER_URL_ARC}/admin/trades/resolve-stuck`, { method: 'POST' }).catch(() => {});
+                    }
+
                     setRecentActivity(prev => {
                         const byId = new Map(prev.map(r => [String(r.betId || r.id), r]));
                         for (const h of (histData || []).slice(0, 60)) {
@@ -637,10 +661,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             const local = byId.get(row.betId);
                             if (!local) { byId.set(row.betId, row); continue; }
                             const snapHasVerdict = row.settled && (row.won === true || row.won === false);
-                            // A pending/mid-flight local row yields to a settled
-                            // snapshot; an already-settled local row only yields
-                            // when it is payout-failed (a recovered payment) or
-                            // the snapshot verdict is strictly newer.
                             if (snapHasVerdict && (!local.settled || local.payoutFailed)) {
                                 byId.set(row.betId, { ...local, ...row });
                             } else if (row.settled && local.settled && local.payoutFailed && row.paid) {
@@ -1052,11 +1072,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             {/* Main column */}
             <div className="flex-1 flex flex-col min-w-0">
 
-                {/* MOBILE top bar — brand + quick identity, above the scroller.
-                    Transparent on purpose: the console background continues
-                    through it, so the phone view reads as one fullscreen
-                    surface with no off-tone navbar strip behind the logo. */}
-                <div className="md:hidden flex-none flex items-center gap-3 px-4 py-2.5 z-40">
+                {/* MOBILE top bar — brand + quick identity, above the scroller. */}
+                <div className={`md:hidden flex-none flex items-center gap-3 px-4 py-2.5 z-40 ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}>
                     <img
                         src={isLight ? '/goblogo.png' : '/gowlogo.png'}
                         alt="15market"
@@ -1200,22 +1217,26 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                     const secsLeft = Math.max(0, Math.ceil((act.settleAt - feedAt) / 1000));
                                                     return (
                                                         <div className="flex flex-col items-end lg:items-start gap-1 w-full min-w-[92px]">
-                                                            {/* Progress beam — identical mechanics to the user side */}
-                                                            <div className={`relative w-full h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-black/10' : 'bg-white/10'}`}>
-                                                                <div
-                                                                    className={`absolute left-0 top-0 h-full rounded-full transition-[width] duration-200 ease-linear ${gone ? 'bg-red-500 animate-pulse' : 'bg-amber-400'}`}
-                                                                    style={{ width: `${beamPct}%` }}
-                                                                />
-                                                                {/* Glow tip */}
-                                                                {!gone && beamPct < 100 && (
+                                                            {/* Beam + spinner row */}
+                                                            <div className="flex items-center gap-1.5 w-full">
+                                                                {/* Circular pending spinner */}
+                                                                <div className={`flex-none w-3.5 h-3.5 rounded-full border-2 ${gone ? 'border-red-500/40 border-t-red-500 animate-spin' : 'border-amber-400/30 border-t-amber-400 animate-spin'}`} />
+                                                                {/* Progress beam */}
+                                                                <div className={`relative flex-1 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-black/10' : 'bg-white/10'}`}>
                                                                     <div
-                                                                        className="absolute top-0 h-full w-4 rounded-full blur-sm bg-amber-300/60 pointer-events-none"
-                                                                        style={{ left: `calc(${beamPct}% - 8px)` }}
+                                                                        className={`absolute left-0 top-0 h-full rounded-full transition-[width] duration-200 ease-linear ${gone ? 'bg-red-500 animate-pulse' : 'bg-amber-400'}`}
+                                                                        style={{ width: `${beamPct}%` }}
                                                                     />
-                                                                )}
+                                                                    {!gone && beamPct < 100 && (
+                                                                        <div
+                                                                            className="absolute top-0 h-full w-4 rounded-full blur-sm bg-amber-300/60 pointer-events-none"
+                                                                            style={{ left: `calc(${beamPct}% - 8px)` }}
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             <div className={`text-[8px] font-black uppercase tracking-widest text-right lg:text-left ${gone ? 'text-red-500 animate-pulse' : 'text-amber-400'}`}>
-                                                                {gone ? 'Resolving…' : `${secsLeft}s`}
+                                                                {gone ? 'Settling…' : `${secsLeft}s`}
                                                             </div>
                                                         </div>
                                                     );

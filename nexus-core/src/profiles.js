@@ -906,7 +906,18 @@ class ProfileService {
                 }
                 // Supabase values win for fields; keep local-only fields (e.g.
                 // trades when the optional columns aren't present yet).
-                this.profiles[addr] = { ...(local || {}), ...remote, address: addr };
+                // Referral enrollment lives in migration 009 columns. When those
+                // columns are absent from the Supabase schema (remote.referralEnrolled
+                // is undefined), preserve the local enrollment flag so users don't
+                // "deroll" on every backend restart. Remote explicitly false wins.
+                const merged_ = { ...(local || {}), ...remote, address: addr };
+                if (remote.referralEnrolled === undefined && local?.referralEnrolled === true) {
+                    merged_.referralEnrolled = true;
+                    if (merged_.referralEnrolledAt == null) merged_.referralEnrolledAt = local.referralEnrolledAt;
+                    if (merged_.referralCode == null) merged_.referralCode = local.referralCode;
+                    if (merged_.referredBy == null) merged_.referredBy = local.referredBy;
+                }
+                this.profiles[addr] = merged_;
                 merged++;
             }
             if (merged > 0) console.log(`[Supabase] Loaded ${merged} profile(s) into cache.`);

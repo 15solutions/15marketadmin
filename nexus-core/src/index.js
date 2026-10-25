@@ -418,16 +418,24 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Push latest stats on connection
-  const stats = profiles.getGlobalStats();
-  socket.emit('dashboard_stats', {
-    ...stats,
-    activeCount: cache.sessions.size,
-    activeStakesTotal: Array.from(cache.trades.values())
-      .filter(t => t.status === 'PENDING')
-      .reduce((sum, t) => sum + t.amount, 0),
-    totalWallets: Object.keys(profiles.profiles).length
-  });
+  // Push latest stats on connection — run async so we can fetch the real
+  // treasury balance instead of emitting "LIVE" or undefined.
+  (async () => {
+    const stats = profiles.getGlobalStats();
+    let treasuryBalance = "0.00";
+    if (config.TREASURY_ADDRESS && config.TREASURY_ADDRESS !== ethers.ZeroAddress) {
+      try { treasuryBalance = await rpc.getBalance(config.TREASURY_ADDRESS); } catch (_) {}
+    }
+    socket.emit('dashboard_stats', {
+      ...stats,
+      activeCount: cache.sessions.size,
+      activeStakesTotal: Array.from(cache.trades.values())
+        .filter(t => t.status === 'PENDING')
+        .reduce((sum, t) => sum + t.amount, 0).toFixed(2),
+      treasuryBalance,
+      totalWallets: Object.keys(profiles.profiles).length
+    });
+  })();
 
   // Push latest odds on connection
   if (oddsEngine.currentOdds) {
@@ -2445,18 +2453,28 @@ app.post('/circle/transfer', async (req, res) => {
 
 // â”€â”€â”€ ADMIN ENDPOINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-app.get('/admin/stats', (req, res) => {
+app.get('/admin/stats', async (req, res) => {
   // Use the global stats from profiles which aggregates data across all users
   const stats = profiles.getGlobalStats();
-  
+
+  // Fetch real treasury balance from the blockchain (same as emitAdminStats).
+  let realTreasuryBal = "0.00";
+  if (config.TREASURY_ADDRESS && config.TREASURY_ADDRESS !== ethers.ZeroAddress) {
+    try {
+      realTreasuryBal = await rpc.getBalance(config.TREASURY_ADDRESS);
+    } catch (e) {
+      console.warn("[Admin-Stats] REST: Failed to fetch treasury balance:", e.message);
+    }
+  }
+
   // Augment with real-time metrics
   res.json({
     ...stats,
     activeCount: cache.sessions.size,
     activeStakesTotal: Array.from(cache.trades.values())
       .filter(t => t.status === 'PENDING')
-      .reduce((sum, t) => sum + t.amount, 0),
-    treasuryBalance: cache.prices.eth > 0 ? 'LIVE' : '0.00', // Mock or fetch actual
+      .reduce((sum, t) => sum + t.amount, 0).toFixed(2),
+    treasuryBalance: realTreasuryBal,
     pendingDisputes: 0,
     totalWallets: Object.keys(profiles.profiles).length
   });

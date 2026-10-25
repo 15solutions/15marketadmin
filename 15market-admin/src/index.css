@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap');
 @import "@fontsource/inter";
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/700.css";
@@ -10,7 +10,7 @@
 
 html,
 body {
-  background-color: #0d0d0d !important;
+  background-color: #0d0d0d;
   overscroll-behavior: none !important;
   font-family: 'Comfortaa', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -19,6 +19,12 @@ body {
   padding: 0;
   height: 100%;
   transition: background-color 0.3s ease;
+}
+
+/* Light mode body background so transparent elements don't bleed dark */
+html.light,
+body.light {
+  background-color: #F4F7F5 !important;
 }
 
 /* ARC NETWORK - DARK MODE */
