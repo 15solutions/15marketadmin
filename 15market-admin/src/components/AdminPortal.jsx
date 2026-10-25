@@ -34,7 +34,7 @@ export function AdminPortal({ onBack, notify }) {
         try {
             const res = await fetch(`${KEEPER_URL_ARC}/admin/auth/me`, {
                 headers: { Authorization: `Bearer ${getSession()?.accessToken || ''}` },
-                signal: AbortSignal.timeout(8000)
+                signal: AbortSignal.timeout(55000)
             });
             if (res.status === 401) { clearSession(); setStatus('login'); return; }
             if (!res.ok) {
@@ -46,7 +46,7 @@ export function AdminPortal({ onBack, notify }) {
             setAuth(me);
             try {
                 const sRes = await fetch(`${KEEPER_URL_ARC}/admin/auth/status`, {
-                    signal: AbortSignal.timeout(5000)
+                    signal: AbortSignal.timeout(55000)
                 });
                 if (sRes.ok) setBootStatus(await sRes.json());
             } catch (e) { /* bootstrap info optional */ }
@@ -55,7 +55,10 @@ export function AdminPortal({ onBack, notify }) {
             // Timeout or network error — drop to login so the screen is never
             // stuck on a spinner indefinitely.
             clearSession();
-            setLoginError('Backend unreachable. Check your connection and try again.');
+            const isTimeout = e?.name === 'TimeoutError' || e?.name === 'AbortError';
+            setLoginError(isTimeout
+                ? 'Backend is waking up — this can take up to 60s on first load. Please try signing in again.'
+                : 'Backend unreachable. Check your connection and try again.');
             setStatus('login');
         }
     }, []);
@@ -65,7 +68,7 @@ export function AdminPortal({ onBack, notify }) {
         // Hard safety net: if status is still 'checking' after 10s, force login.
         const safetyTimer = setTimeout(() => {
             if (!cancelled) setStatus(s => s === 'checking' ? 'login' : s);
-        }, 10000);
+        }, 65000);
 
         (async () => {
             if (!sessionValid()) {
@@ -78,7 +81,7 @@ export function AdminPortal({ onBack, notify }) {
                 setStatus('login');
                 try {
                     const res = await fetch(`${KEEPER_URL_ARC}/admin/auth/status`, {
-                        signal: AbortSignal.timeout(5000)
+                        signal: AbortSignal.timeout(55000)
                     });
                     if (res.ok) setBootStatus(await res.json());
                 } catch (e) { /* bootstrap info optional */ }
