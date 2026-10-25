@@ -57,7 +57,8 @@ export default defineConfig({
     host: true,
     allowedHosts: [
       "revenues-margin-authorities-booth.trycloudflare.com",
-      ".trycloudflare.com"
+      ".trycloudflare.com",
+      ".preview.studio.arc.io"
     ],
     proxy: {
       '/api-binance': {
