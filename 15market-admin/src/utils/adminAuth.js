@@ -30,6 +30,11 @@ export function sessionValid(session = getSession()) {
 
 /** Email+password sign-in via the Supabase Auth REST endpoint. */
 export async function loginWithPassword(email, password) {
+    // Guard early — an empty anon key causes a CORS preflight rejection that
+    // looks like a network error. Surface the real cause before the fetch.
+    if (!SUPABASE_ANON_KEY) {
+        throw new Error('Admin login is unavailable: VITE_SUPABASE_ANON_KEY was not set at build time. Add it to the 15market-admin service in the Render dashboard and redeploy.');
+    }
     let res;
     try {
         res = await fetch(`${SUPABASE_AUTH_URL}/auth/v1/token?grant_type=password`, {
@@ -38,13 +43,6 @@ export async function loginWithPassword(email, password) {
             body: JSON.stringify({ email, password })
         });
     } catch (e) {
-        // A missing or empty VITE_SUPABASE_ANON_KEY causes Supabase to reject
-        // the CORS preflight, which the browser surfaces as a network error
-        // (not an HTTP error). Check that the env var is set in the Render
-        // dashboard and the admin service was redeployed after it was added.
-        if (!SUPABASE_ANON_KEY) {
-            throw new Error('Supabase anon key is missing — set VITE_SUPABASE_ANON_KEY in the Render dashboard and redeploy the admin service.');
-        }
         throw new Error('Could not reach Supabase Auth — check your network connection.');
     }
     const data = await res.json().catch(() => ({}));
