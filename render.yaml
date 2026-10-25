@@ -90,6 +90,6 @@ services:
         value: https://cwzbdxvninfagfbaehre.supabase.co
       - key: VITE_SUPABASE_AUTH_URL
         value: https://cwzbdxvninfagfbaehre.supabase.co
-      - fromContext: env
-        key: VITE_SUPABASE_ANON_KEY
+      # VITE_SUPABASE_ANON_KEY is set directly in the Render dashboard for
+      # this service — no render.yaml entry needed for dashboard-level vars.
 
