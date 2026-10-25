@@ -90,8 +90,6 @@ services:
         value: https://cwzbdxvninfagfbaehre.supabase.co
       - key: VITE_SUPABASE_AUTH_URL
         value: https://cwzbdxvninfagfbaehre.supabase.co
-      # Set this in the Render Dashboard — it is a public key but kept out of
-      # source control. Render will prompt for its value on first deploy.
-      - key: VITE_SUPABASE_ANON_KEY
-        sync: false
+      - fromContext: env
+        key: VITE_SUPABASE_ANON_KEY
 
