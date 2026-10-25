@@ -5,7 +5,7 @@ import { priceSocketService } from '../utils/priceSocket';
 import { KEEPER_URL_ARC } from '../constants';
 import { GlobalTradeScroller } from './GlobalTradeScroller';
 import { FlipClock, ProgressBeam, ResolvingOutcome, TradeOutcome } from './TradingWidget';
-import { isTradeSettled, isTradeInFlight, isTradeOverdue, isWinningTrade } from '../utils/tradeStatus';
+import { isTradeSettled, isTradeInFlight, isTradeOverdue, isWinningTrade, tradeShares } from '../utils/tradeStatus';
 
 const LOGO_MAP = {
   eth: '/logos/eth.png',
@@ -1521,6 +1521,8 @@ export default function MobileTradeView({
                 entryPrice={settledTrade.entryPrice}
                 exitPrice={settledTrade.settlementPrice || settledTrade.exitPrice}
                 symbol={settledTrade.symbol}
+                shares={tradeShares(settledTrade).shares}
+                sharePrice={tradeShares(settledTrade).price}
               />
             ) : null}
           </motion.div>
@@ -1616,39 +1618,43 @@ export default function MobileTradeView({
               </div>
             </div>
 
-            {/* ─── 6. EXECUTION BUTTONS (YES | NO) ─── */}
+            {/* ─── 6. EXECUTION BUTTONS (YES | NO) — each carries the real-time
+                 share count the stake buys on that side (a share costs the
+                 side's price and redeems $1 at settlement) ─── */}
             <div className="shrink-0 px-4 pt-1 pb-3 flex items-center gap-3 select-none">
               <button
                 onClick={() => handleTrade('UP')}
                 disabled={currentStake <= 0 || isExecuting}
-                className={`flex-1 h-[52px] rounded-full bg-[#1A6140] text-white flex items-center justify-center gap-3 font-black text-[18px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
+                className={`flex-1 h-[52px] rounded-full bg-[#1A6140] text-white flex flex-col items-center justify-center gap-0 font-black text-[16px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
                   currentStake <= 0 || isExecuting ? 'opacity-85' : 'hover:brightness-105'
                 }`}
               >
                 {isExecuting ? (
                   <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 ) : (
-                  <>
+                  <span className="flex items-center gap-2">
                     <span>YES</span>
-                    <span className="text-[17px] font-black opacity-95">{yesCents}¢</span>
-                  </>
+                    <span className="text-[16px] font-black opacity-95">{yesCents}¢</span>
+                    <span className="text-[9px] font-bold tabular-nums opacity-80">≈ {currentStake > 0 ? (currentStake / Math.max(0.01, yesShare)).toFixed(2) : '0.00'} sh</span>
+                  </span>
                 )}
               </button>
 
               <button
                 onClick={() => handleTrade('DOWN')}
                 disabled={currentStake <= 0 || isExecuting}
-                className={`flex-1 h-[52px] rounded-full bg-[#EF5350] text-white flex items-center justify-center gap-3 font-black text-[18px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
+                className={`flex-1 h-[52px] rounded-full bg-[#EF5350] text-white flex flex-col items-center justify-center gap-0 font-black text-[16px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
                   currentStake <= 0 || isExecuting ? 'opacity-85' : 'hover:brightness-105'
                 }`}
               >
                 {isExecuting ? (
                   <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 ) : (
-                  <>
+                  <span className="flex items-center gap-2">
                     <span>NO</span>
-                    <span className="text-[17px] font-black opacity-95">{noCents}¢</span>
-                  </>
+                    <span className="text-[16px] font-black opacity-95">{noCents}¢</span>
+                    <span className="text-[9px] font-bold tabular-nums opacity-80">≈ {currentStake > 0 ? (currentStake / Math.max(0.01, noShare)).toFixed(2) : '0.00'} sh</span>
+                  </span>
                 )}
               </button>
             </div>

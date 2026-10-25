@@ -2602,6 +2602,20 @@ app.get('/admin/trade/:id', (req, res) => {
   res.status(404).json({ error: 'Trade not found' });
 });
 
+// Re-deliver a WON trade's payout whose on-chain settlement failed. The
+// engine refuses rows that are not flagged payoutFailed, so a re-run is a
+// no-op and a live bet is never double-handled.
+app.post('/admin/trades/:id/payout-retry', async (req, res) => {
+  try {
+    const result = await classicEngine.retryFailedPayout(req.params.id);
+    if (!result?.success) return res.status(400).json(result || { success: false, error: 'retry refused' });
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[PayoutRetry] route error:', err?.message || err);
+    return res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
 app.post('/admin/broadcast', requirePerm('broadcast.send'), (req, res) => {
   const { message, type, expiry } = req.body;
   if (!message) return res.status(400).json({ error: 'Message required' });

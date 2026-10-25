@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { tradeShares } from '../utils/tradeStatus';
 
 function PriceMeterTicker({ value }) {
   const prevRef = useRef(value);
@@ -177,7 +178,7 @@ function ResolvingOutcome({ isLight }) {
 // Desktop: compact horizontal layout with icon orb, staggered letter reveal,
 // and counting payout — all sized to fit the ~104px action-area strip.
 // Mobile (fit): compact in-flow pill.
-function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, payout, entryPrice, exitPrice, symbol, onExpire }) {
+function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, payout, entryPrice, exitPrice, symbol, shares, sharePrice, onExpire }) {
   if (isPending) {
     return (
       <motion.div
@@ -242,6 +243,19 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
   const entryStr = (entryPrice != null && !isNaN(Number(entryPrice))) ? Number(entryPrice).toFixed(2) : null;
   const exitStr = (exitPrice != null && !isNaN(Number(exitPrice)) && Number(exitPrice) > 0) ? Number(exitPrice).toFixed(2) : null;
 
+  // Shares bought + the price of a share at entry, mirroring the receipt
+  // cards (shares = stake / share-price; a share redeems $1 on a win).
+  const sharesInfo = (() => {
+    if (shares != null && !isNaN(Number(shares)) && Number(shares) > 0) {
+      const sh = Number(shares);
+      const pr = (sharePrice != null && !isNaN(Number(sharePrice)) && Number(sharePrice) > 0)
+        ? Number(sharePrice) : (Number(amount) > 0 && sh > 0 ? Number(amount) / sh : null);
+      return { sh: `${sh.toFixed(2)}sh`, pr: pr ? `@${Math.round(pr * 100)}¢` : null };
+    }
+    return null;
+  })();
+  const sharesBits = sharesInfo ? [sharesInfo.sh, sharesInfo.pr].filter(Boolean).join(' ') : null;
+
   const resultRow = (
     <>
       <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isWin ? 'bg-[#1A6140] text-white' : 'bg-[#FF7F50] text-white'}`}>
@@ -287,11 +301,12 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
           className={`px-4 py-2 rounded-[20px] border flex flex-col items-center justify-center gap-1 select-none shadow-lg w-full max-w-full overflow-visible ${cardClass}`}
         >
           <div className="flex items-center justify-center gap-2 w-full max-w-full">{resultRow}</div>
-          {(payoutStr || stakeStr || (entryStr && exitStr)) && (
-            <div className={`flex items-center justify-center gap-2 text-[10px] font-black tabular-nums max-w-full flex-wrap ${isLight ? 'text-[#0a261a]/70' : 'text-white/70'}`}>
+          {(payoutStr || stakeStr || (entryStr && exitStr) || sharesBits) && (
+            <div className={`flex items-center justify-center gap-1.5 text-[9px] font-black tabular-nums max-w-full whitespace-nowrap flex-nowrap overflow-hidden ${isLight ? 'text-[#0a261a]/70' : 'text-white/70'}`}>
               {payoutStr && <span className={textClass}>{payoutStr}</span>}
+              {sharesBits && <span className="opacity-85">{sharesBits}</span>}
               {stakeStr && <span className="opacity-70">Stake {stakeStr}</span>}
-              {(entryStr && exitStr) && <span className="opacity-50">${entryStr} → ${exitStr}</span>}
+              {(entryStr && exitStr) && <span className="opacity-50">${entryStr}→${exitStr}</span>}
             </div>
           )}
         </motion.div>
@@ -427,6 +442,15 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
             </div>
           </div>
         )}
+
+        {/* Values line — payout · shares bought + share price · stake · entry→exit,
+            all one nowrap row, pinned to the card's bottom edge (desktop card) */}
+        <div className={`absolute bottom-1.5 inset-x-0 flex items-center justify-center gap-2 text-[9px] sm:text-[10px] font-black tabular-nums whitespace-nowrap flex-nowrap overflow-hidden px-2 ${isLight ? 'text-[#0a261a]/55' : 'text-white/55'}`}>
+          {payoutStr && <span className={isWin ? '!text-[#1A6140] opacity-100' : '!text-[#EF5350] opacity-100'}>{payoutStr}</span>}
+          {sharesBits && <span>{sharesBits}</span>}
+          {stakeStr && <span>Stake {stakeStr}</span>}
+          {(entryStr && exitStr) && <span className="opacity-70">${entryStr}→${exitStr}</span>}
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -749,6 +773,8 @@ export default function TradingWidget({
                     entryPrice={displayTrade?.entryPrice}
                     exitPrice={displayTrade?.exitPrice}
                     symbol={displayTrade?.symbol}
+                    shares={displayTrade ? tradeShares(displayTrade).shares : null}
+                    sharePrice={displayTrade ? tradeShares(displayTrade).price : null}
                     onExpire={() => setLatchedTrade(null)}
                   />
                 )}
@@ -767,16 +793,28 @@ export default function TradingWidget({
               <button
                 onClick={() => handleTrade('YES')}
                 disabled={stake <= 0 || stake > (sessionBalance || 0)}
-                className={`flex-1 h-full rounded-full flex items-center justify-center gap-2 transition-all text-[20px] font-black tracking-wide text-white bg-[#1A6140] ${!address ? 'opacity-40' : ''}`}
+                className={`flex-1 h-full rounded-full flex flex-col items-center justify-center gap-0.5 transition-all text-white bg-[#1A6140] ${!address ? 'opacity-40' : ''}`}
               >
-                YES <span className="text-[18px] inline-flex items-center"><PriceMeterTicker value={Math.round(yesShare * 100)} />¢</span>
+                <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
+                  YES <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={Math.round(yesShare * 100)} />¢</span>
+                </span>
+                {/* Real-time share count the stake buys on this side (a share
+                    costs the side's price and redeems $1 at settlement). */}
+                <span className="text-[9px] font-bold tabular-nums opacity-80 tracking-wide">
+                  ≈ {stake > 0 ? (stake / Math.max(0.01, yesShare)).toFixed(2) : '0.00'} shares
+                </span>
               </button>
               <button
                 onClick={() => handleTrade('NO')}
                 disabled={stake <= 0 || stake > (sessionBalance || 0)}
-                className={`flex-1 h-full rounded-full flex items-center justify-center gap-2 transition-all text-[20px] font-black tracking-wide text-white bg-[#EF5350] ${!address ? 'opacity-40' : ''}`}
+                className={`flex-1 h-full rounded-full flex flex-col items-center justify-center gap-0.5 transition-all text-white bg-[#EF5350] ${!address ? 'opacity-40' : ''}`}
               >
-                NO <span className="text-[18px] inline-flex items-center"><PriceMeterTicker value={Math.round(noShare * 100)} />¢</span>
+                <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
+                  NO <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={Math.round(noShare * 100)} />¢</span>
+                </span>
+                <span className="text-[9px] font-bold tabular-nums opacity-80 tracking-wide">
+                  ≈ {stake > 0 ? (stake / Math.max(0.01, noShare)).toFixed(2) : '0.00'} shares
+                </span>
               </button>
             </motion.div>
           )}

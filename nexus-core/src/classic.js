@@ -461,11 +461,20 @@ class ClassicEngine {
 
     this.io.emit('global_trade_settled', {
       betId: trade.id,
+      id: trade.id,
       won: true,
-      status: 'WON',
+      status: 'PAID',
+      paid: true,
       payout: payoutAmount,
       exitPrice: exitPrice,
-      userAddr: trade.userAddr
+      userAddr: trade.userAddr,
+      amount: trade.amount,
+      symbol: trade.symbol,
+      direction: trade.direction,
+      duration: trade.duration,
+      entryPrice: trade.entryPrice,
+      sharePrice: trade.sharePrice,
+      settledAt: Date.now()
     });
 
     cache.pushHistory(trade.userAddr, {
@@ -570,6 +579,7 @@ class ClassicEngine {
         status: 'PAYOUT_FAILED',
         won: true,
         exitPrice: trade.lockedExitPrice,
+        payout: payoutAmount,
         settledAt: Date.now(),
         payoutFailed: true
       });
@@ -579,9 +589,228 @@ class ClassicEngine {
         message: "On-chain settlement failed. Payout was reverted."
       });
 
+      // The global broadcast was missing here, so the admin console kept the
+      // row on "Resolving…" forever even though the user side had already
+      // settled. Emit it with the payoutFailed flag so the admin row flips to
+      // WON + PAY FAIL with a retry affordance instead of hanging.
+      this.io.emit('global_trade_settled', {
+        betId: trade.id,
+        id: trade.id,
+        won: true,
+        status: 'PAYOUT_FAILED',
+        paid: false,
+        payoutFailed: true,
+        payout: payoutAmount,
+        exitPrice: trade.lockedExitPrice,
+        userAddr: trade.userAddr,
+        amount: trade.amount,
+        symbol: trade.symbol,
+        direction: trade.direction,
+        duration: trade.duration,
+        entryPrice: trade.entryPrice,
+        sharePrice: trade.sharePrice,
+        settledAt: Date.now()
+      });
+
       cache.trades.delete(String(betId));
       cache.deleteCachedTradeResult(String(betId));
     })();
+  }
+
+  // ── PAYOUT RETRY (admin) ───────────────────────────────────────────────
+  // Re-delivers a WON trade's payout whose on-chain settlement exhausted its
+  // retries (the history row carries payoutFailed). The failed attempt
+  // reverted the wallet credit, so this credits the balance again, flips the
+  // history row to PAID and re-broadcasts settleBet in the background. If the
+  // chain refuses again the credit is reverted and the row flips back to
+  // PAYOUT_FAILED — the admin can simply retry once more. Idempotent: a row
+  // that is not in the payout-failed state is refused (or reported already
+  // paid), and a bet still owned by the live settler is never double-handled.
+  async retryFailedPayout(betId) {
+    const profiles = require('./profiles');
+    const id = String(betId || '');
+    if (!id) return { success: false, error: 'Missing bet id' };
+
+    let row = null;
+    let addr = null;
+    for (const a in profiles.profiles) {
+      const rows = profiles.profiles[a]?.trades || [];
+      const hit = rows.find(t => String(t.id || t.betId) === id);
+      if (hit) { row = hit; addr = a; break; }
+    }
+    if (!row) return { success: false, error: 'Trade not found', betId: id };
+
+    const isFailedRow = row.payoutFailed === true || String(row.status || '').toUpperCase() === 'PAYOUT_FAILED';
+    if (!isFailedRow) {
+      const wonRow = row.won === true || ['PAID', 'WON'].includes(String(row.status || '').toUpperCase());
+      if (wonRow) return { success: true, alreadyPaid: true, betId: id };
+      return { success: false, error: 'Trade is not a failed payout', betId: id, status: row.status };
+    }
+    if (cache.trades.has(id)) {
+      return { success: false, error: 'Trade is still live in the working set', betId: id };
+    }
+
+    const amt = Number(row.amount) || 0;
+    if (amt <= 0) return { success: false, error: 'Trade stake invalid', betId: id };
+
+    // Newer failed rows carry the exact credited payout; older ones derive it
+    // from the duration multiplier with the same 0.99 house cap.
+    const payout = Number(
+      row.payout ?? row.payoutAmount ?? amt * this.multiplierFor(row.duration) * 0.99
+    );
+    if (!payout || payout <= 0 || !isFinite(payout)) {
+      return { success: false, error: 'Payout amount unknown', betId: id };
+    }
+
+    // Re-credit the wallet (the failed attempt reverted it).
+    const session = cache.sessions.get(addr);
+    if (session) {
+      session.balance = Number((session.balance + payout).toFixed(6));
+      this.syncBalance(addr, session);
+    }
+    this.io.to(addr).emit('balance_update', {
+      balance: String(session ? session.balance : payout),
+      reason: 'PAYOUT_RETRY',
+      betId: id,
+      payout
+    });
+
+    // Flip the history row to PAID — pushTrade merge-upserts and persists.
+    const exitPriceRaw = Number(row.exitPrice ?? row.lockedExitPrice ?? 0) || 0;
+    try {
+      profiles.pushTrade(addr, {
+        ...row,
+        status: 'PAID',
+        won: true,
+        paid: true,
+        payoutFailed: false,
+        payout,
+        exitPrice: exitPriceRaw,
+        payoutRetriedAt: Date.now()
+      });
+    } catch (e) {
+      console.warn(`[PayoutRetry] #${id} history update failed:`, e?.message || e);
+    }
+
+    this.io.to(addr).emit('payout_completed', { tradeId: id, betId: id, payout, retried: true });
+
+    this.io.emit('global_trade_settled', {
+      betId: id,
+      id,
+      won: true,
+      status: 'PAID',
+      paid: true,
+      payout,
+      exitPrice: exitPriceRaw || null,
+      userAddr: addr,
+      amount: row.amount,
+      symbol: row.symbol,
+      direction: row.direction,
+      duration: row.duration,
+      entryPrice: row.entryPrice,
+      sharePrice: row.sharePrice,
+      settledAt: Date.now(),
+      retried: true
+    });
+
+    console.log(`[PayoutRetry] #${id} credited ${payout} USDC to ${(addr || '').slice(0, 10)}…; re-broadcasting on-chain settle`);
+
+    // Background: give the chain another chance. Success here only confirms —
+    // the wallet credit already happened. Failure reverts exactly like the
+    // original attempt and re-flags the row so the retry pill comes back.
+    (async () => {
+      let retries = 0;
+      const maxRetries = 3;
+      let exitPriceBigInt;
+      try { exitPriceBigInt = ethers.parseUnits(exitPriceRaw.toFixed(8), 8); }
+      catch { exitPriceBigInt = ethers.parseUnits("0", 8); }
+      let payoutBigInt;
+      try { payoutBigInt = ethers.parseEther(payout.toFixed(6)); }
+      catch { payoutBigInt = ethers.parseEther("0.000001"); }
+
+      while (retries < maxRetries) {
+        try {
+          const data = this.contractInterface.encodeFunctionData('settleBet', [id, exitPriceBigInt, payoutBigInt]);
+          const nonce = await rpc.getNonce(rpc.wallet.address);
+          const txResponse = await rpc.broadcastWithFailover(
+            config.PRIVATE_KEY,
+            {
+              to: config.TREASURY_ADDRESS,
+              data,
+              gasLimit: 600000,
+              gasPrice: STATIC_GAS_PRICE,
+              nonce,
+              chainId: rpc.chainId
+            }
+          );
+          const receipt = await rpc.waitForReceipt(txResponse.hash, 8, 5000);
+          if (receipt && receipt.status === 1) {
+            console.log(`[PayoutRetry] #${id} confirmed on-chain`);
+            return;
+          }
+          try {
+            const verifyBet = await this.treasuryContract.bets(id);
+            if (verifyBet && verifyBet.settled) {
+              console.log(`[PayoutRetry] #${id} confirmed via direct check`);
+              return;
+            }
+          } catch {}
+          throw new Error("Receipt not found or status 0");
+        } catch (err) {
+          retries++;
+          console.error(`[PayoutRetry] #${id} attempt ${retries}/${maxRetries} failed:`, err?.message?.substring(0, 120) || err);
+          if (retries < maxRetries) await new Promise(r => setTimeout(r, 5000 * retries));
+        }
+      }
+
+      console.error(`[PayoutRetry] #${id} chain delivery failed again after ${maxRetries} attempts. Reverting credit.`);
+      const session2 = cache.sessions.get(addr);
+      if (session2) {
+        session2.balance = Number(Math.max(0, session2.balance - payout).toFixed(6));
+        this.syncBalance(addr, session2);
+        this.io.to(addr).emit('balance_update', {
+          balance: String(session2.balance),
+          reason: 'SETTLEMENT_FAILED_REVERT',
+          betId: id
+        });
+      }
+      try {
+        profiles.pushTrade(addr, {
+          ...row,
+          status: 'PAYOUT_FAILED',
+          won: true,
+          paid: false,
+          payoutFailed: true,
+          payout,
+          exitPrice: exitPriceRaw,
+          settledAt: Date.now()
+        });
+      } catch {}
+      this.io.to(addr).emit('payout_failed', {
+        betId: id,
+        message: 'Settlement failed again. The payout retry did not confirm on-chain.'
+      });
+      this.io.emit('global_trade_settled', {
+        betId: id,
+        id,
+        won: true,
+        status: 'PAYOUT_FAILED',
+        paid: false,
+        payoutFailed: true,
+        payout,
+        exitPrice: exitPriceRaw || null,
+        userAddr: addr,
+        amount: row.amount,
+        symbol: row.symbol,
+        direction: row.direction,
+        duration: row.duration,
+        entryPrice: row.entryPrice,
+        sharePrice: row.sharePrice,
+        settledAt: Date.now()
+      });
+    })();
+
+    return { success: true, alreadyPaid: false, betId: id, payout, userAddr: addr };
   }
 
   // ── TRADE PLACEMENT ────────────────────────────────────────────────────
@@ -918,11 +1147,20 @@ class ClassicEngine {
 
     this.io.emit('global_trade_settled', {
       betId: trade.id,
+      id: trade.id,
       won: false,
       status: 'LOST',
+      paid: false,
       payout: 0,
       exitPrice: trade.lockedExitPrice,
-      userAddr: trade.userAddr
+      userAddr: trade.userAddr,
+      amount: trade.amount,
+      symbol: trade.symbol,
+      direction: trade.direction,
+      duration: trade.duration,
+      entryPrice: trade.entryPrice,
+      sharePrice: trade.sharePrice,
+      settledAt: Date.now()
     });
   }
 

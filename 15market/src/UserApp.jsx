@@ -3697,6 +3697,19 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
             />
           </Suspense>
 
+          {/* Receipt card behind the Share button on settled win/lose cards
+              (LiveExecution + ActiveTradesSidebar set these states). It was
+              never mounted, so the button looked dead — now it opens the
+              downloadable receipt. */}
+          <Suspense fallback={null}>
+            <PnLModal
+              isOpen={isPnLOpen}
+              onClose={() => setIsPnLOpen(false)}
+              trade={selectedPnLTrade}
+              theme={theme}
+            />
+          </Suspense>
+
           {/* Disclaimer dialog for trades that have not settled yet. */}
           <AnimatePresence>
             {pendingTradeNotice && (

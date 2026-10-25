@@ -10,18 +10,36 @@ export function TransactionReceiptModal({ isOpen, onClose, transaction }) {
     if (!transaction || !isOpen) return null;
 
     const handleDownload = async () => {
-        if (cardRef.current === null) return;
+        if (cardRef.current === null || cardRef.current.dataset.captureBusy === '1') return;
+        cardRef.current.dataset.captureBusy = '1';
         try {
             const buttons = cardRef.current.querySelectorAll('.receipt-control');
             buttons.forEach(b => b.style.opacity = '0');
 
-            const dataUrl = await toPng(cardRef.current, {
-                cacheBust: true,
-                quality: 1,
-                backgroundColor: 'transparent'
-            });
+            let dataUrl = null;
+            try {
+                dataUrl = await toPng(cardRef.current, {
+                    cacheBust: true,
+                    quality: 1,
+                    backgroundColor: 'transparent'
+                });
+            } catch (err) {
+                // Web-font embedding is the usual first-pass failure; retry
+                // without inlining fonts so the save still succeeds.
+                console.warn('Receipt capture retrying without font embed:', err);
+                dataUrl = await toPng(cardRef.current, {
+                    quality: 0.95,
+                    backgroundColor: 'transparent',
+                    skipFonts: true
+                });
+            }
 
             buttons.forEach(b => b.style.opacity = '1');
+
+            if (!dataUrl || !dataUrl.startsWith('data:image')) {
+                alert('Could not generate the receipt image. Please try again.');
+                return;
+            }
 
             const link = document.createElement('a');
             link.download = `15market-${transaction.type}-${transaction.timestamp}.png`;
@@ -29,6 +47,9 @@ export function TransactionReceiptModal({ isOpen, onClose, transaction }) {
             link.click();
         } catch (err) {
             console.error('Failed to download image:', err);
+            alert('Could not generate the receipt image. Please try again.');
+        } finally {
+            delete cardRef.current?.dataset.captureBusy;
         }
     };
 

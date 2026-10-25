@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Shield,
@@ -46,6 +46,7 @@ import { GlobalTradeScroller } from "./GlobalTradeScroller";
 import { socketService } from "../utils/socket";
 import { COUNTRY_CENTER } from "./ui/places";
 import { RouteGlobe } from "./ui/route-globe";
+import { ThemeToggle } from "./ui/ThemeToggle";
 
 // Sidebar navigation: collapsible icon rail ↔ full menu. "Referral Program"
 // hosts the participants list (with earnings), the withdrawal request queue
@@ -119,6 +120,60 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     ]), [stats.activeCount, stats.totalVolume, stats.pendingDisputes, stats.bullBearRatio]);
 
     const [recentActivity, setRecentActivity] = useState([]);
+    // Payout-retry in-flight set: warms the spinning icon on a PAY FAIL pill
+    // while the engine re-credits and re-broadcasts the settlement.
+    const [retryingPayouts, setRetryingPayouts] = useState(() => new Set());
+
+    // Retry a won trade whose on-chain payout failed. The backend re-credits
+    // the user's wallet and re-broadcasts the settlement, re-emitting
+    // global_trade_settled — we also patch the row locally so the pill flips
+    // to PAID immediately even if that re-emit is what got dropped.
+    const retryPayout = async (row) => {
+        const id = String(row?.betId || row?.id || '');
+        if (!id) return;
+        setRetryingPayouts(prev => new Set(prev).add(id));
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/trades/${encodeURIComponent(id)}/payout-retry`, { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (data?.ok || data?.alreadyPaid || data?.success) {
+                setRecentActivity(prev => prev.map(x => (
+                    String(x.betId || x.id) === id
+                        ? {
+                            ...x,
+                            payoutFailed: false,
+                            paid: true,
+                            status: 'PAID',
+                            payout: x.payout ?? data.payout ?? 0,
+                            settledAt: x.settledAt || Date.now()
+                        }
+                        : x
+                )));
+            }
+        } catch (e) {}
+        finally {
+            setRetryingPayouts(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
+        }
+    };
+
+    // Event-driven refresh bus: any live platform event bumps the epoch, and
+    // every section-level fetch depends on it — so treasury, trades, analytics
+    // and referral data reconcile in real time on BOTH desktop and mobile
+    // instead of only when the page is reloaded. Bursts (the 10s stats pulse,
+    // several trades landing together) coalesce into one refetch.
+    const [dataEpoch, setDataEpoch] = useState(0);
+    const lastEpochBumpRef = useRef(0);
+    // Addresses that returned 404 from /profile — skip repeat lookups.
+    const profileMissRef = useRef(new Set());
+    const bumpEpoch = (force = false) => {
+        const now = Date.now();
+        if (!force && now - lastEpochBumpRef.current < 8000) return;
+        lastEpochBumpRef.current = now;
+        setDataEpoch(e => e + 1);
+    };
 
     // Realtime beam clock — ticks only while a trade in the feed is pending.
     const [feedNow, setFeedNow] = useState(() => Date.now());
@@ -140,9 +195,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         } catch (e) { /* list stays empty; the card shows a retry button */ }
     };
 
+    // Refetches on the event-driven epoch too — new commissions, withdrawals
+    // or participant events reconcile without a page reload.
     useEffect(() => {
         fetchRefWithdrawals();
-    }, []);
+    }, [dataEpoch]);
 
     const setRefWithdrawalStatus = async (id, status, note = '') => {
         setProcessingId(id);
@@ -301,17 +358,22 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             fetchRefUsers();
             if (wdSection === 'withdrawals') fetchRefWithdrawals();
         }
-    }, [adminTab, wdSection]);
+    }, [adminTab, wdSection, dataEpoch]);
 
     const fetchProfile = async (addr) => {
         if (!addr) return;
         const lowAddr = addr.toLowerCase();
         if (userProfiles[lowAddr]) return;
+        // Negative cache too — an address with no profile (fresh wallet) must
+        // not be re-requested on every event/ops pulse.
+        if (profileMissRef.current.has(lowAddr)) return;
         try {
             const res = await fetch(`${KEEPER_URL_ARC}/profile?address=${lowAddr}`);
             if (res.ok) {
                 const data = await res.json();
                 setUserProfiles(prev => ({ ...prev, [lowAddr]: data }));
+            } else {
+                profileMissRef.current.add(lowAddr);
             }
         } catch (e) {}
     };
@@ -326,6 +388,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             if (!data) return;
             setStats(prev => ({ ...prev, ...data }));
             setIsConnected(true);
+            // The pulse doubles as a refresh trigger for non-socket data
+            // (referral lists, treasury ledger) — debounced by the bus.
+            bumpEpoch();
         };
         const unbindMetrics = socketService.on('admin_stats_update', applyStats);
         const unbindMetrics2 = socketService.on('dashboard_stats', applyStats);
@@ -377,6 +442,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 shares: t.shares || t.amount,
                 entryPrice: t.entryPrice ?? null,
                 direction: dirRaw === '1' || dirRaw === 'UP' || dirRaw === 'LONG' ? 'UP' : 'DOWN',
+                status: t.status || null,
+                paid: t.paid !== undefined ? !!t.paid : null,
+                payoutFailed: !!t.payoutFailed,
                 timestamp: createdAt,
                 duration,
                 settleAt,
@@ -403,6 +471,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             upsertIndexedTrade(row);
             if (row.userAddr) fetchProfile(row.userAddr);
             pingUserCountry(row.userAddr || row.owner);
+            bumpEpoch();
         });
         // Back-compat alias (orig design event; harmless if the backend never fires it)
         const unbindTradesLegacy = socketService.on('new_trade', (trade) => {
@@ -416,28 +485,34 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         // Settlement: merge the verdict into the exact indexed row (matched by
         // betId). If the entry push was missed (admin connected mid-flight),
         // settle merges into any snapshot row or the head instead of vanishing.
+        // payoutFailed arrives as a real verdict too — it renders as a
+        // WON + PAY FAIL pill with a retry button, not a stuck "Resolving…".
         const bindSettled = socketService.on('global_trade_settled', (res) => {
             if (!res) return;
             const key = String(res.betId || res.tradeId || res.id || '');
             setRecentActivity(prev => {
                 const idx = prev.findIndex(x => String(x.betId || x.id) === key);
+                const paid = res.paid !== undefined ? !!res.paid : !res.payoutFailed;
                 if (idx === -1) {
                     // Result without a witnessed entry: still index it.
                     const row = normalizeIncomingTrade(res);
                     if (!row) return prev;
-                    return [{ ...row, pending: false, settled: true, won: !!res.won, payout: res.payout ?? 0, exitPrice: res.exitPrice ?? null, timestamp: Date.now(), type: 'TRADE_SETTLED' }, ...prev].slice(0, 60);
+                    return [{ ...row, pending: false, settled: true, won: !!res.won, status: res.status || (res.won ? 'PAID' : 'LOST'), paid, payoutFailed: !!res.payoutFailed, payout: res.payout ?? 0, exitPrice: res.exitPrice ?? null, timestamp: Date.now(), type: 'TRADE_SETTLED' }, ...prev].slice(0, 60);
                 }
                 const next = [...prev];
                 next[idx] = {
                     ...next[idx],
                     pending: false,
                     settled: true,
-                    settledAt: Date.now(),
+                    settledAt: res.settledAt || Date.now(),
                     won: !!res.won,
                     status: res.status || (res.won ? 'WON' : 'LOST'),
+                    paid,
+                    payoutFailed: !!res.payoutFailed,
                     payout: res.payout ?? next[idx].payout ?? 0,
-                    exitPrice: res.exitPrice ?? null,
+                    exitPrice: res.exitPrice ?? next[idx].exitPrice ?? null,
                 };
+                bumpEpoch();
                 return next;
             });
         });
@@ -446,41 +521,102 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         const unbindUsers = socketService.on('user_onboarded', (user) => {
             if (user.address) fetchProfile(user.address);
             pingUserCountry(user.address);
+            bumpEpoch();
         });
+
+        // REST fallback for the ops pulse: pull /admin/stats straight away on
+        // mount, on every (re)connect, and every 30s — so a dropped mobile
+        // socket self-heals with real numbers instead of displaying mounting
+        // defaults until a reload.
+        const fetchStatsRest = async () => {
+            try {
+                const res = await fetch(`${KEEPER_URL_ARC}/admin/stats`);
+                if (res.ok) applyStats(await res.json());
+            } catch (e) {}
+        };
+        fetchStatsRest();
+        const unbindConnect = socketService.onConnect(() => {
+            setIsConnected(true);
+            bumpEpoch(true);
+            fetchStatsRest();
+        });
+        const statsFallback = setInterval(fetchStatsRest, 30000);
+
+        // Mobile browsers suspend sockets in background tabs; when the page
+        // becomes visible again, force a reconnect and a full reconcile so
+        // values are current without a manual refresh.
+        const onVisible = () => {
+            if (document.visibilityState !== 'visible') return;
+            if (!socketService.socket?.connected) socketService.connect();
+            bumpEpoch(true);
+            fetchStatsRest();
+        };
+        document.addEventListener('visibilitychange', onVisible);
 
         // 4. Recent activity history for the Overview feed (snapshot; the
         //    socket pushes above keep it live afterwards).
+        //    Runs once at mount AND every 12s: a snapshot row that carries a
+        //    verdict resolves any still-pending row (or a stale PAY FAIL row
+        //    that a retry elsewhere settled), so a settle event the socket
+        //    dropped self-heals within a beat instead of hanging on
+        //    "Resolving…" forever. Never clobbers live socket rows.
         const fetchHistory = async () => {
             try {
                 const histRes = await fetch(`${KEEPER_URL_ARC}/history`);
                 if (histRes.ok) {
                     const histData = await histRes.json();
-                    const seen = new Set();
-                    const rows = (histData || []).slice(0, 60).map(h => {
-                        const row = normalizeIncomingTrade(h);
-                        if (row && row.betId) seen.add(row.betId);
-                        // Snapshot rows are finished trades unless settleAt is in the future.
-                        if (row && (h.won === true || h.won === false || h.settledAt)) {
-                            row.pending = false;
-                            row.settled = true;
-                            row.type = 'TRADE_SETTLED';
-                            row.won = !!h.won;
-                            row.payout = h.payout ?? null;
-                            row.exitPrice = h.exitPrice ?? null;
-                        }
-                        return row;
-                    });
-                    setRecentActivity(rows);
                     (histData || []).slice(0, 20).forEach(h => {
                         if (h.owner) fetchProfile(h.owner);
                         if (h.userAddr) fetchProfile(h.userAddr);
+                    });
+                    setRecentActivity(prev => {
+                        const byId = new Map(prev.map(r => [String(r.betId || r.id), r]));
+                        for (const h of (histData || []).slice(0, 60)) {
+                            const row = normalizeIncomingTrade(h);
+                            if (!row || !row.betId) continue;
+                            const failed = !!h.payoutFailed || String(h.status || '').toUpperCase() === 'PAYOUT_FAILED';
+                            if (h.won === true || h.won === false || h.settledAt || failed) {
+                                row.pending = false;
+                                row.settled = true;
+                                row.type = 'TRADE_SETTLED';
+                                row.won = !!h.won;
+                                row.status = h.status || (h.won ? 'PAID' : 'LOST');
+                                row.payout = h.payout ?? null;
+                                row.exitPrice = h.exitPrice ?? null;
+                                row.payoutFailed = failed;
+                                row.paid = !failed && !!h.won;
+                            }
+                            const local = byId.get(row.betId);
+                            if (!local) { byId.set(row.betId, row); continue; }
+                            const snapHasVerdict = row.settled && (row.won === true || row.won === false);
+                            // A pending/mid-flight local row yields to a settled
+                            // snapshot; an already-settled local row only yields
+                            // when it is payout-failed (a recovered payment) or
+                            // the snapshot verdict is strictly newer.
+                            if (snapHasVerdict && (!local.settled || local.payoutFailed)) {
+                                byId.set(row.betId, { ...local, ...row });
+                            } else if (row.settled && local.settled && local.payoutFailed && row.paid) {
+                                byId.set(row.betId, { ...local, ...row });
+                            } else if (row.settled && local.settled &&
+                                Number(row.settledAt || row.timestamp || 0) > Number(local.settledAt || local.timestamp || 0)) {
+                                byId.set(row.betId, { ...local, ...row });
+                            }
+                        }
+                        return [...byId.values()]
+                            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+                            .slice(0, 60);
                     });
                 }
             } catch (e) {}
         };
         fetchHistory();
+        const histTimer = setInterval(fetchHistory, 12000);
 
         return () => {
+            clearInterval(histTimer);
+            clearInterval(statsFallback);
+            document.removeEventListener('visibilitychange', onVisible);
+            unbindConnect();
             unbindMetrics();
             unbindMetrics2();
             bindExecuted();
@@ -779,25 +915,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 {/* Bottom rail: theme switch + collapse toggle + identity */}
                 <div className={`flex-none p-3 flex flex-col gap-1.5 border-t ${isLight ? 'border-black/5' : 'bg-transparent border-white/5'}`}>
                     {sidebarOpen ? (
-                        <button
-                            onClick={toggleTheme}
-                            className={`flex items-center gap-3 px-3 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${isLight ? 'text-black/70 hover:text-black' : 'text-white/70 hover:text-white'}`}
-                        >
-                            {isLight ? <Moon size={14} /> : <Sun size={14} />}
-                            <span>Theme</span>
-                            {/* the pill switch — ON = light, knob slides on toggle */}
+                        <div className="flex items-center gap-3 px-3 py-1">
                             <span
-                                className={`ml-auto relative w-9 h-5 rounded-full p-0.5 flex-none transition-colors ${isLight ? 'bg-[#3CB371]' : 'bg-white/15'}`}
-                                role="switch"
-                                aria-checked={isLight}
+                                className="text-[9px] font-black uppercase tracking-widest flex-none"
+                                style={{ color: isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)' }}
                             >
-                                <motion.div
-                                    animate={{ x: isLight ? 16 : 0 }}
-                                    transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-                                    className="w-4 h-4 rounded-full bg-white shadow"
-                                />
+                                Theme
                             </span>
-                        </button>
+                            <ThemeToggle theme={themeState} onToggle={toggleTheme} />
+                        </div>
                     ) : (
                         <button
                             onClick={toggleTheme}
@@ -843,8 +969,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             {/* Main column */}
             <div className="flex-1 flex flex-col min-w-0">
 
-                {/* MOBILE top bar — brand + quick identity, above the scroller */}
-                <div className={`md:hidden flex-none flex items-center gap-3 px-4 py-2.5 border-b backdrop-blur-3xl z-40 ${isLight ? 'bg-white/60 border-black/5' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
+                {/* MOBILE top bar — brand + quick identity, above the scroller.
+                    Transparent on purpose: the console background continues
+                    through it, so the phone view reads as one fullscreen
+                    surface with no off-tone navbar strip behind the logo. */}
+                <div className="md:hidden flex-none flex items-center gap-3 px-4 py-2.5 z-40">
                     <img
                         src={isLight ? '/goblogo.png' : '/gowlogo.png'}
                         alt="15market"
@@ -853,13 +982,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     <span className={`w-px h-7 flex-none ${isLight ? 'bg-black/10' : 'bg-white/15'}`} />
                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#1A6140] flex-none">Admin</span>
                     <div className="ml-auto flex items-center gap-2">
-                        <button
-                            onClick={toggleTheme}
-                            title="Switch theme"
-                            className={`p-2.5 rounded-xl transition-all active:scale-95 ${isLight ? 'bg-black/[0.04] text-black/50' : 'bg-white/5 text-white/50'}`}
-                        >
-                            {isLight ? <Moon size={15} /> : <Sun size={15} />}
-                        </button>
+                        <ThemeToggle theme={themeState} onToggle={toggleTheme} />
                         {auth?.email && (
                             <button
                                 onClick={auth.signOut || auth.onSignOut}
@@ -897,9 +1020,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         ))}
                     </div>
 
-                    {/* Platform trade index — plain indexed feed, no boxes behind the rows */}
+                    {/* Trade index — trades sit directly under the metrics. The
+                        counts/description block above the list is desktop-only;
+                        phones go straight into the rows. */}
                     <div className="flex flex-col min-w-0">
-                        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+                        {/* Desktop-only counts + feed description */}
+                        <div className="mb-3 hidden lg:flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-4">
                                 <div>
                                     <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>{String(recentActivity.length).padStart(2, '0')}</div>
@@ -932,9 +1058,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         initial={{ x: -16, opacity: 0 }}
                                         animate={{ x: 0, opacity: 1 }}
                                         key={act.id || `${act.timestamp}-${i}`}
-                                        className={`px-2 lg:px-3 py-2.5 lg:grid lg:grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] lg:items-center lg:gap-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 justify-between min-w-0 transition-colors ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
+                                        className={`px-2 lg:px-3 py-2.5 lg:grid lg:grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] lg:items-center lg:gap-3 flex items-center justify-between gap-3 min-w-0 transition-colors ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
                                     >
                                         <span className="hidden lg:block text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
+                                        {/* Left cluster: avatar + trader; the market line underneath
+                                            carries symbol • side • stake so a phone user reads the
+                                            whole trade in one glance without the desktop columns. */}
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className={`w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center flex-none ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
                                                 {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.avatar ? (
@@ -952,7 +1081,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                     {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.username || `${(act.userAddr || act.owner || "0x").slice(0, 6)}…`}
                                                     {act.type === 'TRADE_PLACED' && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-none" />}
                                                 </div>
-                                                <div className="text-[8px] opacity-40 font-bold uppercase font-mono truncate lg:hidden">{act.symbol} • ${act.amount}</div>
+                                                <div className={`text-[8px] font-bold uppercase font-mono truncate lg:hidden ${act.direction === 'UP' ? 'text-[#1A6140]/70' : 'text-red-500/70'}`}>
+                                                    {act.symbol || '—'} {act.direction === 'UP' ? '▲ UP' : '▼ DOWN'} • ${Number(act.amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="hidden lg:flex flex-col min-w-0">
@@ -964,8 +1095,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         <div className={`hidden lg:flex items-center justify-center px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
                                             {act.direction === 'UP' ? '▲ Up' : '▼ Down'}
                                         </div>
-                                        <div className={`lg:block text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</div>
-                                        <div className="min-w-0 w-full sm:w-[92px] sm:flex-none">
+                                        <div className={`hidden lg:block text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</div>
+                                        {/* Result column — right-aligned on phones so the
+                                            verdict/pill reads as the row's outcome. */}
+                                        <div className="flex-none flex flex-col items-end gap-1 min-w-[92px] lg:min-w-0 lg:items-start">
                                             {act.pending && act.settleAt && !act.settled ? (
                                                 (() => {
                                                     const start = Number(act.timestamp || act.createdAt) || (act.settleAt - 15000);
@@ -981,21 +1114,42 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                                     style={{ width: `${beamPct}%` }}
                                                                 />
                                                             </div>
-                                                            <div className={`text-[8px] font-black uppercase tracking-widest mt-1 ${gone ? 'text-red-500 animate-pulse' : 'text-amber-500'}`}>
+                                                            <div className={`text-[8px] font-black uppercase tracking-widest mt-1 text-right lg:text-left ${gone ? 'text-red-500 animate-pulse' : 'text-amber-500'}`}>
                                                                 {gone ? 'Resolving…' : `${secsLeft}s`}
                                                             </div>
                                                         </>
                                                     );
                                                 })()
                                             ) : (
-                                                <div className={`text-[10px] font-black uppercase tracking-wide ${act.won ? 'text-[#1A6140]' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
-                                                    {act.won
-                                                        ? <span>WON +${Number(act.payout || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}{act.exitPrice ? <span className="opacity-50 font-mono text-[8px] ml-1">exit {act.exitPrice}</span> : null}</span>
-                                                        : (act.settled ? 'LOST' : (act.pending ? 'PENDING' : (act.type === 'TRADE_PLACED' ? 'PENDING' : 'LOST')))}
+                                                <div className="flex flex-col items-end lg:items-start gap-1 min-w-0">
+                                                    <div className={`text-[10px] font-black uppercase tracking-wide text-right lg:text-left ${act.won ? 'text-[#1A6140]' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
+                                                        {act.won
+                                                            ? <span>WON +${Number(act.payout || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}{act.exitPrice ? <span className="opacity-50 font-mono text-[8px] ml-1">exit {act.exitPrice}</span> : null}</span>
+                                                            : (act.settled ? 'LOST' : (act.pending ? 'PENDING' : (act.type === 'TRADE_PLACED' ? 'PENDING' : 'LOST')))}
+                                                    </div>
+                                                    {/* Paid state: every settled win shows whether the
+                                                        won amount actually landed in the user's wallet.
+                                                        A payout delivery failure surfaces a red pill with
+                                                        a retry button instead of a silent hang. */}
+                                                    {act.won && act.payoutFailed && (
+                                                        <button
+                                                            onClick={() => retryPayout(act)}
+                                                            title="Retry payout delivery to the user's wallet"
+                                                            className={`flex items-center gap-1 px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest cursor-pointer transition-colors ${isLight ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'} ${retryingPayouts.has(String(act.betId || act.id)) ? 'animate-pulse' : ''}`}
+                                                        >
+                                                            <RefreshCw size={8} className={retryingPayouts.has(String(act.betId || act.id)) ? 'animate-spin' : ''} />
+                                                            Pay fail · retry
+                                                        </button>
+                                                    )}
+                                                    {act.won && !act.payoutFailed && (act.paid !== false) && (
+                                                        <span className={`px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest w-fit ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-[#1A6140]/20 text-[#4ade80]'}`}>
+                                                            Paid
+                                                        </span>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="text-[8px] opacity-30 font-mono">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                        <div className="flex-none text-[8px] opacity-30 font-mono">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                     </motion.div>
                                 ))
                             )}

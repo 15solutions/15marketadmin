@@ -12,20 +12,39 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
     const isLight = theme === 'light';
 
     const handleDownload = async () => {
-        if (cardRef.current === null) return;
+        if (cardRef.current === null || cardRef.current.dataset.captureBusy === '1') return;
+        cardRef.current.dataset.captureBusy = '1';
         try {
             // Hide buttons during download
             const buttons = cardRef.current.querySelectorAll('.receipt-control');
             buttons.forEach(b => b.style.opacity = '0');
 
-            const dataUrl = await toPng(cardRef.current, {
-                cacheBust: true,
-                quality: 1,
-                backgroundColor: '#f8f8f8'
-            });
+            let dataUrl = null;
+            try {
+                dataUrl = await toPng(cardRef.current, {
+                    cacheBust: true,
+                    quality: 1,
+                    backgroundColor: '#f8f8f8'
+                });
+            } catch (err) {
+                // First pass can fail on web-font embedding (CORS on the font
+                // files). Retry without font inlining — the card still renders
+                // in its loaded families because the DOM styles are inlined.
+                console.warn('Receipt capture retrying without font embed:', err);
+                dataUrl = await toPng(cardRef.current, {
+                    quality: 0.95,
+                    backgroundColor: '#f8f8f8',
+                    skipFonts: true
+                });
+            }
 
             // Restore buttons
             buttons.forEach(b => b.style.opacity = '1');
+
+            if (!dataUrl || !dataUrl.startsWith('data:image')) {
+                alert('Could not generate the card image. Please try again.');
+                return;
+            }
 
             const link = document.createElement('a');
             link.download = `15market-pnl-${trade.id}.png`;
@@ -33,6 +52,9 @@ export function PnLModal({ isOpen, onClose, trade, theme }) {
             link.click();
         } catch (err) {
             console.error('Failed to download image:', err);
+            alert('Could not generate the card image. Please try again.');
+        } finally {
+            delete cardRef.current?.dataset.captureBusy;
         }
     };
 

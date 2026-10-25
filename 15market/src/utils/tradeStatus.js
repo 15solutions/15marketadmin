@@ -64,3 +64,39 @@ export function isWinningTrade(trade) {
   if (WIN_STATUSES.includes(String(trade.status || '').toUpperCase())) return true;
   return Number(trade.payout) > 0;
 }
+
+// How many shares the stake bought, and what each share cost at entry.
+// A share costs the side's odds at entry (e.g. 61¢) and redeems $1 at
+// settlement, so:
+//   · a WON trade's payout IS the share count (payout = shares × $1)
+//   · a LOST trade has no payout but the duration's payout multiplier is
+//     exactly 1/odds, so shares = amount × multiplier
+// and in both cases price = amount / shares — the same convention the
+// receipt and PnL cards already print.
+export function tradeShares(trade) {
+  if (!trade) return { shares: null, price: null };
+  const amt = Number(trade.amount);
+  if (!amt || isNaN(amt) || amt <= 0) return { shares: null, price: null };
+  const payout = Number(trade.payout);
+  const won = trade.won === true ||
+    ['WON', 'PAID'].includes(String(trade.status || '').toUpperCase());
+  // Exact backend model when the trade carries its locked share price:
+  // gross payout = stake / sharePrice, house keeps 1%, so shares bought =
+  // stake / sharePrice × 0.99. Fall back to the duration multiplier
+  // (multiplier ≈ 1 / entry odds) when the price never arrived.
+  const lockedPrice = Number(trade.sharePrice);
+  let shares;
+  if (won && !isNaN(payout) && payout > 0) {
+    // A won trade's credited payout IS its share count — matches the receipt.
+    shares = payout;
+  } else if (lockedPrice > 0 && isFinite(lockedPrice)) {
+    shares = (amt / Math.max(0.03, Math.min(0.97, lockedPrice))) * 0.99;
+  } else {
+    shares = amt * (trade.duration <= 5 ? 2.90 : trade.duration <= 10 ? 2.40 : 1.90);
+  }
+  if (!shares || isNaN(shares) || shares <= 0) return { shares: null, price: null };
+  const price = lockedPrice > 0 && isFinite(lockedPrice)
+    ? Math.max(0.03, Math.min(0.97, lockedPrice))
+    : amt / shares;
+  return { shares, price };
+}

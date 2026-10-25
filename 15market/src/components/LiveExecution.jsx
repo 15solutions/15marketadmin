@@ -2,7 +2,7 @@ import React, { memo, useState, useEffect, useMemo, useRef } from 'react';
 import { Share2, X, Zap, TrendingUp, TrendingDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Stamp } from './Stamp';
-import { isTradeSettled } from '../utils/tradeStatus';
+import { isTradeSettled, tradeShares } from '../utils/tradeStatus';
 import { KEEPER_URL_ARC } from '../constants';
 
 const LCD_COUNTER_STYLE = `
@@ -280,6 +280,16 @@ function LiveExecutionComponent({
                                             <span className={`text-base font-matrix tracking-widest ${(instantStatus === "WON" || trade.status === "WON") ? 'text-[#1A6140]' : 'text-[#FF7F50]'}`}>
                                                 {(instantStatus === "WON" || trade.status === "WON") ? `+$${Number(trade.payout || potentialProfit).toFixed(2)}` : "$0.00"}
                                             </span>
+                                            {/* Shares bought + the price of a share, same convention
+                                                as the receipt cards (share count = credited payout). */}
+                                            {(() => {
+                                                const info = tradeShares(trade);
+                                                return (info.shares && (!trade.status || trade.status === "WON" || trade.status === "PAID")) ? (
+                                                    <span className={`text-[9px] font-black tabular-nums tracking-wide ${isLight ? 'text-[#0a261a]/50' : 'text-white/45'}`}>
+                                                        {Number(info.shares).toFixed(2)}sh @ {Math.round(Number(info.price || 0) * 100)}¢
+                                                    </span>
+                                                ) : null;
+                                            })()}
                                             {isPayoutPending && (
                                                 <div className="flex items-center gap-1">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-[#1A6140] animate-ping" />
