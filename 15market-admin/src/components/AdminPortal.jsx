@@ -232,13 +232,13 @@ export function AdminPortal({ onBack, notify }) {
                                             autoComplete="new-password"
                                             value={bootPassword}
                                             onChange={e => setBootPassword(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && bootEmail && bootPassword.length >= 8 && handleBootstrap()}
-                                            placeholder="Password (min 8)"
+                                            onKeyDown={e => e.key === 'Enter' && bootEmail && /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/.test(bootPassword) && handleBootstrap()}
+                                            placeholder="Password (8+, Aa1!)"
                                             className={`${inputCls} !tracking-normal !text-base`}
                                         />
                                         <button
                                             onClick={handleBootstrap}
-                                            disabled={busy === 'bootstrap' || !bootEmail.trim() || bootPassword.length < 8}
+                                            disabled={busy === 'bootstrap' || !bootEmail.trim() || bootPassword.length < 8 || !(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/.test(bootPassword))}
                                             className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#1A6140] text-white shadow-[0_0_35px_-8px_rgba(26,97,64,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
                                         >
                                             {busy === 'bootstrap' ? <Loader2 size={18} className="animate-spin" /> : <><UserPlus size={18} /> Continue</>}

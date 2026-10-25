@@ -38,7 +38,9 @@ import {
     Flame,
     BarChart3,
     Sun,
-    Moon
+    Moon,
+    ShieldAlert,
+    Radar
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
@@ -57,6 +59,7 @@ const NAV = [
     { key: 'analytics', label: 'Analytics', hint: 'Globe · Reach · Users', icon: Globe },
     { key: 'referrals', label: 'Referral Program', hint: 'Participants · Earnings · Requests', icon: Users },
     { key: 'broadcast', label: 'Broadcast', hint: 'Live banner · Alerts', icon: Radio },
+    { key: 'siem', label: 'SIEM', hint: 'Threats · Intrusions', icon: ShieldAlert },
     { key: 'security', label: 'Security', hint: 'Protocols · Team', icon: Shield }
 ];
 
@@ -524,6 +527,27 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             bumpEpoch();
         });
 
+        // 3.5 SIEM — backend pushes HIGH/CRITICAL security events live so bad
+        // actors are surfaced on the console the moment they act.
+        const unbindSiem = socketService.on('siem_alert', (ev) => {
+            if (!ev) return;
+            setSiemEvents(prev => [ev, ...prev].slice(0, 250));
+            setSiemSummary(prev => prev ? {
+                ...prev,
+                total24h: (prev.total24h || 0) + 1,
+                [ev.type === 'AUTH_FAILURE' ? 'authFailures'
+                    : ev.type === 'AUTH_BRUTEFORCE' ? 'bruteforce'
+                    : ev.type === 'ADMIN_TAMPER' ? 'tamper'
+                    : 'rateAbuse']: (prev[ev.type === 'AUTH_FAILURE' ? 'authFailures'
+                        : ev.type === 'AUTH_BRUTEFORCE' ? 'bruteforce'
+                        : ev.type === 'ADMIN_TAMPER' ? 'tamper' : 'rateAbuse'] || 0) + 1,
+                lastEventAt: ev.at
+            } : prev);
+            if (ev.severity === 'high' || ev.severity === 'critical') {
+                notify(`SIEM · ${ev.message} (from ${ev.ip})`, 'error');
+            }
+        });
+
         // REST fallback for the ops pulse: pull /admin/stats straight away on
         // mount, on every (re)connect, and every 30s — so a dropped mobile
         // socket self-heals with real numbers instead of displaying mounting
@@ -618,6 +642,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             document.removeEventListener('visibilitychange', onVisible);
             unbindConnect();
             unbindMetrics();
+            unbindSiem();
             unbindMetrics2();
             bindExecuted();
             bindSettled();
@@ -724,6 +749,39 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const visibleNav = NAV.filter(t => (t.key === 'referrals' ? canReferrals : t.key === 'broadcast' ? canBroadcast : true));
     // Fall back to Overview if a permission change hid the saved section.
     const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : 'overview';
+
+    // ── SIEM — live threat/abuse feed (backend ring buffer + siem_alert) ──
+    const [siemEvents, setSiemEvents] = useState([]);
+    const [siemSummary, setSiemSummary] = useState(null);
+    const [siemBusy, setSiemBusy] = useState(false);
+
+    const fetchSiem = async () => {
+        setSiemBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/siem/events`);
+            if (res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setSiemEvents(Array.isArray(data.events) ? data.events : []);
+                setSiemSummary(data.summary || null);
+            }
+        } catch (e) { /* feed stays as-is */ }
+        finally { setSiemBusy(false); }
+    };
+
+    const clearSiem = async () => {
+        if (!auth?.isRoot) return;
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/siem/events`, { method: 'DELETE' });
+            if (res.ok) {
+                setSiemEvents([]);
+                notify('SIEM log cleared', 'success');
+            } else notify('Could not clear SIEM log', 'error');
+        } catch (e) { notify('Could not clear SIEM log', 'error'); }
+    };
+
+    useEffect(() => {
+        if (adminTab === 'siem') fetchSiem();
+    }, [adminTab, dataEpoch]);
 
     // ── Admins & Moderators (root-only, migration 011) ───────────────────
     const [adminRoster, setAdminRoster] = useState([]);
@@ -1005,15 +1063,20 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 {activeNav === 'overview' && (
                 <div className="w-full flex flex-col gap-6 min-w-0">
 
-                    {/* Headline ops metrics — HUD readouts, directly on the background */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                    {/* Headline ops metrics — ONE scrollable line on phones
+                        (swipe to reveal Treasury / trades), grid on desktop.
+                        Treasury + Total Trades live here too so the whole
+                        platform health reads at a glance. */}
+                    <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory gap-4 md:grid md:grid-cols-3 lg:grid-cols-6 md:gap-6 md:overflow-visible">
                         {[
                             { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371' },
                             { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, color: '#3b82f6' },
                             { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
-                            { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' }
+                            { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' },
+                            { label: 'Treasury', value: `${Number(stats.treasuryBalance || 0).toFixed(2)} ARC`, color: '#3CB371' },
+                            { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#a78bfa' }
                         ].map((stat, i) => (
-                            <div key={i} className="border-l-2 pl-3 min-w-0" style={{ borderColor: `${stat.color}55` }}>
+                            <div key={i} className="border-l-2 pl-3 min-w-0 flex-none w-[128px] snap-start md:w-auto md:flex-1" style={{ borderColor: `${stat.color}55` }}>
                                 <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
                                 <div className={`text-lg md:text-xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
                             </div>
@@ -1276,7 +1339,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             type="password"
                                             value={newAdmin.password}
                                             onChange={e => setNewAdmin(prev => ({ ...prev, password: e.target.value }))}
-                                            placeholder="temp password (min 8)"
+                                            placeholder="temp password (8+, Aa1!)"
                                             className={`px-4 py-2.5 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
                                         />
                                         <div className="flex gap-2">
@@ -1310,11 +1373,14 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     </div>
                                     <button
                                         onClick={createAdmin}
-                                        disabled={createAdminBusy || !newAdmin.email.trim() || newAdmin.password.length < 8}
+                                        disabled={createAdminBusy || !newAdmin.email.trim() || !/^.{8,}$/.test(newAdmin.password) || !(/[a-z]/.test(newAdmin.password) && /[A-Z]/.test(newAdmin.password) && /[0-9]/.test(newAdmin.password) && /[^a-zA-Z0-9]/.test(newAdmin.password))}
                                         className="w-full py-3 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
                                     >
                                         {createAdminBusy ? 'Creating…' : 'Create account'}
                                     </button>
+                                    <div className="text-[8px] font-medium opacity-40 -mt-1">
+                                        Supabase policy: password needs 8+ chars incl. lower &amp; upper case, a digit and a special character.
+                                    </div>
                                 </motion.div>
                             )}
 
@@ -1449,6 +1515,89 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         </div>
                         )}
+                    </div>
+                )}
+
+                {/* SIEM — security information & event management. Watchers on
+                    every admin/referral call classify brute force, privilege
+                    tampering and request floods; events stream live to this
+                    feed with severity coding. */}
+                {activeNav === 'siem' && (
+                    <div className="w-full flex flex-col gap-6 min-w-0">
+
+                        {siemSummary && (
+                            <div className="flex overflow-x-auto no-scrollbar gap-3 md:grid md:grid-cols-4 md:gap-6 md:overflow-visible">
+                                {[
+                                    { label: 'Security events · 24h', value: String(siemSummary.total24h | 0), color: '#a78bfa' },
+                                    { label: 'Brute force', value: String(siemSummary.bruteforce | 0), color: '#ef4444' },
+                                    { label: 'Tamper attempts', value: String((siemSummary.tamper | 0) + (siemSummary.authFailures | 0)), color: '#f59e0b' },
+                                    { label: 'Request floods', value: String(siemSummary.rateAbuse | 0), color: '#3b82f6' }
+                                ].map((stat, i) => (
+                                    <div key={i} className="border-l-2 pl-3 min-w-0 flex-none w-[128px] snap-start md:w-auto md:flex-1" style={{ borderColor: `${stat.color}55` }}>
+                                        <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
+                                        <div className={`text-lg md:text-xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Feed head */}
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center">
+                                    <Radar size={15} />
+                                </div>
+                                <div>
+                                    <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Threat Feed</div>
+                                    <div className="text-[8px] font-black uppercase tracking-widest opacity-40">
+                                        {siemSummary && siemSummary.lastEventAt ? `Last event ${Math.max(0, Math.round((Date.now() - siemSummary.lastEventAt) / 1000))}s ago` : 'Watching admin surface'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={fetchSiem}
+                                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                >
+                                    <span className="inline-flex items-center gap-2"><RefreshCw size={11} className={siemBusy ? 'animate-spin' : ''} /> Refresh</span>
+                                </button>
+                                {auth?.isRoot && (
+                                    <button
+                                        onClick={clearSiem}
+                                        className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border border-red-500/30 text-red-500 hover:bg-red-500/10"
+                                    >
+                                        Clear log
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Event feed — plain rows, no boxes */}
+                        <div className={`flex flex-col min-w-0 max-h-[520px] overflow-y-auto no-scrollbar border-y ${isLight ? 'border-black/5' : 'border-white/10'}`}>
+                            {siemEvents.length === 0 && (
+                                <div className="py-6 px-2 text-center text-[9px] font-medium opacity-40">
+                                    No security events recorded. Authentication, tamper and rate watchers are live on every admin &amp; referral call.
+                                </div>
+                            )}
+                            {siemEvents.map((ev, i) => {
+                                const sevColors = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', info: '#3b82f6' };
+                                const sev = sevColors[ev.severity] || '#6b7280';
+                                const typeLabels = { AUTH_FAILURE: 'Auth failure', AUTH_BRUTEFORCE: 'Brute force', ADMIN_TAMPER: 'Admin tamper', RATE_ABUSE: 'Rate abuse' };
+                                return (
+                                    <div key={ev.id || i} className={`flex items-start gap-3 px-2 lg:px-3 py-2.5 border-b last:border-b-0 ${isLight ? 'border-black/5' : 'border-white/5'}`}>
+                                        <div className="w-1.5 h-1.5 rounded-full flex-none mt-1.5" style={{ backgroundColor: sev }} />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: sev }}>{typeLabels[ev.type] || ev.type}</span>
+                                                <span className="text-[8px] font-mono opacity-30 uppercase">{ev.ip}</span>
+                                            </div>
+                                            <div className={`text-[10px] font-medium mt-0.5 ${isLight ? 'text-black/70' : 'text-white/70'}`}>{ev.message}</div>
+                                        </div>
+                                        <div className="flex-none text-[8px] opacity-30 font-mono">{new Date(ev.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
 

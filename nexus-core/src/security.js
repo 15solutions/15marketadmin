@@ -106,6 +106,10 @@ const ROLE_DEFAULTS = {
   moderator: ['ref.withdrawals']
 };
 
+// Character-class names matching Supabase's global password policy order
+// (lowercase, uppercase, digits, specials) — used to explain weak passwords.
+const PASSWORD_POLICY_HINTS = ['lowercase letters', 'uppercase letters', 'digits', 'special characters'];
+
 const adminSessions = new Map(); // legacy map kept so requireOwnership's shape is unchanged
 const sessionCache = new Map();  // access token -> { user, expiresAt }
 
@@ -271,7 +275,14 @@ async function handleAdminBootstrap(req, res) {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const password = String(req.body?.password || '');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email' });
-    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    // Supabase global password policy: at least one lower, upper, digit and
+    // special character. Validate locally so the UI gets a readable error
+    // instead of an opaque "Supabase rejected the account" wall.
+    const PW_TESTS = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/];
+    const pwFail = PASSWORD_POLICY_HINTS.filter((_, i) => !PW_TESTS[i].test(password));
+    if (password.length < 8 || pwFail.length) {
+      return res.status(400).json({ error: pwFail.length ? `Password must also contain: ${pwFail.join(', ')}` : 'Password must be at least 8 characters' });
+    }
     if (ROOT_ADMIN_EMAIL && email !== ROOT_ADMIN_EMAIL) {
       return res.status(403).json({ error: 'This email is not the configured root admin (ROOT_ADMIN_EMAIL)' });
     }
@@ -339,7 +350,14 @@ async function handleAdminCreate(req, res) {
       return res.status(400).json({ error: 'Role must be admin or moderator — the root role is reserved for the initial bootstrap' });
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email' });
-    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    // Supabase global password policy: at least one lower, upper, digit and
+    // special character. Validate locally so the UI gets a readable error
+    // instead of an opaque "Supabase rejected the account" wall.
+    const PW_TESTS = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/];
+    const pwFail = PASSWORD_POLICY_HINTS.filter((_, i) => !PW_TESTS[i].test(password));
+    if (password.length < 8 || pwFail.length) {
+      return res.status(400).json({ error: pwFail.length ? `Password must also contain: ${pwFail.join(', ')}` : 'Password must be at least 8 characters' });
+    }
     const perms = Array.isArray(req.body?.permissions) ? req.body.permissions.filter(p => ALL_PERMISSIONS.includes(p) && p !== 'admins.manage') : ROLE_DEFAULTS[role];
 
     const created = await supabaseAdminRest('/auth/v1/admin/users', {

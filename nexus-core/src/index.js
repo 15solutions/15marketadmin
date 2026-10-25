@@ -86,10 +86,40 @@ const isAllowedOrigin = (origin) => {
 const corsOptions = { origin: (origin, cb) => cb(null, isAllowedOrigin(origin)), credentials: true };
 const io = new Server(server, { cors: corsOptions });
 notificationService.init(io);
+const siem = require('./siem');
+// Every HIGH/CRITICAL SIEM alert reaches open admin dashboards live.
+siem.setBroadcaster((event) => io.emit('siem_alert', event));
 
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+/**
+ * SIEM instrumentation middleware — sits BEFORE all routes and inspects each
+ * finished admin/referral response:
+ *   401 → failed admin authentication (brute-force tracker)
+ *   403 → authenticated privilege escalation attempt (tamper tracker)
+ * Every request feeds the per-IP rate-abuse tracker.
+ */
+app.use((req, res, next) => {
+    try {
+        const path = req.path.toLowerCase();
+        const watched = path.startsWith('/admin') || path.startsWith('/referral') || path.startsWith('/history');
+        if (!watched) return next();
+
+        const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+            || req.socket?.remoteAddress || 'unknown';
+        res.on('finish', () => {
+            try {
+                siem.trackRequest(ip);
+                const code = res.statusCode;
+                if (code === 401) siem.trackAdminAuthFailure(ip, { via: path, method: req.method });
+                else if (code === 403) siem.trackAdminTamper(ip, { via: path, method: req.method });
+            } catch (e) { /* SIEM must never break the API */ }
+        });
+    } catch (e) { /* SIEM must never break the API */ }
+    next();
+});
 
 // --- Deterministic Session Wallet Derivation ---
 
@@ -176,6 +206,19 @@ app.get('/admin/auth/admins', requireRoot, handleAdminList);
 app.post('/admin/auth/admins', requireRoot, handleAdminCreate);
 app.patch('/admin/auth/admins/:id', requireRoot, handleAdminUpdate);
 app.delete('/admin/auth/admins/:id', requireRoot, handleAdminDelete);
+
+/**
+ * SIEM — security event feed for the admin console.
+ * GET  /admin/siem/events — last 250 events + 24h summary
+ * Root only: DELETE /admin/siem/events — clear the log after triage.
+ */
+app.get('/admin/siem/events', requireAdminAuth, (req, res) => {
+    res.json({ summary: siem.summary(), events: siem.listEvents() });
+});
+app.delete('/admin/siem/events', requireRoot, (req, res) => {
+    siem.clearAll();
+    res.json({ ok: true });
+});
 
 /**
  * AGGREGATED ADMIN METRICS BROADCAST
