@@ -30,7 +30,6 @@ export function sessionValid(session = getSession()) {
 
 /** Email+password sign-in via the Supabase Auth REST endpoint. */
 export async function loginWithPassword(email, password) {
-    if (!SUPABASE_ANON_KEY) throw new Error('Supabase Auth is not configured (VITE_SUPABASE_ANON_KEY missing)');
     let res;
     try {
         res = await fetch(`${SUPABASE_AUTH_URL}/auth/v1/token?grant_type=password`, {
