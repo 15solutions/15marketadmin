@@ -27,7 +27,7 @@ services:
       - fromContext: env
         key: ADMIN_TOKEN
       - key: ALLOWED_ORIGINS
-        value: "https://15market.online,https://api.15market.online"
+        value: "https://15market.online,https://api.15market.online,https://admin.15market.online"
 
   # Frontend Service (Static Site)
   - type: static
@@ -83,9 +83,9 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_KEEPER_URL
-        value: https://15market-backend.onrender.com
+        value: https://api.15market.online
       - key: VITE_KEEPER_URL_ARC
-        value: https://15market-backend.onrender.com
+        value: https://api.15market.online
       - key: VITE_SUPABASE_URL
         value: https://cwzbdxvninfagfbaehre.supabase.co
       - key: VITE_SUPABASE_AUTH_URL

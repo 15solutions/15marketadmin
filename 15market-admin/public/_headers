@@ -1,0 +1,6 @@
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  X-XSS-Protection: 1; mode=block
+  X-Robots-Tag: noindex, nofollow
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://app.beta.getpara.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://*.15market.online https://api.15market.online https://*.supabase.co wss://*.supabase.co https://hermes.pyth.network https://api.devnet.solana.com https://rpc.testnet.arc.io https://rpc.blockdaemon.testnet.arc.io https://rpc.drpc.testnet.arc.io https://rpc.quicknode.testnet.arc.io wss://rpc.testnet.arc.io wss://rpc.blockdaemon.testnet.arc.io wss://rpc.drpc.testnet.arc.io wss://rpc.quicknode.testnet.arc.io https://price.jup.ag https://app.beta.getpara.com https://pulse.walletconnect.org https://api.web3modal.org https://rpc.walletconnect.com wss://relay.walletconnect.com https://cca-lite.coinbase.com https://api.binance.com https://api.mexc.com https://15market-backend.onrender.com

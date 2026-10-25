@@ -40,10 +40,17 @@ export async function loginWithPassword(email, password) {
         res = await fetch(`${SUPABASE_AUTH_URL}/auth/v1/token?grant_type=password`, {
             method: 'POST',
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password }),
+            signal: AbortSignal.timeout(10000),
         });
     } catch (e) {
-        throw new Error('Could not reach Supabase Auth — check your network connection.');
+        const isTimeout = e?.name === 'TimeoutError' || e?.name === 'AbortError';
+        // A CORS block surfaces as a TypeError with no useful message.
+        // A paused Supabase project also rejects the TCP connection immediately.
+        const hint = isTimeout
+            ? 'The request timed out.'
+            : 'This is usually a CORS rejection (add your admin domain to Supabase → Auth → URL Configuration) or the Supabase project is paused (visit app.supabase.com to resume it).';
+        throw new Error(`Could not reach Supabase Auth. ${hint}`);
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
