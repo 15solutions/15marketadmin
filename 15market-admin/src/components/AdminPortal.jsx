@@ -178,15 +178,9 @@ export function AdminPortal({ onBack, notify }) {
                 <div className={`absolute bottom-[-12%] left-[-8%] w-[520px] h-[520px] rounded-full blur-[130px] ${isLight ? 'bg-[#1A6140]/6' : 'bg-[#1A6140]/5'}`} />
             </div>
 
-            {/* Top bar — back chip only; the brand shows as the logo below */}
+            {/* Top bar — spacer only; back button removed from auth page */}
             <div className="flex-none flex items-center justify-between px-5 z-10" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}>
-                <button
-                    onClick={onBack || (() => window.location.href = '/')}
-                    aria-label="Back"
-                    className={`w-10 h-10 rounded-full border flex items-center justify-center active:scale-95 ${isLight ? 'border-gray-200 text-[#0a261a]/60' : 'border-white/10 text-white/60'}`}
-                >
-                    <ArrowLeft size={18} />
-                </button>
+                <div className="w-10" />
                 <div className="w-10" />
             </div>
 

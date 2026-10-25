@@ -590,17 +590,13 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
             style={{ fontFamily: '"Comfortaa", cursive' }}
         >
             <div className="flex items-center justify-between px-5" style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}>
-                {step !== 'entry' ? (
-                    <button
-                        onClick={goBack}
-                        aria-label="Back"
-                        className={`w-10 h-10 rounded-full border flex items-center justify-center active:scale-95 ${isLight ? 'border-gray-200 text-[#0a261a]/60' : 'border-white/10 text-white/60'}`}
-                    >
-                        <ArrowLeft size={18} />
-                    </button>
-                ) : (
-                    <div className="w-10" aria-hidden="true" />
-                )}
+                <button
+                    onClick={goBack}
+                    aria-label="Back"
+                    className={`w-10 h-10 rounded-full border flex items-center justify-center active:scale-95 ${isLight ? 'border-gray-200 text-[#0a261a]/60' : 'border-white/10 text-white/60'}`}
+                >
+                    <ArrowLeft size={18} />
+                </button>
                 <div className="w-10" aria-hidden="true" />
             </div>
 
