@@ -38,7 +38,14 @@ export async function loginWithPassword(email, password) {
             body: JSON.stringify({ email, password })
         });
     } catch (e) {
-        throw new Error('Could not reach Supabase Auth — check the network or the admin app CSP');
+        // A missing or empty VITE_SUPABASE_ANON_KEY causes Supabase to reject
+        // the CORS preflight, which the browser surfaces as a network error
+        // (not an HTTP error). Check that the env var is set in the Render
+        // dashboard and the admin service was redeployed after it was added.
+        if (!SUPABASE_ANON_KEY) {
+            throw new Error('Supabase anon key is missing — set VITE_SUPABASE_ANON_KEY in the Render dashboard and redeploy the admin service.');
+        }
+        throw new Error('Could not reach Supabase Auth — check your network connection.');
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {

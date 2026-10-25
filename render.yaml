@@ -86,4 +86,11 @@ services:
         value: https://15market-backend.onrender.com
       - key: VITE_KEEPER_URL_ARC
         value: https://15market-backend.onrender.com
+      - key: VITE_SUPABASE_URL
+        value: https://cwzbdxvninfagfbaehre.supabase.co
+      - key: VITE_SUPABASE_AUTH_URL
+        value: https://cwzbdxvninfagfbaehre.supabase.co
+      # VITE_SUPABASE_ANON_KEY must be set in the Render Dashboard (secret)
+      - fromContext: env
+        key: VITE_SUPABASE_ANON_KEY
 
