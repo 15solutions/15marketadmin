@@ -536,10 +536,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 username: payload.username || null,
                 referralCode: payload.referralCode || null,
                 referredBy: payload.referredBy || null,
+                enrolled: true,
                 enrolledAt: payload.enrolledAt || Date.now(),
                 suspended: false,
                 rateOverride: null,
                 slashed: 0,
+                hasEmail: false,
             };
             setRefUsers(prev => {
                 // Avoid duplicates if a re-fetch already added the row.

@@ -1619,7 +1619,13 @@ class ProfileService {
             hasEmail: !!(p.email || p.verifiedEmail)
         });
         const query = 'select=address,username,referral_code,referred_by,referred_at,referral_enrolled,referral_enrolled_at,referral_suspended,referral_rate_override,referral_slashed,email,verified_email&referral_enrolled=eq.true&order=referral_enrolled_at.desc&limit=200';
-        if (SUPABASE_ENABLED && this.sbReferralAvailable !== false) {
+        // Admin query always tries Supabase directly — the service-role key
+        // bypasses RLS so the sbReferralAvailable probe result (which may
+        // have been blocked by RLS on a non-service-role path) is irrelevant.
+        // Only fall through to memory on a hard error or a true 400 (missing
+        // column), so enrolled users from before the last process restart
+        // are always visible.
+        if (SUPABASE_ENABLED) {
             try {
                 let path = `/rest/v1/profiles?${query}`;
                 if (q) {
@@ -1642,10 +1648,14 @@ class ProfileService {
                         hasEmail: !!(r.email || r.verified_email)
                     }));
                 }
-                // 400 here means the referral columns are missing (010 not
-                // applied) — fall through to the memory layer with what we have.
-                console.warn('[Referral] admin users query fell back to memory (referral columns missing?)');
-            } catch (e) { /* fall through */ }
+                if (res.status === 400) {
+                    console.warn('[Referral] admin users query fell back to memory (referral columns missing — run 009_referrals.sql)');
+                } else {
+                    console.warn('[Referral] admin users Supabase query failed', res.status);
+                }
+            } catch (e) {
+                console.warn('[Referral] admin users Supabase request error:', e.message);
+            }
         }
         const term = q ? String(q).trim().replace(/^@/, '').toLowerCase() : '';
         return Object.values(this.profiles || {})

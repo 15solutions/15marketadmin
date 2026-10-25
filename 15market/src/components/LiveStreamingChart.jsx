@@ -83,10 +83,14 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         targetPriceRef.current = null;
         interpolatedPriceRef.current = null;
         priceHistoryRef.current = [];
+        symbolRef._resetAt = Date.now();
 
         // The parent may already hold real points (it streams them itself) —
         // use them straight away, no round trip needed.
-        if (Array.isArray(priceHistory) && priceHistory.length) {
+        // IMPORTANT: only accept them when a socket tick already arrived for
+        // THIS symbol (targetPriceRef is non-null), so stale points from the
+        // previous symbol don't become the chart seed.
+        if (Array.isArray(priceHistory) && priceHistory.length && targetPriceRef.current !== null) {
             const seedPts = [];
             for (const p of priceHistory) {
                 if (!p) continue;
@@ -97,13 +101,12 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             if (seedPts.length) priceHistoryRef.current = seedPts.slice(-1200);
         }
 
-        // Seed from the prop so the draw loop doesn't stall before the first socket tick.
-        const seed = parseFloat(currentPrice);
-        if (!isNaN(seed) && seed > 0) {
-            targetPriceRef.current = seed;
-            interpolatedPriceRef.current = seed;
-            startTimeRef.current = Date.now();
-        }
+        // Do NOT seed targetPriceRef / interpolatedPriceRef from the currentPrice
+        // prop here. The prop may still hold the previous symbol's price while
+        // the parent hasn't received a tick for the new symbol yet. Seeding from
+        // it causes a visible spike: the chart starts at the old/wrong price,
+        // then slams down to the real price as the easing loop runs.
+        // The async history fetch below sets the correct seed once it arrives.
 
         // Pull the backend's recent price history so the chart renders a full,
         // correctly-scaled window on frame one (no "wait for the form").
@@ -155,15 +158,26 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
     }, [symbol]);
 
     // Update target from parent's 5Hz pulse — fast path when socket relay is slow.
+    // Only runs once we already have a valid price for THIS symbol (i.e. the
+    // async history seed has resolved and set targetPriceRef).  If we don't
+    // have one yet we skip the prop — a stale/wrong prop value must never
+    // become the first data point on the chart.
     useEffect(() => {
         const p = parseFloat(currentPrice);
         if (!isNaN(p) && p > 0) {
-            targetPriceRef.current = p;
-            if (interpolatedPriceRef.current === null) {
-                interpolatedPriceRef.current = p;
-            }
-            if (startTimeRef.current === null) {
-                startTimeRef.current = Date.now();
+            // Guard: only update when the chart is already initialised for this
+            // symbol OR when the prop is for a symbol we haven't received a
+            // history tick for in a reasonable time (>3 s after symbol reset).
+            const alreadyInit = targetPriceRef.current !== null;
+            const longWait = startTimeRef.current === null && (Date.now() - (symbolRef._resetAt || 0)) > 3000;
+            if (alreadyInit || longWait) {
+                targetPriceRef.current = p;
+                if (interpolatedPriceRef.current === null) {
+                    interpolatedPriceRef.current = p;
+                }
+                if (startTimeRef.current === null) {
+                    startTimeRef.current = Date.now();
+                }
             }
         }
     }, [currentPrice]);

@@ -870,7 +870,13 @@ export function CircleWalletPage({
                 setSendAmount("");
                 setDestAddress("");
             } else if (currentWallet.key === 'main') {
-                const eoaWallet = wallets?.find(w => w.walletClientType === 'privy') || wallets?.[0];
+                // Resolve the wallet that actually owns mainWalletAddress.
+                // Prefer an external/injected connector (MetaMask, etc.) whose
+                // address matches — only fall back to the Privy embedded wallet
+                // when no external match is found.
+                const eoaWallet = wallets?.find(w =>
+                    w.address?.toLowerCase() === (mainWalletAddress || '').toLowerCase()
+                ) || wallets?.find(w => w.walletClientType !== 'privy') || wallets?.find(w => w.walletClientType === 'privy') || wallets?.[0];
                 if (!eoaWallet) throw new Error("No connected wallet found");
 
                 notify("Preparing transfer...", "pending");
