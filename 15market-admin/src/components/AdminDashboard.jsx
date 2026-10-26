@@ -1120,9 +1120,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         ].map((stat, i) => (
                             <div key={i} className="border-l-2 pl-3 min-w-0 flex-none w-[128px] snap-start md:w-auto md:flex-1" style={{ borderColor: `${stat.color}55` }}>
                                 <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
-                                <div className={`text-lg md:text-xl font-black tracking-tight tabular-nums leading-tight truncate flex items-center gap-1 ${isLight ? 'text-black' : 'text-white'}`}>
-                                    {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-4 h-4 flex-none" style={{ filter: isLight ? 'brightness(0) saturate(100%) invert(27%) sepia(60%) saturate(600%) hue-rotate(110deg) brightness(90%)' : 'brightness(0) invert(1)' }} />}
+                                <div className={`text-lg md:text-xl font-black tracking-tight tabular-nums leading-tight truncate flex items-center gap-1.5 ${isLight ? 'text-black' : 'text-white'}`}>
                                     {stat.value}
+                                    {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-8 h-8 flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
                                 </div>
                             </div>
                         ))}
@@ -1293,8 +1293,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div key={i} className="border-l-2 pl-3 min-w-0" style={{ borderColor: `${stat.color}55` }}>
                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
                                     <div className={`text-lg xl:text-2xl font-black tracking-tight tabular-nums leading-tight truncate flex items-center gap-1.5 ${isLight ? 'text-black' : 'text-white'}`}>
-                                        {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-4 h-4 flex-none" style={{ filter: isLight ? 'brightness(0) saturate(100%) invert(27%) sepia(60%) saturate(600%) hue-rotate(110deg) brightness(90%)' : 'brightness(0) invert(1)' }} />}
                                         {stat.value}
+                                        {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-8 h-8 flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
                                     </div>
                                 </div>
                             ))}
@@ -1311,9 +1311,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 {[...platformStats, ...pulseStats].map((stat, i) => (
                                     <div key={i} className="border-l-2 pl-2.5 py-0.5 flex-none min-w-[84px]" style={{ borderColor: `${stat.color}55` }}>
                                         <div className="text-[6.5px] font-black uppercase tracking-[0.15em] opacity-40 whitespace-nowrap">{stat.label}</div>
-                                        <div className={`text-sm font-black tracking-tight tabular-nums leading-tight whitespace-nowrap flex items-center gap-1 ${isLight ? 'text-black' : 'text-white'}`}>
-                                            {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-3 h-3 flex-none" style={{ filter: isLight ? 'brightness(0) saturate(100%) invert(27%) sepia(60%) saturate(600%) hue-rotate(110deg) brightness(90%)' : 'brightness(0) invert(1)' }} />}
+                                        <div className={`text-sm font-black tracking-tight tabular-nums leading-tight whitespace-nowrap flex items-center gap-1.5 ${isLight ? 'text-black' : 'text-white'}`}>
                                             {stat.value}
+                                            {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-6 h-6 flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
                                         </div>
                                     </div>
                                 ))}
