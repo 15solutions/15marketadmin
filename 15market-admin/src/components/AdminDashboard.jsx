@@ -1276,8 +1276,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         </div>
 
-                        {/* Column legend (desktop) */}
-                        <div className={`hidden lg:grid grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] gap-3 px-3 pb-2 text-[7px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
+                        {/* Trade index is a REAL table on every screen: the column
+                            headers sit right under the metrics, and phones swipe
+                            horizontally (same gesture as the metrics strip) while
+                            desktop fits every column at rest. Header + rows share
+                            one min-width so they always stay aligned. */}
+                        <div className="overflow-x-auto no-scrollbar">
+                        <div className="min-w-[660px] flex flex-col">
+                        {/* Column legend — headers for each data column */}
+                        <div className={`grid grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] gap-3 px-3 pb-2 text-[7px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
                             <span>#</span><span>Trader</span><span>Market</span><span>Side</span><span>Amount</span><span>Result</span><span>Time</span>
                         </div>
                         <div className={`flex flex-col max-h-[600px] overflow-y-auto no-scrollbar divide-y ${isLight ? 'divide-black/5' : 'divide-white/5'}`}>
@@ -1291,67 +1298,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         initial={{ x: -16, opacity: 0 }}
                                         animate={{ x: 0, opacity: 1 }}
                                         key={act.id || `${act.timestamp}-${i}`}
-                                        className={`px-2 lg:px-3 py-2.5 lg:grid lg:grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] lg:items-center lg:gap-3 flex flex-col gap-1.5 min-w-0 transition-colors ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
+                                        className={`px-3 py-2.5 grid grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] items-center gap-3 min-w-0 transition-colors ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
                                     >
-                                        <span className="hidden lg:block text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
-
-                                        {/* ===== MOBILE — the SAME column order as the desktop
-                                            legend: # Trader · Market · Side · Amount · Result ·
-                                            Time — compact label/value lines so every datum
-                                            reads clearly on a phone. */}
-                                        <div className="lg:hidden min-w-0 flex-1 flex flex-col gap-1">
-                                            {/* L1 — # · Trader */}
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <span className="flex-none text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
-                                                <div className={`w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center flex-none ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
-                                                    {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.avatar ? (
-                                                        <img src={userProfiles[(act.userAddr || act.owner || "").toLowerCase()].avatar} className="w-full h-full object-cover" alt="" />
-                                                    ) : (
-                                                        <UserCheck size={12} />
-                                                    )}
-                                                </div>
-                                                <div className="text-[10px] font-black uppercase flex items-center gap-2 truncate min-w-0">
-                                                    {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.username || `${(act.userAddr || act.owner || "0x").slice(0, 6)}…`}
-                                                    {act.type === 'TRADE_PLACED' && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-none" />}
-                                                </div>
-                                            </div>
-                                            {/* L2 — Market */}
-                                            <div className="flex items-center gap-2 pl-1 min-w-0">
-                                                <span className="flex-none w-[48px] text-[6.5px] font-black uppercase tracking-widest opacity-40">Market</span>
-                                                <span className={`text-[10px] font-black uppercase font-mono ${isLight ? 'text-black' : 'text-white'}`}>{act.symbol || '—'}</span>
-                                                {act.entryPrice != null && (
-                                                    <span className="text-[8px] font-mono opacity-40 uppercase truncate min-w-0">entry {Number(act.entryPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
-                                                )}
-                                            </div>
-                                            {/* L3 — Side */}
-                                            <div className="flex items-center gap-2 pl-1 min-w-0">
-                                                <span className="flex-none w-[48px] text-[6.5px] font-black uppercase tracking-widest opacity-40">Side</span>
-                                                <span className={`flex-none px-1.5 py-[2px] rounded-full text-[8px] font-black uppercase tracking-widest ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
-                                                    {act.direction === 'UP' ? '▲ Up' : '▼ Down'}
-                                                </span>
-                                            </div>
-                                            {/* L4 — Amount */}
-                                            <div className="flex items-center gap-2 pl-1 min-w-0">
-                                                <span className="flex-none w-[48px] text-[6.5px] font-black uppercase tracking-widest opacity-40">Amount</span>
-                                                <span className={`text-[10px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</span>
-                                            </div>
-                                            {/* L5 — Result (beam spans the full line, spinner after) */}
-                                            <div className="flex items-center gap-2 pl-1 min-w-0">
-                                                <span className="flex-none w-[48px] text-[6.5px] font-black uppercase tracking-widest opacity-40">Result</span>
-                                                <div className="flex-1 flex items-center min-w-0">
-                                                    {act.pending && act.settleAt && !act.settled ? renderPendingFeedCell(act) : renderVerdictFeedCell(act)}
-                                                </div>
-                                            </div>
-                                            {/* L6 — Time */}
-                                            <div className="flex items-center gap-2 pl-1 min-w-0">
-                                                <span className="flex-none w-[48px] text-[6.5px] font-black uppercase tracking-widest opacity-40">Time</span>
-                                                <span className="text-[8px] font-mono opacity-30">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* ===== DESKTOP — the grid columns (unchanged order),
-                                            reusing the same shared cell renderers. */}
-                                        <div className="hidden lg:flex items-center gap-3 min-w-0 flex-1">
+                                        <span className="text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
+                                        {/* Trader column */}
+                                        <div className="flex items-center gap-3 min-w-0">
                                             <div className={`w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center flex-none ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
                                                 {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.avatar ? (
                                                     <img
@@ -1368,25 +1319,31 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 {act.type === 'TRADE_PLACED' && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-none" />}
                                             </div>
                                         </div>
-                                        <div className="hidden lg:flex flex-col min-w-0">
+                                        {/* Market column */}
+                                        <div className="flex flex-col min-w-0">
                                             <span className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black' : 'text-white'}`}>{act.symbol || '—'}</span>
                                             {act.entryPrice != null && (
                                                 <span className="text-[7px] font-mono opacity-40 uppercase">entry {Number(act.entryPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
                                             )}
                                         </div>
-                                        <div className={`hidden lg:flex items-center justify-center px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
+                                        {/* Side column */}
+                                        <div className={`flex items-center justify-center px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
                                             {act.direction === 'UP' ? '▲ Up' : '▼ Down'}
                                         </div>
-                                        <div className={`hidden lg:block text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</div>
+                                        {/* Amount column */}
+                                        <div className={`block text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</div>
                                         {/* Result column — the shared beam / verdict cell */}
-                                        <div className="hidden lg:flex flex-col items-start gap-1 min-w-0">
+                                        <div className="flex flex-col items-start gap-1 min-w-0">
                                             {act.pending && act.settleAt && !act.settled ? renderPendingFeedCell(act) : renderVerdictFeedCell(act)}
                                         </div>
-                                        <div className="hidden lg:block flex-none text-[8px] opacity-30 font-mono">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                        {/* Time column */}
+                                        <div className="flex-none text-[8px] opacity-30 font-mono">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                     </motion.div>
                                 ))
                             )}
                         </div>
+                        </div>{/* min-w table body (x-scrolled on phones) */}
+                        </div>{/* — overflow-x: headers + rows swipe together */}
                     </div>
                 </div>
                 )}
