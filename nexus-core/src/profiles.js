@@ -225,6 +225,23 @@ function parseJsonField(v) {
 // Map in-memory camelCase profile -> Supabase snake_case row.
 // Undefined keys are dropped (JSON.stringify) so absent fields do not
 // overwrite existing column values on merge-upserts.
+
+// timestamptz columns (migration 009) reject raw epoch-ms numbers with
+// `22008 date/time field value out of range` — a failure that previously
+// 400'd EVERY referral write silently. Always serialize to ISO8601; reads
+// normalize back to epoch-ms (rowToProfile accepts both shapes).
+function toTstz(v) {
+    if (v == null) return null;
+    try {
+        if (typeof v === 'number') return new Date(v).toISOString();
+        if (typeof v === 'string') {
+            if (/^\d{10,}$/.test(v.trim())) return new Date(Number(v)).toISOString();
+            return v;
+        }
+        return new Date(v).toISOString();
+    } catch (e) { return null; }
+}
+
 function profileToRow(profile, includeTrades, includeOnboarding = true, includeChainRecon = true) {
     const row = {
         address: profile.address,
@@ -262,9 +279,9 @@ function profileToRow(profile, includeTrades, includeOnboarding = true, includeC
         // can never silently drop a referral link the user applied once.
         referral_code: profile.referralCode ?? null,
         referred_by: profile.referredBy ?? null,
-        referred_at: profile.referredAt != null ? profile.referredAt : null,
+        referred_at: toTstz(profile.referredAt),
         referral_enrolled: profile.referralEnrolled ?? false,
-        referral_enrolled_at: profile.referralEnrolledAt != null ? profile.referralEnrolledAt : null,
+        referral_enrolled_at: toTstz(profile.referralEnrolledAt),
         // Referral admin controls (migration 010): suspension, per-user
         // commission-rate override and slashed commission must round-trip or
         // every admin action would evaporate on restart.
