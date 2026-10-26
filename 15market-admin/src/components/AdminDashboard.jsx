@@ -1122,7 +1122,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
                                 <div className={`text-lg md:text-xl font-black tracking-tight tabular-nums leading-tight truncate flex items-center gap-1.5 ${isLight ? 'text-black' : 'text-white'}`}>
                                     {stat.value}
-                                    {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-8 h-8 flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
+                                    {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-[21px] h-[21px] flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
                                 </div>
                             </div>
                         ))}
@@ -1294,7 +1294,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
                                     <div className={`text-lg xl:text-2xl font-black tracking-tight tabular-nums leading-tight truncate flex items-center gap-1.5 ${isLight ? 'text-black' : 'text-white'}`}>
                                         {stat.value}
-                                        {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-8 h-8 flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
+                                        {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-[21px] h-[21px] flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
                                     </div>
                                 </div>
                             ))}
@@ -1313,7 +1313,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         <div className="text-[6.5px] font-black uppercase tracking-[0.15em] opacity-40 whitespace-nowrap">{stat.label}</div>
                                         <div className={`text-sm font-black tracking-tight tabular-nums leading-tight whitespace-nowrap flex items-center gap-1.5 ${isLight ? 'text-black' : 'text-white'}`}>
                                             {stat.value}
-                                            {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-6 h-6 flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
+                                            {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-[15px] h-[15px] flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
                                         </div>
                                     </div>
                                 ))}
