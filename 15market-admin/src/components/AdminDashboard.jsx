@@ -197,6 +197,131 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         const iv = setInterval(() => setFeedNow(Date.now()), 250);
         return () => clearInterval(iv);
     }, [pendingFeedCount]);
+
+    // Live quotes for the feed's pending trades — powers the SAME win/lose
+    // tracker the user side paints onto its beam: current market price vs the
+    // trade's entry, in the trade's own direction. Polled only while trades
+    // are actually pending (one request per distinct symbol every 4s).
+    const [livePrices, setLivePrices] = useState({});
+    const pendingSymbolsKey = useMemo(() => (
+        [...new Set(recentActivity.filter(t => t.pending && t.settleAt && !t.settled)
+            .map(t => String(t.symbol || '').toLowerCase()))].filter(Boolean).sort().join(',')
+    ), [recentActivity]);
+    useEffect(() => {
+        if (!pendingSymbolsKey) return;
+        let alive = true;
+        const syms = pendingSymbolsKey.split(',');
+        const poll = async () => {
+            const out = {};
+            await Promise.all(syms.map(async s => {
+                try {
+                    const res = await fetch(`${KEEPER_URL_ARC}/price/${encodeURIComponent(s)}`);
+                    if (res.ok) { const j = await res.json(); if (j && j.price > 0) out[s] = Number(j.price); }
+                } catch { /* offline — keep the last known quote */ }
+            }));
+            if (alive && Object.keys(out).length) setLivePrices(prev => ({ ...prev, ...out }));
+        };
+        poll();
+        const iv = setInterval(poll, 4000);
+        return () => { alive = false; clearInterval(iv); };
+    }, [pendingSymbolsKey]);
+
+    // -----------------------------------------------------------------------
+    // Feed cell renderers — shared by the desktop grid AND the stacked mobile
+    // layout so both sizes always show identical data.
+
+    // PENDING — the EXACT radiant laser beam from the user side
+    // (TradingWidget.ProgressBeam): slanted ash/grey striped conduit track,
+    // glowing laser fill whose COLOR is the live win/lose tracker, white spark
+    // flare riding the advancing edge. The circling pending spinner rides
+    // AFTER the beam in the same line — no countdown text; the settled event
+    // replaces this cell the moment the verdict lands.
+    const renderPendingFeedCell = (act) => {
+        const start = Number(act.timestamp || act.createdAt) || (act.settleAt - 15000);
+        const span = Math.max(1000, act.settleAt - start);
+        const elapsed = feedAt - start;
+        const beamPct = Math.max(0, Math.min(100, (elapsed / span) * 100));
+        const entry = Number(act.entryPrice);
+        const live = livePrices[String(act.symbol || '').toLowerCase()] || 0;
+        const isWinning = (live > 0 && entry > 0)
+            ? (act.direction === 'UP' ? live > entry : live < entry)
+            : null; // no live quote yet — neutral amber until the first tick lands
+        const color = isWinning === null ? '#f59e0b' : isWinning ? '#1A6140' : '#FF914D';
+        const head = isWinning === null ? '#fcd34d' : isWinning ? '#1A6140' : '#FFB085';
+        return (
+            <div className="w-full flex items-center gap-1.5">
+                <div className="flex-1 relative flex items-center min-w-[56px] h-[24px] px-1 select-none">
+                    {/* Conduit track — slanted ash/grey diagonal stripes on the UN-FILLED portion */}
+                    <div
+                        className="w-full h-[6px] rounded-full relative overflow-hidden"
+                        style={{
+                            background: 'repeating-linear-gradient(135deg, rgba(148,150,155,0.30) 0 4px, rgba(148,150,155,0.08) 4px 9px)',
+                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.25)',
+                        }}
+                    >
+                        {/* Radiant Laser Line Beam — width only from progress, color from win/lose */}
+                        <div
+                            className="h-full rounded-full relative flex items-center justify-end will-change-[width]"
+                            style={{
+                                width: `${beamPct}%`,
+                                background: `linear-gradient(90deg, ${color} 0%, ${head} 100%)`,
+                                boxShadow: `0 0 6px ${color}, 0 0 12px ${color}, 0 0 20px ${color}`,
+                            }}
+                        >
+                            {/* Laser Head Flare / Spark on the advancing (right) edge */}
+                            {beamPct > 1 && (
+                                <div className="relative flex items-center justify-center">
+                                    <div
+                                        className="absolute w-[9px] h-[9px] rounded-full animate-ping opacity-60 pointer-events-none"
+                                        style={{ backgroundColor: color }}
+                                    />
+                                    <div
+                                        className="w-[4px] h-[7px] rounded-full z-10"
+                                        style={{ backgroundColor: '#ffffff', boxShadow: `0 0 6px #ffffff, 0 0 12px ${color}, 0 0 18px ${color}` }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                {/* Circling pending spinner — AFTER the beam, same line */}
+                <div
+                    className="flex-none w-3.5 h-3.5 rounded-full border-2 animate-spin"
+                    style={{ borderColor: color, borderTopColor: 'transparent', opacity: 0.75 }}
+                />
+            </div>
+        );
+    };
+
+    // SETTLED / verdict — +payout or LOST, plus the Paid / payout-retry state.
+    const renderVerdictFeedCell = (act) => (
+        <div className="flex flex-col items-start gap-1 min-w-0">
+            <div className={`text-[10px] font-black uppercase tracking-wide ${act.won ? 'text-[#1A6140]' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
+                {act.won
+                    ? <span>+${Number(act.payout || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                    : (act.settled ? 'LOST' : (act.pending ? 'PENDING' : (act.type === 'TRADE_PLACED' ? 'PENDING' : 'LOST')))}
+            </div>
+            {/* Paid state: every settled win shows whether the won amount
+                actually landed in the user's wallet. A payout delivery failure
+                surfaces a red pill with a retry button instead of a hang. */}
+            {act.won && act.payoutFailed && (
+                <button
+                    onClick={() => retryPayout(act)}
+                    title="Retry payout delivery to the user's wallet"
+                    className={`flex items-center gap-1 px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest cursor-pointer transition-colors ${isLight ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'} ${retryingPayouts.has(String(act.betId || act.id)) ? 'animate-pulse' : ''}`}
+                >
+                    <RefreshCw size={8} className={retryingPayouts.has(String(act.betId || act.id)) ? 'animate-spin' : ''} />
+                    Pay fail · retry
+                </button>
+            )}
+            {act.won && !act.payoutFailed && (act.paid !== false) && (
+                <span className={`px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest w-fit ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-[#1A6140]/20 text-[#4ade80]'}`}>
+                    Paid
+                </span>
+            )}
+        </div>
+    );
+
     const [userProfiles, setUserProfiles] = useState({});
     // Referral commission withdrawal requests (manual payouts — not on-chain).
     const [refWithdrawals, setRefWithdrawals] = useState([]);
@@ -1166,13 +1291,51 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         initial={{ x: -16, opacity: 0 }}
                                         animate={{ x: 0, opacity: 1 }}
                                         key={act.id || `${act.timestamp}-${i}`}
-                                        className={`px-2 lg:px-3 py-2.5 lg:grid lg:grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] lg:items-center lg:gap-3 flex items-center justify-between gap-3 min-w-0 transition-colors ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
+                                        className={`px-2 lg:px-3 py-2.5 lg:grid lg:grid-cols-[36px_minmax(0,1.3fr)_minmax(0,0.8fr)_64px_88px_92px_72px] lg:items-center lg:gap-3 flex flex-col gap-1.5 min-w-0 transition-colors ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
                                     >
                                         <span className="hidden lg:block text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
-                                        {/* Left cluster: avatar + trader; the market line underneath
-                                            carries symbol • side • stake so a phone user reads the
-                                            whole trade in one glance without the desktop columns. */}
-                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+
+                                        {/* ===== MOBILE — stacked readout arranged like the
+                                            desktop columns: trader + time, market/side/stake,
+                                            then the result line (beam or verdict) full width
+                                            so every datum reads clearly on a phone. */}
+                                        <div className="lg:hidden min-w-0 flex-1">
+                                            {/* L1 — trader + time */}
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div className={`w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center flex-none ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
+                                                    {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.avatar ? (
+                                                        <img src={userProfiles[(act.userAddr || act.owner || "").toLowerCase()].avatar} className="w-full h-full object-cover" alt="" />
+                                                    ) : (
+                                                        <UserCheck size={12} />
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] font-black uppercase flex items-center gap-2 truncate min-w-0">
+                                                    {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.username || `${(act.userAddr || act.owner || "0x").slice(0, 6)}…`}
+                                                    {act.type === 'TRADE_PLACED' && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-none" />}
+                                                </div>
+                                                <div className="ml-auto flex-none text-[8px] opacity-30 font-mono">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                            </div>
+                                            {/* L2 — side · market · stake */}
+                                            <div className="mt-1.5 flex items-center gap-2 min-w-0">
+                                                <span className={`flex-none px-1.5 py-[2px] rounded-full text-[8px] font-black uppercase tracking-widest ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
+                                                    {act.direction === 'UP' ? '▲ Up' : '▼ Down'}
+                                                </span>
+                                                <span className={`text-[10px] font-black uppercase font-mono ${isLight ? 'text-black' : 'text-white'}`}>{act.symbol || '—'}</span>
+                                                {act.entryPrice != null && (
+                                                    <span className="text-[8px] font-mono opacity-40 uppercase truncate min-w-0">entry {Number(act.entryPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+                                                )}
+                                                <span className={`ml-auto flex-none text-[10px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</span>
+                                            </div>
+                                            {/* L3 — the result line, full width so the pending
+                                                laser beam spans the row and reads clearly */}
+                                            <div className="mt-1 flex items-center min-w-0">
+                                                {act.pending && act.settleAt && !act.settled ? renderPendingFeedCell(act) : renderVerdictFeedCell(act)}
+                                            </div>
+                                        </div>
+
+                                        {/* ===== DESKTOP — the grid columns (unchanged order),
+                                            reusing the same shared cell renderers. */}
+                                        <div className="hidden lg:flex items-center gap-3 min-w-0 flex-1">
                                             <div className={`w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center flex-none ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
                                                 {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.avatar ? (
                                                     <img
@@ -1184,14 +1347,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                     <UserCheck size={13} />
                                                 )}
                                             </div>
-                                            <div className="min-w-0">
-                                                <div className="text-[10px] font-black uppercase flex items-center gap-2 truncate">
-                                                    {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.username || `${(act.userAddr || act.owner || "0x").slice(0, 6)}…`}
-                                                    {act.type === 'TRADE_PLACED' && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-none" />}
-                                                </div>
-                                                <div className={`text-[8px] font-bold uppercase font-mono truncate lg:hidden ${act.direction === 'UP' ? 'text-[#1A6140]/70' : 'text-red-500/70'}`}>
-                                                    {act.symbol || '—'} {act.direction === 'UP' ? '▲ UP' : '▼ DOWN'} • ${Number(act.amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                                                </div>
+                                            <div className="text-[10px] font-black uppercase flex items-center gap-2 truncate min-w-0">
+                                                {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.username || `${(act.userAddr || act.owner || "0x").slice(0, 6)}…`}
+                                                {act.type === 'TRADE_PLACED' && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-none" />}
                                             </div>
                                         </div>
                                         <div className="hidden lg:flex flex-col min-w-0">
@@ -1204,73 +1362,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             {act.direction === 'UP' ? '▲ Up' : '▼ Down'}
                                         </div>
                                         <div className={`hidden lg:block text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>${act.amount}</div>
-                                        {/* Result column — right-aligned on phones so the
-                                            verdict/pill reads as the row's outcome. */}
-                                        <div className="flex-none flex flex-col items-end gap-1 min-w-[92px] lg:min-w-0 lg:items-start">
-                                            {act.pending && act.settleAt && !act.settled ? (
-                                                (() => {
-                                                    const start = Number(act.timestamp || act.createdAt) || (act.settleAt - 15000);
-                                                    const span = Math.max(1000, act.settleAt - start);
-                                                    const elapsed = feedAt - start;
-                                                    const beamPct = Math.max(0, Math.min(100, (elapsed / span) * 100));
-                                                    const gone = feedAt >= act.settleAt;
-                                                    const secsLeft = Math.max(0, Math.ceil((act.settleAt - feedAt) / 1000));
-                                                    return (
-                                                        <div className="flex flex-col items-end lg:items-start gap-1 w-full min-w-[92px]">
-                                                            {/* Beam + spinner row */}
-                                                            <div className="flex items-center gap-1.5 w-full">
-                                                                {/* Circular pending spinner */}
-                                                                <div className={`flex-none w-3.5 h-3.5 rounded-full border-2 ${gone ? 'border-red-500/40 border-t-red-500 animate-spin' : 'border-amber-400/30 border-t-amber-400 animate-spin'}`} />
-                                                                {/* Progress beam */}
-                                                                <div className={`relative flex-1 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-black/10' : 'bg-white/10'}`}>
-                                                                    <div
-                                                                        className={`absolute left-0 top-0 h-full rounded-full transition-[width] duration-200 ease-linear ${gone ? 'bg-red-500 animate-pulse' : 'bg-amber-400'}`}
-                                                                        style={{ width: `${beamPct}%` }}
-                                                                    />
-                                                                    {!gone && beamPct < 100 && (
-                                                                        <div
-                                                                            className="absolute top-0 h-full w-4 rounded-full blur-sm bg-amber-300/60 pointer-events-none"
-                                                                            style={{ left: `calc(${beamPct}% - 8px)` }}
-                                                                        />
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            <div className={`text-[8px] font-black uppercase tracking-widest text-right lg:text-left ${gone ? 'text-red-500 animate-pulse' : 'text-amber-400'}`}>
-                                                                {gone ? 'Settling…' : `${secsLeft}s`}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })()
-                                            ) : (
-                                                <div className="flex flex-col items-end lg:items-start gap-1 min-w-0">
-                                                    <div className={`text-[10px] font-black uppercase tracking-wide text-right lg:text-left ${act.won ? 'text-[#1A6140]' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
-                                                        {act.won
-                                                            ? <span>+${Number(act.payout || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
-                                                            : (act.settled ? 'LOST' : (act.pending ? 'PENDING' : (act.type === 'TRADE_PLACED' ? 'PENDING' : 'LOST')))}
-                                                    </div>
-                                                    {/* Paid state: every settled win shows whether the
-                                                        won amount actually landed in the user's wallet.
-                                                        A payout delivery failure surfaces a red pill with
-                                                        a retry button instead of a silent hang. */}
-                                                    {act.won && act.payoutFailed && (
-                                                        <button
-                                                            onClick={() => retryPayout(act)}
-                                                            title="Retry payout delivery to the user's wallet"
-                                                            className={`flex items-center gap-1 px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest cursor-pointer transition-colors ${isLight ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20' : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'} ${retryingPayouts.has(String(act.betId || act.id)) ? 'animate-pulse' : ''}`}
-                                                        >
-                                                            <RefreshCw size={8} className={retryingPayouts.has(String(act.betId || act.id)) ? 'animate-spin' : ''} />
-                                                            Pay fail · retry
-                                                        </button>
-                                                    )}
-                                                    {act.won && !act.payoutFailed && (act.paid !== false) && (
-                                                        <span className={`px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest w-fit ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-[#1A6140]/20 text-[#4ade80]'}`}>
-                                                            Paid
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
+                                        {/* Result column — the shared beam / verdict cell */}
+                                        <div className="hidden lg:flex flex-col items-start gap-1 min-w-0">
+                                            {act.pending && act.settleAt && !act.settled ? renderPendingFeedCell(act) : renderVerdictFeedCell(act)}
                                         </div>
-                                        <div className="flex-none text-[8px] opacity-30 font-mono">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                        <div className="hidden lg:block flex-none text-[8px] opacity-30 font-mono">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                     </motion.div>
                                 ))
                             )}

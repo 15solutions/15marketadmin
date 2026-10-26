@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Share2, ArrowUp, ArrowDown, Copy, Check } from 'lucide-react';
+import { tradeShares } from '../utils/tradeStatus';
 // Static, not dynamic. This component is itself lazy-loaded (UserApp.jsx), so
 // qrcode still lands in its own chunk and never in the initial bundle - but a
 // plain import cannot fail the way `import('qrcode')` could. The old dynamic
@@ -149,6 +150,9 @@ export default function TradeShareCard({ isOpen, onClose, trade, userProfile, th
   };
 
   const isWin = trade?.status === 'WON' || trade?.payout > 0;
+  // Share economics for the stat row (price paid per share + shares bought) —
+  // same derivation the receipt and PnL cards print.
+  const shareStats = tradeShares(trade || {});
   const isUp = trade?.direction === 'UP';
   const sym = (trade?.symbol || '').toUpperCase().replace('USDT', '');
   const username = userProfile?.username || 'Trader';
@@ -452,6 +456,16 @@ const handleNativeShare = async () => {
                       <div className="flex-1">
                         <div className="text-white/25 text-[8px] font-bold uppercase tracking-widest">Exit</div>
                         <div className="text-white text-[13px] font-bold">${Number(trade.exitPrice || trade.settlementPrice || 0).toFixed(2)}</div>
+                      </div>
+                      <div className="w-px h-5 bg-white/10 mx-3" />
+                      <div className="flex-1">
+                        <div className="text-white/25 text-[8px] font-bold uppercase tracking-widest">Share price</div>
+                        <div className="text-white text-[13px] font-bold">{shareStats.price != null ? `$${shareStats.price.toFixed(2)}` : '—'}</div>
+                      </div>
+                      <div className="w-px h-5 bg-white/10 mx-3" />
+                      <div className="flex-1">
+                        <div className="text-white/25 text-[8px] font-bold uppercase tracking-widest">Shares</div>
+                        <div className="text-white text-[13px] font-bold">{shareStats.shares != null ? shareStats.shares.toFixed(2) : '—'}</div>
                       </div>
                     </div>
                   </div>
