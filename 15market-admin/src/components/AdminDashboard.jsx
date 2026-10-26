@@ -296,10 +296,14 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     // SETTLED / verdict — +payout or LOST, plus the Paid / payout-retry state.
     const renderVerdictFeedCell = (act) => (
         <div className="flex flex-col items-start gap-1 min-w-0">
-            <div className={`text-[10px] font-black uppercase tracking-wide ${act.won ? 'text-[#1A6140]' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : 'text-red-500')}`}>
+            <div className={`text-[10px] font-black uppercase tracking-wide ${act.won ? 'text-[#1A6140]' : (act.status === 'DISPUTE' ? 'text-orange-400 animate-pulse' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : (act.status === 'CANCELLED' ? 'text-amber-500' : 'text-red-500')))}`}>
                 {act.won
                     ? <span>+${Number(act.payout || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
-                    : (act.settled ? 'LOST' : (act.pending ? 'PENDING' : (act.type === 'TRADE_PLACED' ? 'PENDING' : 'LOST')))}
+                    : (act.status === 'DISPUTE'
+                        ? <span title={act.disputeReason || 'Parked for manual review'}>⚑ Dispute</span>
+                        : (act.status === 'CANCELLED'
+                            ? <span title={act.refunded ? 'Refunded to the user' : 'Voided, no refund'}>Voided</span>
+                            : (act.settled ? 'LOST' : (act.pending ? 'PENDING' : (act.type === 'TRADE_PLACED' ? 'PENDING' : 'LOST')))))}
             </div>
             {/* Paid state: every settled win shows whether the won amount
                 actually landed in the user's wallet. A payout delivery failure
@@ -655,6 +659,46 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             });
         });
 
+        // Dispute echo: the engine parked a trade for a human decision. The row
+        // drops its beam and shows a DISPUTE marker instead of hanging on the
+        // countdown forever — no verdict exists yet, nothing is red (the stake
+        // is intact until an admin clears it).
+        const bindDisputed = socketService.on('global_trade_disputed', (res) => {
+            if (!res) return;
+            const key = String(res.betId || res.id || '');
+            if (!key) return;
+            setRecentActivity(prev => {
+                const idx = prev.findIndex(x => String(x.betId || x.id) === key);
+                if (idx === -1) {
+                    const row = normalizeIncomingTrade(res);
+                    if (!row) return prev;
+                    return [{ ...row, pending: false, settled: false, status: 'DISPUTE', disputeReason: res.reason || null, timestamp: Date.now() }, ...prev].slice(0, 60);
+                }
+                const next = [...prev];
+                next[idx] = { ...next[idx], pending: false, settled: false, status: 'DISPUTE', disputeReason: res.reason || null };
+                return next;
+            });
+        });
+
+        // Voided echo: support cancelled the trade manually (refund or not) —
+        // a terminal state, so the row leaves the pending beam immediately.
+        const bindResolved = socketService.on('global_trade_resolved', (res) => {
+            if (!res) return;
+            const key = String(res.betId || res.id || '');
+            if (!key) return;
+            setRecentActivity(prev => {
+                const idx = prev.findIndex(x => String(x.betId || x.id) === key);
+                if (idx === -1) {
+                    const row = normalizeIncomingTrade(res);
+                    if (!row) return prev;
+                    return [{ ...row, pending: false, settled: true, status: 'CANCELLED', won: false, refunded: res.refunded ?? 0, timestamp: Date.now(), type: 'TRADE_SETTLED' }, ...prev].slice(0, 60);
+                }
+                const next = [...prev];
+                next[idx] = { ...next[idx], pending: false, settled: true, status: 'CANCELLED', won: false, refunded: res.refunded ?? 0 };
+                return next;
+            });
+        });
+
         // 3. User Onboarding (Geo Pin)
         const unbindUsers = socketService.on('user_onboarded', (user) => {
             if (user.address) fetchProfile(user.address);
@@ -815,6 +859,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             unbindMetrics2();
             bindExecuted();
             bindSettled();
+            bindDisputed();
+            bindResolved();
             unbindTradesLegacy();
             unbindUsers();
             unbindRefEnroll();

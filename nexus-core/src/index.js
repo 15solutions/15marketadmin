@@ -2615,6 +2615,16 @@ app.post('/admin/trades/resolve-stuck', requirePerm('trades.maintenance'), async
             ? `Trade #${id} was voided by support and your ${amount.toFixed(2)} USDC stake was returned.`
             : `Trade #${id} was voided by support.`
         });
+        // Admin console echo (it is not in the user's room) so the feed row
+        // stops hanging on its pending beam the moment support voids a trade.
+        io.emit('global_trade_resolved', {
+          betId: id,
+          id,
+          status: 'CANCELLED',
+          refunded: refund ? amount : 0,
+          userAddr: addr,
+          settledAt: Date.now()
+        });
         io.to(addr).emit('balance_update', { balance: String(cache.sessions.get(addr)?.balance || 0), reason: 'TRADE_VOIDED' });
 
         summary.resolved++;

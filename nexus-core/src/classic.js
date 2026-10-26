@@ -198,6 +198,17 @@ class ClassicEngine {
         // The stake is untouched - say so plainly rather than implying a loss.
         message: 'We could not verify this trade\'s result. Your stake is safe and an admin will resolve it.'
       });
+      // The ADMIN console is not in the user's room: broadcast globally so the
+      // trade feed swaps its beam for a DISPUTE marker the moment the engine
+      // parks the trade, instead of waiting for the next snapshot poll.
+      this.io.emit('global_trade_disputed', {
+        betId: trade.id,
+        id: trade.id,
+        status: 'DISPUTE',
+        reason,
+        userAddr: trade.userAddr,
+        settledAt: null
+      });
       this._noteDispute(trade, reason);
     };
 
@@ -395,6 +406,32 @@ class ClassicEngine {
     // Same guard as settleTradeLocally: a win must be credited exactly once.
     if (trade.status === 'WON' || trade.payoutAmount) {
       console.warn(`[Engine] #${trade.id} duplicate win credit ignored (already WON).`);
+      // The credit already happened, but the indexed history row may still say
+      // PENDING and the live cache row may never have been evicted (crash
+      // between credit and record). Reconcile without paying again.
+      try {
+        const profiles = require('./profiles');
+        profiles.pushTrade(trade.userAddr, {
+          ...trade,
+          status: 'PAID',
+          won: true,
+          payout: trade.payoutAmount ?? trade.payout,
+          paid: true,
+          exitPrice: trade.lockedExitPrice ?? exitPrice,
+          settledAt: trade.settledAt || Date.now()
+        });
+      } catch (e) {
+        console.error(`[Engine] #${trade.id} win history reconcile failed:`, e?.message || e);
+      }
+      try {
+        const cache = require('./cache');
+        cache.resolveOpenTrade(String(trade.id));
+        for (const [key, t] of cache.trades) {
+          if (String(t.id) === String(trade.id)) cache.trades.delete(key);
+        }
+      } catch (e2) {
+        console.error(`[Engine] #${trade.id} win cache reconcile failed:`, e2?.message || e2);
+      }
       return;
     }
     const sharePrice = Math.max(0.03, Math.min(0.97, Number(trade.sharePrice) || 0.50));
@@ -1109,6 +1146,33 @@ class ClassicEngine {
     // so refuse rather than stack it.
     if (trade.settledAt || trade.status === 'LOST' || trade.status === 'WON') {
       console.warn(`[Engine] #${trade.id} duplicate settle ignored (already ${trade.status}).`);
+      // The engine already returned its verdict for this trade, but the
+      // indexed history row may still say PENDING (crash between the verdict
+      // and the record write) and the row may still squat in the live cache —
+      // which left the admin console staring at a PENDING beam for a trade
+      // whose result existed. Reconcile quietly: flip the history row and
+      // evict the live row WITHOUT re-crediting or re-notifying anyone.
+      try {
+        const profiles = require('./profiles');
+        profiles.pushTrade(trade.userAddr, {
+          ...trade,
+          status: trade.status === 'WON' ? 'PAID' : 'LOST',
+          won: trade.status === 'WON',
+          exitPrice: trade.lockedExitPrice,
+          settledAt: trade.settledAt || Date.now()
+        });
+      } catch (e) {
+        console.error(`[Engine] #${trade.id} history reconcile failed:`, e?.message || e);
+      }
+      try {
+        const cache = require('./cache');
+        cache.resolveOpenTrade(String(trade.id));
+        for (const [key, t] of cache.trades) {
+          if (String(t.id) === String(trade.id)) cache.trades.delete(key);
+        }
+      } catch (e2) {
+        console.error(`[Engine] #${trade.id} cache reconcile failed:`, e2?.message || e2);
+      }
       return;
     }
     trade.status = 'LOST';
