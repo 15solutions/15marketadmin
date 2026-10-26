@@ -443,29 +443,29 @@ const handleNativeShare = async () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-0 px-1 py-1 mt-auto">
-                      <div className="flex-1">
-                        <div className="text-white/25 text-[8px] font-bold uppercase tracking-widest">Stake</div>
-                        <div className="text-white text-[13px] font-bold">${Number(trade.amount || 0).toFixed(2)}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white/25 text-[6px] font-bold uppercase tracking-widest truncate">Stake</div>
+                        <div className="text-white text-[10px] font-bold truncate">${Number(trade.amount || 0).toFixed(2)}</div>
                       </div>
-                      <div className="w-px h-5 bg-white/10 mx-3" />
-                      <div className="flex-1">
-                        <div className="text-white/25 text-[8px] font-bold uppercase tracking-widest">Entry</div>
-                        <div className="text-white text-[13px] font-bold">${Number(trade.entryPrice || 0).toFixed(2)}</div>
+                      <div className="w-px h-4 bg-white/10 mx-2 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white/25 text-[6px] font-bold uppercase tracking-widest truncate">Entry</div>
+                        <div className="text-white text-[10px] font-bold truncate">${Number(trade.entryPrice || 0).toFixed(2)}</div>
                       </div>
-                      <div className="w-px h-5 bg-white/10 mx-3" />
-                      <div className="flex-1">
-                        <div className="text-white/25 text-[8px] font-bold uppercase tracking-widest">Exit</div>
-                        <div className="text-white text-[13px] font-bold">${Number(trade.exitPrice || trade.settlementPrice || 0).toFixed(2)}</div>
+                      <div className="w-px h-4 bg-white/10 mx-2 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white/25 text-[6px] font-bold uppercase tracking-widest truncate">Exit</div>
+                        <div className="text-white text-[10px] font-bold truncate">${Number(trade.exitPrice || trade.settlementPrice || 0).toFixed(2)}</div>
                       </div>
-                      <div className="w-px h-5 bg-white/10 mx-3" />
-                      <div className="flex-1">
-                        <div className="text-white/25 text-[8px] font-bold uppercase tracking-widest">Share price</div>
-                        <div className="text-white text-[13px] font-bold">{shareStats.price != null ? `$${shareStats.price.toFixed(2)}` : '—'}</div>
+                      <div className="w-px h-4 bg-white/10 mx-2 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white/25 text-[6px] font-bold uppercase tracking-widest truncate">Share price</div>
+                        <div className="text-white text-[10px] font-bold truncate">{shareStats.price != null ? `${parseFloat((shareStats.price * 100).toFixed(2))}¢` : '—'}</div>
                       </div>
-                      <div className="w-px h-5 bg-white/10 mx-3" />
-                      <div className="flex-1">
-                        <div className="text-white/25 text-[8px] font-bold uppercase tracking-widest">Shares</div>
-                        <div className="text-white text-[13px] font-bold">{shareStats.shares != null ? shareStats.shares.toFixed(2) : '—'}</div>
+                      <div className="w-px h-4 bg-white/10 mx-2 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white/25 text-[6px] font-bold uppercase tracking-widest truncate">Shares</div>
+                        <div className="text-white text-[10px] font-bold truncate">{shareStats.shares != null ? shareStats.shares.toFixed(2) : '—'}</div>
                       </div>
                     </div>
                   </div>
