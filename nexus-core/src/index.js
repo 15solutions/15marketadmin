@@ -272,6 +272,15 @@ async function emitAdminStats() {
 classicEngine.onUpdate = emitAdminStats;
 
 let activeBroadcast = null;
+// Broadcast ledger for the admin console: every transmission, edit and
+// withdrawal stays listed there with its own expiry clock, newest first.
+const recentBroadcasts = [];
+const rememberBroadcast = (b) => {
+  const existing = recentBroadcasts.findIndex(x => String(x.id) === String(b.id));
+  if (existing !== -1) recentBroadcasts[existing] = b;
+  else recentBroadcasts.unshift(b);
+  if (recentBroadcasts.length > 25) recentBroadcasts.length = 25;
+};
 
 classicEngine.start();
 emitAdminStats(); // Initial broadcast
@@ -397,26 +406,10 @@ io.on('connection', (socket) => {
     if (room) socket.join(room);
   });
 
-  // Admin Event: Global Broadcast
-  socket.on('send_broadcast', (msg) => {
-    const broadcast = {
-      id: Date.now(),
-      message: msg.text || msg.message,
-      type: msg.type || 'ANNOUNCEMENT',
-      expiry: msg.expiry || (Date.now() + (msg.duration * 1000)),
-      timestamp: Date.now(),
-      sender: msg.sender || 'SYSTEM'
-    };
-
-    activeBroadcast = broadcast;
-    io.emit('broadcast', broadcast);
-    console.log(`[Socket-Admin] Broadcast Sent: ${broadcast.message}`);
-
-    // Maintenance logic
-    if (broadcast.type === 'MAINTENANCE') {
-      io.emit('settings_update', { maintenanceMode: true, systemBanner: broadcast.message });
-    }
-  });
+  // NOTE: there is deliberately NO socket 'send_broadcast' handler. Broadcasts
+  // are transmitted exclusively through the auth-gated POST /admin/broadcast —
+  // sockets carry no identity (no io.use auth middleware), so leaving the old
+  // handler in place let any user client hijack the platform banner.
 
   // Push latest stats on connection — run async so we can fetch the real
   // treasury balance instead of emitting "LIVE" or undefined.
@@ -2702,26 +2695,113 @@ app.post('/admin/trades/:id/payout-retry', async (req, res) => {
 
 app.post('/admin/broadcast', requirePerm('broadcast.send'), (req, res) => {
   const { message, type, expiry } = req.body;
-  if (!message) return res.status(400).json({ error: 'Message required' });
-  
+  if (!message || !String(message).trim()) return res.status(400).json({ error: 'Message required' });
+
   const broadcast = {
     id: Date.now(),
-    message,
+    message: String(message),
+    // Legacy clients (user-side scroller) key on `text` — keep both fields
+    // in sync so every banner consumer renders the same payload.
+    text: String(message),
     type: type || 'ANNOUNCEMENT',
     expiry: expiry || (Date.now() + 60000),
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    sender: req.admin?.email || 'ADMIN',
+    withdrawn: false
   };
-  
+
   activeBroadcast = broadcast;
+  rememberBroadcast(broadcast);
   io.emit('broadcast', broadcast);
   console.log(`[Admin] Broadcast Sent: ${message}`);
-  
+
   // If this is a maintenance broadcast, also trigger the maintenance flag
   if (type === 'MAINTENANCE') {
     io.emit('settings_update', { maintenanceMode: true, systemBanner: message });
   }
-  
+
   res.json({ success: true, broadcast });
+});
+
+// The admin console lists every recent broadcast with its own countdown clock.
+app.get('/admin/broadcasts', requirePerm('broadcast.send'), (req, res) => {
+  const now = Date.now();
+  const list = recentBroadcasts.map(b => ({
+    ...b,
+    // Status is computed live, never stored — an entry expires just by its
+    // own clock passing, exactly like the client banner does.
+    status: b.withdrawn ? 'WITHDRAWN' : (b.expiry <= now ? 'EXPIRED' : 'LIVE')
+  }));
+  res.json({ broadcasts: list, active: activeBroadcast || null });
+});
+
+// Edit a broadcast: the text (and optionally its expiry) change in place and
+// the updated payload re-emits, so the live banner swaps instantly.
+app.post('/admin/broadcast/:id', requirePerm('broadcast.send'), (req, res) => {
+  const id = String(req.params.id);
+  const idx = recentBroadcasts.findIndex(b => String(b.id) === id);
+  if (idx === -1) return res.status(404).json({ error: 'Broadcast not found' });
+
+  const b = recentBroadcasts[idx];
+  if (b.withdrawn || b.expiry <= Date.now()) {
+    return res.status(400).json({ error: 'Broadcast is no longer live' });
+  }
+
+  const { message, expiry } = req.body;
+  if (message !== undefined) {
+    if (!String(message).trim()) return res.status(400).json({ error: 'Message required' });
+    b.message = String(message);
+    b.text = b.message;
+  }
+  if (expiry !== undefined && Number(expiry) > Date.now()) {
+    b.expiry = Number(expiry);
+  } else if (req.body.extendSeconds) {
+    b.expiry = Math.max(b.expiry, Date.now() + Number(req.body.extendSeconds) * 1000);
+  }
+  b.editedAt = Date.now();
+
+  rememberBroadcast(b);
+  if (activeBroadcast && String(activeBroadcast.id) === id) {
+    activeBroadcast = b;
+  }
+  io.emit('broadcast', b);
+  console.log(`[Admin] Broadcast #${id} edited: ${b.message}`);
+
+  if (b.type === 'MAINTENANCE' && b.expiry > Date.now()) {
+    io.emit('settings_update', { maintenanceMode: true, systemBanner: b.message });
+  }
+
+  res.json({ success: true, broadcast: b });
+});
+
+// Withdraw a broadcast: the banner must drop the same moment. The payload is
+// re-emitted with its expiry forced into the past — every client's
+// `expiry > Date.now()` check clears it without needing a new event name.
+app.post('/admin/broadcast/:id/withdraw', requirePerm('broadcast.send'), (req, res) => {
+  const id = String(req.params.id);
+  const idx = recentBroadcasts.findIndex(b => String(b.id) === id);
+  if (idx === -1) return res.status(404).json({ error: 'Broadcast not found' });
+
+  const b = recentBroadcasts[idx];
+  if (b.withdrawn) return res.json({ success: true, broadcast: b });
+
+  b.withdrawn = true;
+  b.withdrawnAt = Date.now();
+  b.expiry = Math.min(b.expiry, Date.now());
+  rememberBroadcast(b);
+
+  if (activeBroadcast && String(activeBroadcast.id) === id) {
+    activeBroadcast = null;
+  }
+  io.emit('broadcast', b);
+  console.log(`[Admin] Broadcast #${id} withdrawn`);
+
+  // Withdrawing the maintenance broadcast un-suspends the platform.
+  if (b.type === 'MAINTENANCE') {
+    io.emit('settings_update', { maintenanceMode: false, systemBanner: '' });
+  }
+
+  res.json({ success: true, broadcast: b });
 });
 
 app.post('/admin/settings/update', requirePerm('platform.settings'), (req, res) => {
@@ -2739,9 +2819,11 @@ app.post('/admin/settings/update', requirePerm('platform.settings'), (req, res) 
 });
 
 app.get('/broadcast', (req, res) => {
-  if (activeBroadcast && activeBroadcast.expiry < Date.now()) {
+  if (activeBroadcast && activeBroadcast.expiry <= Date.now()) {
     activeBroadcast = null;
   }
+  // Legacy clients key on `text`; keep the alias in lockstep with `message`.
+  if (activeBroadcast && !activeBroadcast.text) activeBroadcast.text = activeBroadcast.message;
   res.json(activeBroadcast);
 });
 

@@ -69,9 +69,18 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
         fetchGlobalData();
         const interval = setInterval(fetchGlobalData, 12000);
 
-        // Real-time Socket Listener for Zero-Latency Broadcasts
-        const unbindBroadcast = socketService.on('new_broadcast', (msg) => {
-            if (msg && msg.text && msg.expiry > Date.now()) {
+        // Real-time Socket Listener for Zero-Latency Broadcasts.
+        // The backend emits `broadcast` with a `message` field (older builds
+        // listened for `new_broadcast`/`text`, which never fired — the banner
+        // was dead). Both fields arrive today, so read either.
+        const unbindBroadcast = socketService.on('broadcast', (msg) => {
+            if (!msg) return;
+            const text = msg.message || msg.text;
+            if (msg.withdrawn || (msg.expiry && msg.expiry <= Date.now())) {
+                setActiveBroadcast(prev => (prev && String(prev.id) === String(msg.id)) ? null : prev);
+                return;
+            }
+            if (text && msg.expiry > Date.now()) {
                 setActiveBroadcast(msg);
             }
         });
@@ -96,7 +105,8 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
                 const res = await fetch(`${KEEPER_URL_ARC}/broadcast`);
                 if (res.ok) {
                     const b = await res.json();
-                    if (b && b.text && b.expiry > Date.now()) {
+                    const text = b && (b.message || b.text);
+                    if (b && !b.withdrawn && text && b.expiry > Date.now()) {
                         setActiveBroadcast(b);
                     } else {
                         // Only clear if it's not a real-time broadcast that hasn't expired yet
@@ -183,7 +193,7 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
                                 <div key={i} className="flex items-center gap-2">
                                     <Megaphone size={isV1 ? 14 : 12} className={`${isV1 ? 'text-amber-500' : isLight ? 'text-white' : 'text-black'}`} />
                                     <span className={`${isV1 ? 'text-[11px] font-black' : 'text-[10px]'} uppercase tracking-[0.2em] ${isV1 ? 'text-amber-500' : inkClass}`}>
-                                        {activeBroadcast.text}
+                                        {activeBroadcast.message || activeBroadcast.text}
                                     </span>
                                 </div>
                             ))}

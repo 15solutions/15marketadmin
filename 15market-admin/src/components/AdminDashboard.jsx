@@ -40,7 +40,10 @@ import {
     Sun,
     Moon,
     ShieldAlert,
-    Radar
+    Radar,
+    Pencil,
+    Megaphone,
+    Undo2
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
@@ -62,6 +65,49 @@ const NAV = [
     { key: 'siem', label: 'SIEM', hint: 'Threats · Intrusions', icon: ShieldAlert },
     { key: 'security', label: 'Security', hint: 'Protocols · Team', icon: Shield }
 ];
+
+// ── Broadcast FLIP CLOCK ─────────────────────────────────────────────────────
+// Same flip-digit tiles the trade cards use (verbatim tile style): a digit
+// flips in 3D every tick. Counting MM:SS — broadcasts run 1–60 minutes.
+function FlipBroadcastDigit({ digit }) {
+    return (
+        <div className="relative w-[16px] h-[23px] bg-[#0c0e12] border border-white/15 rounded-[4px] shadow-[0_1px_4px_rgba(0,0,0,0.6)] overflow-hidden flex items-center justify-center select-none">
+            <div className="absolute inset-x-0 top-1/2 h-[1px] bg-black/80 z-20" />
+            <AnimatePresence mode="popLayout" initial={false}>
+                <motion.div
+                    key={digit}
+                    initial={{ rotateX: -90, opacity: 0 }}
+                    animate={{ rotateX: 0, opacity: 1 }}
+                    exit={{ rotateX: 90, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.25, 1, 0.5, 1] }}
+                    style={{ transformOrigin: "center center", transformStyle: "preserve-3d" }}
+                    className="absolute inset-0 flex items-center justify-center font-mono font-black text-[12px] text-white tabular-nums tracking-tighter"
+                >
+                    {digit}
+                </motion.div>
+            </AnimatePresence>
+            <div className="absolute inset-0 bg-gradient-to-b from-white/[0.12] via-transparent to-black/30 pointer-events-none z-10" />
+        </div>
+    );
+}
+
+function FlipBroadcastClock({ seconds }) {
+    const s = Math.max(0, Math.floor(seconds || 0));
+    const mm = Math.floor(s / 60);
+    const ss = s % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    const digits = [
+        ...pad(Math.min(99, mm)), ':sep', ...pad(ss)
+    ];
+    return (
+        <div className="flex items-center gap-[2px] select-none shrink-0">
+            {digits.map((d, i) => d === ':sep'
+                ? <span key={i} className="font-mono font-black text-[11px] text-white/40 w-[3px] text-center leading-none">:</span>
+                : <FlipBroadcastDigit key={i} digit={d} />)}
+            <span className="text-[8px] font-mono font-black text-white/40 ml-1 uppercase tracking-widest">left</span>
+        </div>
+    );
+}
 
 export function AdminDashboard({ onBack, theme, notify, platformSettings: initialSettings, auth }) {
     // Live theme state — the sidebar switch flips it in place.
@@ -96,6 +142,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const [broadcastText, setBroadcastText] = useState("");
     const [broadcastDuration, setBroadcastDuration] = useState(60); // seconds
     const [isSaving, setIsSaving] = useState(false);
+    // Broadcast ledger listed under the composer: each entry carries its own
+    // flip-clock countdown, plus edit/withdraw controls while it is live.
+    const [broadcastList, setBroadcastList] = useState([]);
+    const [broadcastLoading, setBroadcastLoading] = useState(false);
+    const [editingBroadcastId, setEditingBroadcastId] = useState(null);
+    const [editBroadcastDraft, setEditBroadcastDraft] = useState("");
+    const [busyBroadcastId, setBusyBroadcastId] = useState(null);
+    // One-second heartbeat so flip clocks keep flipping while the tab is open.
+    const [broadcastTick, setBroadcastTick] = useState(0);
     const [isConnected, setIsConnected] = useState(true);
     const [syncProgress, setSyncProgress] = useState(0);
 
@@ -926,9 +981,24 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         }, 800);
     };
 
+    // ── Broadcast ledger ─────────────────────────────────────────────────
+    const fetchBroadcasts = async () => {
+        setBroadcastLoading(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/broadcasts`);
+            if (res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setBroadcastList(Array.isArray(data.broadcasts) ? data.broadcasts : []);
+            }
+        } catch (e) { /* list stays as-is */ }
+        finally { setBroadcastLoading(false); }
+    };
+    const fetchBroadcastsRef = useRef(null);
+    fetchBroadcastsRef.current = fetchBroadcasts;
+
     const handleUpdateBroadcast = async () => {
         if (!broadcastText.trim()) return notify("Enter broadcast message", "error");
-        
+
         setIsSaving(true);
         try {
             const res = await adminFetch(`${KEEPER_URL_ARC}/admin/broadcast`, {
@@ -939,17 +1009,76 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     type: 'MANUAL_ADMIN'
                 })
             });
-            
-            if (!res.ok) throw new Error("Broadcast failed");
-            
+
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || "Broadcast failed");
+            }
+
             notify("Global Broadcast Initiated", "success");
             setBroadcastText("");
+            fetchBroadcasts();
         } catch (e) {
             notify("Broadcast Error: " + e.message, "error");
         } finally {
             setIsSaving(false);
         }
     };
+
+    const handleSaveBroadcastEdit = async (id) => {
+        if (!editBroadcastDraft.trim()) return notify("Edit cannot be empty", "error");
+        setBusyBroadcastId(id);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/broadcast/${id}`, {
+                method: 'POST',
+                body: JSON.stringify({ message: editBroadcastDraft })
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || "Edit failed");
+            }
+            notify("Broadcast updated live", "success");
+            setEditingBroadcastId(null);
+            setEditBroadcastDraft("");
+            fetchBroadcasts();
+        } catch (e) {
+            notify("Edit Error: " + e.message, "error");
+        } finally { setBusyBroadcastId(null); }
+    };
+
+    const handleWithdrawBroadcast = async (id) => {
+        setBusyBroadcastId(id);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/broadcast/${id}/withdraw`, { method: 'POST' });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || "Withdraw failed");
+            }
+            notify("Broadcast withdrawn — banner cleared", "success");
+            fetchBroadcasts();
+        } catch (e) {
+            notify("Withdraw Error: " + e.message, "error");
+        } finally { setBusyBroadcastId(null); }
+    };
+
+    // Load the ledger when the tab opens, refresh on any fresh socket pulse
+    // (a transmission/edit/withdrawal from anywhere re-fetches instantly), and
+    // tick the flip clocks once per second while the tab is mounted.
+    useEffect(() => {
+        if (adminTab !== 'broadcast' || !canBroadcast) return;
+        fetchBroadcasts();
+    }, [adminTab, canBroadcast, dataEpoch]);
+
+    useEffect(() => {
+        const unbind = socketService.on('broadcast', () => { fetchBroadcastsRef.current?.(); });
+        return unbind;
+    }, []);
+
+    useEffect(() => {
+        if (adminTab !== 'broadcast' || !canBroadcast) return;
+        const tick = setInterval(() => setBroadcastTick(t => t + 1), 1000);
+        return () => clearInterval(tick);
+    }, [adminTab, canBroadcast]);
 
     // ── Auth context (Supabase-Auth admin) ──────────────────────────────
     const isRoot = auth?.isRoot === true || auth?.role === 'root';
@@ -1787,7 +1916,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         <div className="mb-2 flex items-center justify-between gap-3 flex-wrap">
                             <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Broadcast</span>
                             <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 truncate ${isLight ? 'text-black' : 'text-white'}`}>
-                                Live — {platformSettings.systemBanner || "No active manual broadcast. Platform running standard tickers."}
+                                Live — {(broadcastList.find(b => b.status === 'LIVE')?.message) || platformSettings.systemBanner || "No active manual broadcast. Platform running standard tickers."}
                             </span>
                         </div>
 
@@ -1819,6 +1948,114 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <Radio size={14} />
                                 <span>{isSaving ? 'Transmitting…' : 'Transmit Broadcast'}</span>
                             </button>
+                        </div>
+
+                        {/* ── Broadcast ledger — every transmission listed with
+                            its own flip-clock countdown, editable and
+                            withdrawable while live ───────────────────────── */}
+                        <div className="mt-7 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                <Megaphone size={13} className={isLight ? 'text-black/50' : 'text-white/50'} />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Broadcast log</span>
+                            </div>
+                            <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
+                                {broadcastList.filter(b => b.status === 'LIVE').length} live · {broadcastList.length} total
+                            </span>
+                        </div>
+
+                        <div className="mt-2 flex flex-col gap-2">
+                            {broadcastLoading && !broadcastList.length && (
+                                <div className={`p-4 text-[10px] font-black uppercase tracking-widest opacity-30 animate-pulse ${isLight ? 'text-black' : 'text-white'}`}>
+                                    Reading billboards…
+                                </div>
+                            )}
+                            {!broadcastLoading && !broadcastList.length && (
+                                <div className={`p-4 text-[10px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
+                                    No transmissions yet — send one and it will appear here with its countdown.
+                                </div>
+                            )}
+                            {broadcastList.map(b => {
+                                const remain = b.status === 'LIVE' ? Math.max(0, Math.ceil((b.expiry - Date.now()) / 1000)) : 0;
+                                const isEditing = editingBroadcastId === String(b.id);
+                                const busy = busyBroadcastId === String(b.id);
+                                const statusChip = b.status === 'LIVE'
+                                    ? { label: '● Live', cls: 'text-[#1A6140] bg-[#1A6140]/15' }
+                                    : b.status === 'WITHDRAWN'
+                                        ? { label: '✕ Withdrawn', cls: 'text-red-500 bg-red-500/10' }
+                                        : { label: 'Expired', cls: 'opacity-40 bg-black/5' };
+                                return (
+                                    <div
+                                        key={b.id}
+                                        className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all ${isLight
+                                            ? (b.status === 'LIVE' ? 'bg-white border-[#1A6140]/25 shadow-[0_8px_20px_-12px_rgba(26,97,64,0.25)]' : 'bg-white/60 border-black/10 opacity-70')
+                                            : (b.status === 'LIVE' ? 'bg-[#1A6140]/[0.07] border-[#1A6140]/30' : 'bg-white/[0.03] border-white/5 opacity-60')}`}
+                                    >
+                                        {/* message block */}
+                                        <div className="flex-1 min-w-0">
+                                            {isEditing ? (
+                                                <div className="flex flex-col gap-2">
+                                                    <textarea
+                                                        autoFocus
+                                                        value={editBroadcastDraft}
+                                                        onChange={(e) => setEditBroadcastDraft(e.target.value)}
+                                                        className={`w-full h-16 p-2.5 rounded-xl border text-xs font-bold resize-none outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                                    />
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => handleSaveBroadcastEdit(b.id)}
+                                                            disabled={busy}
+                                                            className="px-4 py-1.5 rounded-lg bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest disabled:opacity-40"
+                                                        >Save & re-emit</button>
+                                                        <button
+                                                            onClick={() => { setEditingBroadcastId(null); setEditBroadcastDraft(""); }}
+                                                            className={`px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest ${isLight ? 'border-black/10 text-black/50' : 'border-white/10 text-white/50'}`}
+                                                        >Cancel</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <p className={`text-xs font-bold truncate ${b.status === 'WITHDRAWN' ? 'line-through' : ''} ${isLight ? 'text-black' : 'text-white'}`}>
+                                                        {b.message || b.text}
+                                                    </p>
+                                                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                                        <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${statusChip.cls}`}>{statusChip.label}</span>
+                                                        <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
+                                                            {b.type} · {new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                            {b.editedAt ? ' · edited' : ''}
+                                                        </span>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* countdown — flips while live */}
+                                        {b.status === 'LIVE' && !isEditing && (
+                                            <FlipBroadcastClock seconds={remain} />
+                                        )}
+
+                                        {/* actions */}
+                                        {!isEditing && b.status === 'LIVE' && (
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <button
+                                                    title="Edit message"
+                                                    onClick={() => { setEditingBroadcastId(String(b.id)); setEditBroadcastDraft(b.message || b.text || ""); }}
+                                                    className={`p-2 rounded-xl border transition-all hover:scale-105 ${isLight ? 'border-black/10 hover:bg-black/5 text-black/60' : 'border-white/10 hover:bg-white/10 text-white/60'}`}
+                                                >
+                                                    <Pencil size={13} />
+                                                </button>
+                                                <button
+                                                    title="Withdraw broadcast (clears the user banner now)"
+                                                    onClick={() => handleWithdrawBroadcast(b.id)}
+                                                    disabled={busy}
+                                                    className="p-2 rounded-xl border border-red-500/25 text-red-500/80 hover:bg-red-500/10 hover:scale-105 transition-all disabled:opacity-40"
+                                                >
+                                                    <Undo2 size={13} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}
