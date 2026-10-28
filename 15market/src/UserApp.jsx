@@ -2902,10 +2902,33 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
         return;
       }
 
-      if (!walletClient) {
-        notify("Wallet client not ready — please reconnect your wallet", "error");
+      // Main wallet sources: external users send through the wagmi client,
+      // while email/google/discord accounts own only the Privy embedded wallet
+      // (the wagmi client never exists for them). Both are valid main wallets.
+      const embeddedMainWallet = embeddedWallet
+        || (Array.isArray(wallets) ? (wallets.find(w => w.walletClientType === 'privy') || wallets[0]) : null);
+      if (!walletClient && (!embeddedMainWallet || !embeddedMainWallet.getEthereumProvider)) {
+        notify("Main wallet is not ready — please reopen the Transfer Hub", "error");
         return;
       }
+
+      // Universal main-wallet sender. wagmi handles external connectors
+      // (MetaMask/WalletConnect popup); the Privy provider path covers the
+      // embedded wallet, exactly like the Transfer Hub's cross-chain sender
+      // (switch chain → getEthereumProvider → ethers BrowserProvider signer).
+      // Without this fallback the deposit silently died for every account
+      // created with an email.
+      const sendFromMainWallet = async ({ to, value }) => {
+        if (walletClient) {
+          return walletClient.sendTransaction({ to, value, account: address });
+        }
+        try { await embeddedMainWallet.switchChain?.(ARC_CHAIN_ID); } catch (_) { /* already on Arc / switch not needed */ }
+        const ethProvider = await embeddedMainWallet.getEthereumProvider();
+        const provider = new ethers.BrowserProvider(ethProvider, 'any');
+        const signer = await provider.getSigner();
+        const tx = await signer.sendTransaction({ to, value });
+        return tx.hash;
+      };
 
       const currentBal = parseFloat(evmBalance);
       if (currentBal < amtNum) {
@@ -2960,20 +2983,10 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
         console.log(`[Deposit] Splitting: ${depositAmt.toFixed(4)} to Session, ${feeAmt.toFixed(4)} to Treasury`);
 
         // STEP 1: Send 1% Fee directly to Treasury
-        if (!walletClient) throw new Error("Wallet not connected — please reconnect and try again");
-
-        const feeTx = await walletClient.sendTransaction({
-          to: ARC_CONTRACT_ADDRESS,
-          value: parseEther(feeAmt.toFixed(18)),
-          account: address,
-        });
+        await sendFromMainWallet({ to: ARC_CONTRACT_ADDRESS, value: parseEther(feeAmt.toFixed(18)) });
 
         // STEP 2: Send remaining 99% to the user's Session Trading Wallet
-        const hash = await walletClient.sendTransaction({
-          to: activeSessionWallet.address,
-          value: parseEther(depositAmt.toFixed(18)),
-          account: address,
-        });
+        const hash = await sendFromMainWallet({ to: activeSessionWallet.address, value: parseEther(depositAmt.toFixed(18)) });
 
         // STEP 3: Optimistic Local State Update
         // Provides immediate visual feedback before block confirmation.
@@ -2995,7 +3008,10 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
           address,
           amount: depositAmt,
           txHash: hash,
-          signMessage: (msg) => walletClient.signMessage({ message: msg, account: address }),
+          signMessage: async (msg) => {
+            if (walletClient) return walletClient.signMessage({ message: msg, account: address });
+            return embeddedMainWallet.sign(msg);
+          },
         });
 
         // STEP 5: Re-pull on-chain + session balances from source of truth after
@@ -3024,7 +3040,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     } finally {
       setIsExecuting(false);
     }
-  }, [address, notify, evmBalance, evmSessionWallet, updateEvmSessionBal, refetchEvmBalance, isExecuting, walletClient, confirmDepositOnBackend]);
+  }, [address, notify, evmBalance, evmSessionWallet, updateEvmSessionBal, refetchEvmBalance, isExecuting, walletClient, embeddedWallet, wallets, confirmDepositOnBackend]);
 
 
   /**
@@ -3300,6 +3316,21 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
 
           <DissolveTransition isAnimating={isAnimatingTheme} targetTheme={targetTheme} />
+
+          {/* Global toast host — every failure/success message flows through
+              notify(), which writes the `toast` state. Without this host every
+              message (deposit/withdraw errors especially) rendered as nothing
+              and flows looked completely dead to the user. */}
+          {toast && (
+            <Toast
+              key={toast.id}
+              message={toast.message}
+              type={toast.type}
+              onClick={toast.onClick}
+              onClose={() => setToast(null)}
+              isSmallScreen={isSmallScreen}
+            />
+          )}
 
           {view === "dashboard" ? (
             <DashboardPage
