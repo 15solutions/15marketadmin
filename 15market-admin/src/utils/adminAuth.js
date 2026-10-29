@@ -3,7 +3,7 @@
 // with email+password (REST, no SDK needed) and every admin API call carries
 // `Authorization: Bearer <access_token>` — the backend validates the token
 // against Supabase and the admin_users row (migrations 011).
-import { SUPABASE_AUTH_URL, SUPABASE_ANON_KEY } from "../constants";
+import { SUPABASE_AUTH_URL, SUPABASE_ANON_KEY, KEEPER_URL_ARC } from "../constants";
 
 export const ADMIN_SESSION_KEY = '15market_admin_session_v1';
 
@@ -28,29 +28,30 @@ export function sessionValid(session = getSession()) {
     return true;
 }
 
-/** Email+password sign-in via the Supabase Auth REST endpoint. */
+/**
+ * Email+password sign-in — PROXIED through the backend `/admin/auth/login`.
+ *
+ * The grant used to fire straight from the browser to Supabase, which meant
+ * the backend never saw a failed attempt and the SIEM brute-force watcher
+ * (5 failures → flag for blocking) was blind in production. Behind the proxy
+ * the backend tracks every failure against the caller's IP before handing
+ * the same { user, session } payload back.
+ */
 export async function loginWithPassword(email, password) {
-    // Guard early — an empty anon key causes a CORS preflight rejection that
-    // looks like a network error. Surface the real cause before the fetch.
-    if (!SUPABASE_ANON_KEY) {
-        throw new Error('Admin login is unavailable: VITE_SUPABASE_ANON_KEY was not set at build time. Add it to the 15market-admin service in the Render dashboard and redeploy.');
-    }
     let res;
     try {
-        res = await fetch(`${SUPABASE_AUTH_URL}/auth/v1/token?grant_type=password`, {
+        res = await fetch(`${KEEPER_URL_ARC}/admin/auth/login`, {
             method: 'POST',
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password }),
-            signal: AbortSignal.timeout(10000),
+            signal: AbortSignal.timeout(15000),
         });
     } catch (e) {
         const isTimeout = e?.name === 'TimeoutError' || e?.name === 'AbortError';
-        // A CORS block surfaces as a TypeError with no useful message.
-        // A paused Supabase project also rejects the TCP connection immediately.
         const hint = isTimeout
             ? 'The request timed out.'
-            : 'This is usually a CORS rejection (add your admin domain to Supabase → Auth → URL Configuration) or the Supabase project is paused (visit app.supabase.com to resume it).';
-        throw new Error(`Could not reach Supabase Auth. ${hint}`);
+            : 'Could not reach the platform security gateway.';
+        throw new Error(`${hint}`);
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -58,9 +59,9 @@ export async function loginWithPassword(email, password) {
         throw new Error(String(msg).replace(/^Invalid login credentials$/i, 'Invalid email or password'));
     }
     saveSession({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresAt: Date.now() + (data.expires_in || 3600) * 1000,
+        accessToken: data.session?.access_token || data.access_token,
+        refreshToken: data.session?.refresh_token || data.refresh_token,
+        expiresAt: Date.now() + (data.session?.expires_in || data.expires_in || 3600) * 1000,
         email: data.user?.email || ''
     });
     return data;

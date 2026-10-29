@@ -90,31 +90,75 @@ const siem = require('./siem');
 // Every HIGH/CRITICAL SIEM alert reaches open admin dashboards live.
 siem.setBroadcaster((event) => io.emit('siem_alert', event));
 
+// Behind the production proxy the direct socket address is the LB — the
+// forwarded client address is the real caller for both gatekeepers below.
+app.set('trust proxy', 1);
+const clientIP = (req) => {
+    const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    if (fwd) return fwd;
+    return (req.ip && req.ip !== '::1' && req.ip !== '::ffff:127.0.0.1') ? req.ip
+        : (req.socket?.remoteAddress || 'unknown');
+};
 
 app.use(cors(corsOptions));
 app.use(express.json());
 
 /**
- * SIEM instrumentation middleware — sits BEFORE all routes and inspects each
- * finished admin/referral response:
- *   401 → failed admin authentication (brute-force tracker)
- *   403 → authenticated privilege escalation attempt (tamper tracker)
- * Every request feeds the per-IP rate-abuse tracker.
+ * IP choke — BEFORE every route: a blocked address gets the same 403 on
+ * anything it tries, user side or admin side. Global platform kill for
+ * malicious clients, controlled from the SIEM console.
+ */
+app.use((req, res, next) => {
+    if (siem.isBlocked(clientIP(req))) {
+        return res.status(403).json({ error: 'Your network has been blocked by platform security' });
+    }
+    next();
+});
+
+/**
+ * Suspended-user gate — a suspended user keeps ONE read: GET /profiles/:address
+ * (so their app can explain the suspension). Every other request that carries
+ * their address — POSTs, PATCHes, balances, transfers, betting — is refused.
+ * /admin routes are exempt: an admin's API call legitimately names any user.
  */
 app.use((req, res, next) => {
     try {
-        const path = req.path.toLowerCase();
-        const watched = path.startsWith('/admin') || path.startsWith('/referral') || path.startsWith('/history');
-        if (!watched) return next();
+        const pathStr = req.originalUrl.toLowerCase();
+        if (!pathStr.startsWith('/admin')) {
+            const qp = req.query?.address || req.query?.owner || req.query?.user;
+            const cand = String(req.body?.address || qp || req.params?.address || '').toLowerCase().trim();
+            if (cand.startsWith('0x') && profiles.isSuspended(cand)) {
+                const isProfileRead = req.method === 'GET'
+                    && (pathStr === `/profiles/${cand}` || pathStr.startsWith(`/profiles/${cand}?`));
+                if (!isProfileRead) {
+                    return res.status(403).json({ error: 'Account suspended by an administrator', suspended: true });
+                }
+            }
+        }
+    } catch (e) { /* never break the API over the gate */ }
+    next();
+});
 
-        const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
-            || req.socket?.remoteAddress || 'unknown';
+/**
+ * SIEM instrumentation middleware — sits BEFORE all routes and inspects each
+ * finished request:
+ *   every request  → per-IP rate-abuse tracker
+ *   401 on admin   → failed admin authentication (brute-force tracker)
+ *   403 on admin   → authenticated privilege escalation (tamper tracker)
+ * The whole API is watched — abuse on user-side routes belongs in the feed
+ * just as much as on the admin surface.
+ */
+app.use((req, res, next) => {
+    try {
+        if (req.path.startsWith('/socket.io')) return next();
+        const path = req.path.toLowerCase();
+        const ip = clientIP(req);
         res.on('finish', () => {
             try {
                 siem.trackRequest(ip);
                 const code = res.statusCode;
-                if (code === 401) siem.trackAdminAuthFailure(ip, { via: path, method: req.method });
-                else if (code === 403) siem.trackAdminTamper(ip, { via: path, method: req.method });
+                if (code === 401 && path.startsWith('/admin')) siem.trackAdminAuthFailure(ip, { via: path, method: req.method });
+                else if (code === 403 && path.startsWith('/admin')) siem.trackAdminTamper(ip, { via: path, method: req.method });
             } catch (e) { /* SIEM must never break the API */ }
         });
     } catch (e) { /* SIEM must never break the API */ }
@@ -208,16 +252,164 @@ app.patch('/admin/auth/admins/:id', requireRoot, handleAdminUpdate);
 app.delete('/admin/auth/admins/:id', requireRoot, handleAdminDelete);
 
 /**
+ * POST /admin/auth/login { email, password } — the BACKEND-proxied sign-in.
+ *
+ * The admin portal used to fire the password grant straight from the browser
+ * to Supabase, which meant the backend never saw a failed attempt — the SIEM
+ * brute-force watcher was blind in production. Login now flows through this
+ * route: every failure lands in the SIEM window for the caller's IP, the 5th
+ * failure in 10 minutes flags the IP for blocking, and a success clears the
+ * window and writes an audit event.
+ */
+app.post('/admin/auth/login', async (req, res) => {
+    const ip = clientIP(req);
+    if (siem.isBlocked(ip)) return res.status(403).json({ error: 'Access blocked by platform security' });
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    // Mask the email in audit meta — enough to identify the attempt without
+    // printing a full credential in the threat feed.
+    const maskEmail = String(email).trim().toLowerCase().replace(/^(.{2}).*(@.*)$/, '$1***$2');
+    try {
+        const upstream = await fetch(`${config.SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: {
+                'apikey': config.SUPABASE_SERVICE_ROLE_KEY,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email: String(email).trim().toLowerCase(), password }),
+            signal: AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined
+        });
+        const data = await upstream.json().catch(() => ({}));
+        if (!upstream.ok) {
+            siem.trackAdminAuthFailure(ip, { email: maskEmail, via: '/admin/auth/login' });
+            return res.status(401).json({
+                error: (data.error_description || data.msg || data.error || 'Invalid email or password')
+            });
+        }
+        siem.clearFailures(ip);
+        siem.addEvent({
+            type: 'ADMIN_LOGIN',
+            severity: 'info',
+            message: `Admin signed in`,
+            ip,
+            meta: { email: maskEmail }
+        });
+        return res.json({ user: data.user, session: data.session });
+    } catch (e) {
+        return res.status(502).json({ error: 'Authentication upstream unreachable', detail: e.message });
+    }
+});
+
+/**
  * SIEM — security event feed for the admin console.
- * GET  /admin/siem/events — last 250 events + 24h summary
+ * GET  /admin/siem/events — last 250 events, 24h summary, flagged IPs (the
+ * brute-force watchlist, ≥5 failed admin logins in 10m) and the blocklist.
  * Root only: DELETE /admin/siem/events — clear the log after triage.
+ * dashboard.siem: POST /admin/siem/block|unblock — the admin choke.
  */
 app.get('/admin/siem/events', requireAdminAuth, (req, res) => {
-    res.json({ summary: siem.summary(), events: siem.listEvents() });
+    res.json({
+        summary: siem.summary(),
+        events: siem.listEvents(),
+        flaggedIPs: siem.flaggedIPs(),
+        blockedIPs: siem.listBlocked()
+    });
 });
 app.delete('/admin/siem/events', requireRoot, (req, res) => {
     siem.clearAll();
     res.json({ ok: true });
+});
+
+// Block an IP across the ENTIRE platform — every route, both sides. The
+// caller's own address is refused (no self-lockout from a fat-fingered click).
+app.post('/admin/siem/block', requirePerm('dashboard.siem'), (req, res) => {
+    const ip = String(req.body?.ip || '').trim();
+    if (!ip) return res.status(400).json({ error: 'IP required' });
+    if (ip === clientIP(req)) return res.status(400).json({ error: 'That is your own IP — blocking it would lock both of us out' });
+    const out = siem.blockIP(ip, {
+        by: req.admin?.email || 'admin',
+        reason: String(req.body?.reason || '').slice(0, 200)
+    });
+    if (!out.ok) return res.status(400).json({ error: out.error });
+    io.emit('siem_ip_blocked', { ip });
+    res.json({ ok: true, blockedIPs: out.blocked });
+});
+
+app.post('/admin/siem/unblock', requirePerm('dashboard.siem'), (req, res) => {
+    const ip = String(req.body?.ip || '').trim();
+    if (!ip) return res.status(400).json({ error: 'IP required' });
+    const out = siem.unblockIP(ip, { by: req.admin?.email || 'admin' });
+    if (!out.ok) return res.status(404).json({ error: out.error });
+    io.emit('siem_ip_unblocked', { ip });
+    res.json({ ok: true, blockedIPs: out.blocked });
+});
+
+/**
+ * USERS — the platform directory for the admin Users panel.
+ * GET  /admin/users — slim rows (identity, balance, access state) for every
+ *     profile; sorted newest first.
+ * POST /admin/users/suspend — the whole-account kill switch. Emits
+ *     account_suspended / account_reinstated over the socket so an active
+ *     session is kicked off the app on the spot.
+ */
+app.get('/admin/users', requirePerm('users.manage'), async (req, res) => {
+    try {
+        await profiles.initSupabase(); // hydrate from the durable store at least once
+        res.json({ users: profiles.listDirectory() });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/admin/users/suspend', requirePerm('users.manage'), async (req, res) => {
+    const addr = String(req.body?.address || '').toLowerCase().trim();
+    const suspended = req.body?.suspended === true;
+    const note = String(req.body?.note || '').slice(0, 300);
+    if (!/^0x[a-f0-9]{40}$/.test(addr)) return res.status(400).json({ error: 'Valid user address required' });
+    try {
+        const out = await profiles.setSuspension(addr, suspended, req.admin?.email || 'admin', note);
+        if (!out.ok) return res.status(out.status || 500).json({ error: out.error || 'Failed' });
+        siem.addEvent({
+            type: 'USER_SUSPENDED',
+            severity: suspended ? 'medium' : 'info',
+            message: suspended
+                ? `User ${addr.slice(0, 6)}…${addr.slice(-4)} suspended by ${req.admin?.email || 'admin'}${note ? ` — ${note}` : ''}`
+                : `User ${addr.slice(0, 6)}…${addr.slice(-4)} reinstated by ${req.admin?.email || 'admin'}`,
+            ip: 'admin',
+            meta: { address: addr, suspended, note }
+        });
+        io.emit(suspended ? 'account_suspended' : 'account_reinstated', { address: addr });
+        res.json({ ok: true, suspended, profile: { address: addr, suspended, suspendedAt: out.profile?.suspendedAt || null, suspendNote: out.profile?.suspendNote || null } });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * MAIL — the email console. Every automated email the platform sends is
+ * mirrored to the outbox (notificationService.recordOutbox); admins can read
+ * it and compose new mail, which carries the identical plain-design header
+ * (logo) and footer (company + no-reply warning).
+ */
+app.get('/admin/emails', requirePerm('emails.send'), (req, res) => {
+    res.json({ emails: notificationService.listOutbox() });
+});
+
+// One full email body (stored HTML) for the reader pane.
+app.get('/admin/emails/:id', requirePerm('emails.send'), (req, res) => {
+    const m = notificationService.getEmail(req.params.id);
+    if (!m) return res.status(404).json({ error: 'Email not found' });
+    res.json({ email: m });
+});
+
+app.post('/admin/emails/send', requirePerm('emails.send'), async (req, res) => {
+    const to = String(req.body?.to || '').trim();
+    const subject = String(req.body?.subject || '').trim();
+    const message = String(req.body?.message || '').trim();
+    const type = ['success', 'info', 'error', 'warning'].includes(String(req.body?.type)) ? String(req.body.type) : 'info';
+    const out = await notificationService.sendAdminEmail({ to, subject, message, type });
+    if (!out.ok) return res.status(400).json({ error: out.error });
+    res.json({ ok: true, mock: out.mock === true });
 });
 
 /**

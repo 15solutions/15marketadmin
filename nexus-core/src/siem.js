@@ -10,11 +10,16 @@
  * Events live in a ring buffer (Last ~250), are mirrored to disk so they
  * survive restarts/deploys, and every HIGH/CRITICAL event is broadcast to
  * live admin dashboards over the socket (`siem_alert`).
+ *
+ * IP choke: admins can BLOCK any flagged or suspicious IP. A blocked address
+ * gets 403 on every route — user side AND admin side — and the set is
+ * persisted to disk so blocks survive restarts.
  */
 const fs = require('fs');
 const path = require('path');
 
 const BACKUP = path.join(__dirname, '..', 'data', 'siem.backup.json');
+const IPBLOCK_PATH = path.join(__dirname, '..', 'data', 'siem.ipblocks.json');
 if (!fs.existsSync(path.dirname(BACKUP))) fs.mkdirSync(path.dirname(BACKUP), { recursive: true });
 
 const MAX_EVENTS = 250;
@@ -36,6 +41,78 @@ if (!Array.isArray(events)) events = [];
 
 let broadcast = null; // cb set via setBroadcaster(event)
 const WHISPERED = new Set((events.slice(-1) || []).map(e => e.id));
+
+// ── IP blocklist (admin-driven choke) ────────────────────────────────────
+// ip -> { ip, at, by, reason }; persisted so blocks survive restarts.
+let blockedIPs = new Map();
+try {
+    const stored = JSON.parse(fs.readFileSync(IPBLOCK_PATH, 'utf8'));
+    if (Array.isArray(stored)) {
+        for (const b of stored) if (b && b.ip) blockedIPs.set(b.ip, b);
+    }
+} catch (e) { /* blank */ }
+
+function persistBlocked() {
+    try { fs.writeFileSync(IPBLOCK_PATH, JSON.stringify([...blockedIPs.values()])); }
+    catch (e) { /* disk hiccup — memory choke stays enforce */ }
+}
+
+function isBlocked(ip) {
+    return blockedIPs.has(String(ip || ''));
+}
+
+function blockIP(ip, { by = 'admin', reason = '' } = {}) {
+    const key = String(ip || '').trim();
+    if (!key) return { ok: false, error: 'IP required' };
+    blockedIPs.delete(key); // keep last block metadata when re-blocked
+    const rec = { ip: key, at: Date.now(), by, reason: String(reason || '').slice(0, 200) };
+    blockedIPs.set(key, rec);
+    persistBlocked();
+    addEvent({
+        type: 'IP_BLOCKED',
+        severity: 'high',
+        message: `IP ${key} blocked from the entire platform${reason ? ` — ${reason}` : ''}`,
+        ip: key,
+        meta: { by, reason }
+    });
+    return { ok: true, blocked: [...blockedIPs.values()] };
+}
+
+function unblockIP(ip, { by = 'admin' } = {}) {
+    const key = String(ip || '').trim();
+    if (!blockedIPs.delete(key)) return { ok: false, error: 'IP not blocked' };
+    persistBlocked();
+    addEvent({
+        type: 'IP_UNBLOCKED',
+        severity: 'info',
+        message: `IP ${key} unblocked — platform access restored`,
+        ip: key,
+        meta: { by }
+    });
+    return { ok: true, blocked: [...blockedIPs.values()] };
+}
+
+function listBlocked() {
+    return [...blockedIPs.values()].sort((a, b) => b.at - a.at);
+}
+
+// IPs that crossed the admin brute-force threshold (5 failures in 10m) —
+// flagged for blocking in the SIEM console but NOT auto-choked.
+function flaggedIPs() {
+    const out = [];
+    for (const [ip, arr] of authFailWindow) {
+        if (Array.isArray(arr) && arr.length >= AUTH_FAIL_LIMIT) {
+            out.push({ ip, attempts: arr.length, lastAt: arr[arr.length - 1] });
+        }
+    }
+    return out.sort((a, b) => b.lastAt - a.lastAt);
+}
+
+// Successful admin sign-in clears the failure window for that IP so a
+// stale half-window can never linger as a false "flagged" chip.
+function clearFailures(ip) {
+    authFailWindow.delete(String(ip || ''));
+}
 
 let persistTimer = null;
 function persist() {
@@ -173,5 +250,11 @@ module.exports = {
     listEvents,
     summary,
     clearAll,
+    blockIP,
+    unblockIP,
+    isBlocked,
+    listBlocked,
+    flaggedIPs,
+    clearFailures,
     setBroadcaster: (fn) => { broadcast = fn; }
 };

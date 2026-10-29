@@ -52,3 +52,15 @@ create index if not exists idx_trades_status on public.trades(status);
 
 -- Upsert convenience (used by the REST upsert with on_conflict=address)
 create unique index if not exists profiles_address_key on public.profiles (address);
+
+-- ---------------------------------------------------------------------------
+-- Migration 012 - platform suspension: the whole-account kill switch the
+-- admin Users panel writes to. Run in the Supabase SQL editor.
+
+alter table public.profiles
+  add column if not exists suspended boolean not null default false,
+  add column if not exists suspended_at bigint,
+  add column if not exists suspended_by text,
+  add column if not exists suspend_note text;
+
+create index if not exists idx_profiles_suspended on public.profiles(suspended) where suspended = true;

@@ -1,4 +1,6 @@
 const { Resend } = require('resend');
+const fs = require('fs');
+const path = require('path');
 const profiles = require('../profiles');
 
 const resendApiKey = process.env.RESEND_API_KEY;
@@ -32,6 +34,101 @@ let socketIo = null;
 
 let notificationStats = { sent: 0, failed: 0, emailsSent: 0, emailsFailed: 0, pushSent: 0, pushFailed: 0 };
 
+// ─── Email design + outbox ───────────────────────────────────────────────
+// One plain design for EVERY email the platform sends: the 15market logo
+// sits directly on the plain white background, content below, and a shared
+// footer carrying the company line + the no-reply warning.
+const EMAIL_LOGO_URL = process.env.EMAIL_LOGO_URL || 'https://15market.online/goblogo.png';
+const EMAIL_OUTBOX_PATH = path.join(__dirname, '..', '..', 'data', 'email-outbox.json');
+
+// Trade outcomes and copy-trading events carry NO email — they already fire
+// as in-app notices + phone push. Blocked at the dispatch layer so nobody
+// can ever re-enable them accidentally.
+const EMAIL_BLOCKED_TITLES = /trade (won|lost)|copy trad|trades copied|provider application/i;
+
+// Outbox: every email (automated + admin-sent) recorded for the admin Mail
+// console. Ring buffer of ~200, mirrored to disk so it survives deploys.
+let emailOutbox = [];
+try {
+    const stored = JSON.parse(fs.readFileSync(EMAIL_OUTBOX_PATH, 'utf8'));
+    if (Array.isArray(stored)) emailOutbox = stored.slice(0, 200);
+} catch (e) { /* blank */ }
+
+function recordOutbox(entry) {
+    const rec = {
+        id: entry.id || `mail-${Date.now()}-${Math.floor(Math.random() * 1e4)}`,
+        kind: entry.kind || 'system',      // system | manual
+        to: entry.to || '',
+        subject: entry.subject || '',
+        type: entry.type || 'info',
+        title: entry.title || '',
+        message: entry.message || '',
+        html: entry.html || '',
+        status: entry.status || 'sent',   // sent | failed
+        detail: entry.detail || '',
+        at: Date.now()
+    };
+    emailOutbox = [rec, ...emailOutbox].slice(0, 200);
+    try {
+        clearTimeout(recordOutbox._t);
+        recordOutbox._t = setTimeout(() => {
+            try { fs.writeFileSync(EMAIL_OUTBOX_PATH, JSON.stringify(emailOutbox)); } catch (e) { /* disk */ }
+        }, 400);
+    } catch (e) { /* never break the send path */ }
+    return rec;
+}
+
+function listOutbox() {
+    return emailOutbox.map(r => ({ ...r, html: undefined }));
+}
+
+// One full entry (with the stored HTML) for the admin Mail reader pane.
+function getEmail(id) {
+    return emailOutbox.find(r => r.id === String(id || '')) || null;
+}
+
+function getEmailShell(innerHtml) {
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700;900&family=Inter:wght@400;600;700&display=swap');
+            body { margin: 0; padding: 0; background-color: #ffffff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0a261a; -webkit-font-smoothing: antialiased; }
+            .plain { width: 100%; background-color: #ffffff; padding: 48px 24px 40px; }
+            .head { text-align: center; padding-bottom: 28px; }
+            .head img { height: 44px; width: auto; }
+            .inner { max-width: 540px; margin: 0 auto; }
+            .badge { display: inline-block; padding: 6px 14px; border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+            .title { font-family: 'Comfortaa', cursive; font-weight: 900; font-size: 21px; color: #0a261a; margin: 14px 0 16px; line-height: 1.3; }
+            .msg { background-color: #f4f6f5; border: 1px solid #e7ece9; border-radius: 16px; padding: 24px; font-size: 15px; line-height: 1.65; color: #35443c; margin: 0 0 4px; }
+            .action { display: block; width: 200px; margin: 28px auto 0; padding: 14px 0; background-color: #1A6140; color: #ffffff !important; text-decoration: none; font-weight: 700; font-size: 12px; text-align: center; border-radius: 28px; text-transform: uppercase; letter-spacing: 1px; }
+            .footer { max-width: 540px; margin: 44px auto 0; border-top: 1px solid #e7ece9; padding-top: 18px; text-align: center; font-size: 11px; color: #7b8a82; }
+            .footer p { margin: 0 0 6px 0; }
+            .footer .company { font-family: 'Comfortaa', cursive; font-weight: 700; color: #0a261a; }
+            .footer .noreply { color: #a3552e; font-weight: 600; }
+            .code-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #7b8a82; margin-bottom: 14px; }
+            .code { font-family: 'Inter', monospace; font-weight: 900; font-size: 40px; letter-spacing: 12px; color: #1A6140; line-height: 1.2; }
+        </style>
+    </head>
+    <body>
+        <div class="plain">
+            <div class="head">
+                <img src="${EMAIL_LOGO_URL}" alt="15market" />
+            </div>
+            <div class="inner">${innerHtml}</div>
+            <div class="footer">
+                <p><span class="company">15market</span> (c) 2026 · All rights reserved</p>
+                <p class="noreply">Warning: this is a no-reply email address. Replies to this email will not be read or processed.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+}
+
 function init(io) {
     socketIo = io;
     console.log('[NotificationService] Socket.io reference initialized.');
@@ -45,66 +142,16 @@ function getEmailTemplate(title, message, type) {
         error: '#FF6B6B'
     };
     const color = typeColors[type] || '#249C6C';
-    
-    return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>15MARKET - Notification</title>
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700;900&family=Inter:wght@400;600;700&display=swap');
-            body {
-                margin: 0;
-                padding: 0;
-                background-color: #070a09;
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                color: #e2ece5;
-                -webkit-font-smoothing: antialiased;
-            }
-            .wrapper { width: 100%; background-color: #070a09; padding: 40px 0; }
-            .container { max-width: 600px; margin: 0 auto; background-color: #101613; border: 1px solid rgba(36, 156, 108, 0.15); border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); }
-            .header { padding: 32px; text-align: center; background: linear-gradient(180deg, rgba(36, 156, 108, 0.1) 0%, rgba(36, 156, 108, 0) 100%); border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
-            .logo { font-family: 'Comfortaa', cursive; font-weight: 900; font-size: 24px; color: #249C6C; text-decoration: none; letter-spacing: -0.5px; }
-            .content { padding: 40px 32px; }
-            .badge-wrapper { text-align: center; margin-bottom: 24px; }
-            .badge { display: inline-block; padding: 8px 16px; border-radius: 12px; background-color: rgba(36, 156, 108, 0.1); border: 1px solid rgba(36, 156, 108, 0.2); color: #249C6C; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
-            .title { font-family: 'Comfortaa', cursive; font-weight: 900; font-size: 22px; color: #ffffff; text-align: center; margin: 0 0 16px 0; }
-            .message-card { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 24px; margin-bottom: 32px; text-align: center; }
-            .message-text { font-size: 15px; line-height: 1.6; color: rgba(226, 236, 229, 0.85); margin: 0; }
-            .action-btn { display: block; width: 200px; margin: 0 auto; padding: 16px 0; background-color: #249C6C; color: #ffffff !important; text-decoration: none; font-weight: 700; font-size: 13px; text-align: center; border-radius: 30px; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s ease; box-shadow: 0 8px 24px rgba(36, 156, 108, 0.25); }
-            .footer { padding: 32px; background-color: rgba(0, 0, 0, 0.2); border-top: 1px solid rgba(255, 255, 255, 0.02); text-align: center; font-size: 11px; color: rgba(226, 236, 229, 0.35); }
-            .footer p { margin: 0 0 8px 0; }
-            .footer a { color: #249C6C; text-decoration: none; }
-        </style>
-    </head>
-    <body>
-        <div class="wrapper">
-            <div class="container">
-                <div class="header">
-                    <a href="https://15market.com" class="logo">15MARKET</a>
-                </div>
-                <div class="content">
-                    <div class="badge-wrapper">
-                        <span class="badge" style="color: ${color}; border-color: ${color}33; background-color: ${color}1a;">${type}</span>
-                    </div>
-                    <h2 class="title">${title}</h2>
-                    <div class="message-card">
-                        <p class="message-text">${message}</p>
-                    </div>
-                    <a href="https://15market.com/dashboard" class="action-btn">Launch Dashboard</a>
-                </div>
-                <div class="footer">
-                    <p>&copy; 2026 15MARKET. All rights reserved.</p>
-                    <p>You received this email because you are registered on 15MARKET.</p>
-                    <p><a href="https://15market.com/settings">Manage Email Preferences</a></p>
-                </div>
-            </div>
+    return getEmailShell(`
+        <div style="text-align: center; margin-bottom: 20px;">
+            <span class="badge" style="color: ${color}; background-color: ${color}1a;">${type}</span>
         </div>
-    </body>
-    </html>
-    `;
+        <h2 class="title">${title}</h2>
+        <div class="msg">
+            <p class="message-text">${message}</p>
+        </div>
+        <a href="https://15market.online" class="action">Launch Dashboard</a>
+    `);
 }
 
 // ─── OneSignal push dispatch ─────────────────────────────────────────────
@@ -209,6 +256,9 @@ async function notifyUserWithPush(userAddr, title, message, type = 'info') {
 }
 
 async function sendNotificationEmail(addr, title, message, type, notification) {
+    // Trade outcomes and copy-trading events never email — in-app + push only.
+    if (EMAIL_BLOCKED_TITLES.test(String(title))) return;
+
     try {
         const profile = profiles.get(addr);
         let emailAddress = profile?.email || profile?.verifiedEmail || null;
@@ -231,7 +281,7 @@ async function sendNotificationEmail(addr, title, message, type, notification) {
         const { data, error } = await resend.emails.send({
             from: process.env.RESEND_FROM || '15MARKET <onboarding@resend.dev>',
             to: [emailAddress],
-            subject: `15MARKET: ${title}`,
+            subject: title,
             html: htmlContent,
             idempotencyKey: idempotencyKey
         });
@@ -239,9 +289,11 @@ async function sendNotificationEmail(addr, title, message, type, notification) {
         if (error) {
             console.error('[Notification-Email] Resend error:', error.message);
             notificationStats.emailsFailed++;
+            recordOutbox({ kind: 'system', to: emailAddress, subject: title, title, message, type, html: htmlContent, status: 'failed', detail: error.message });
         } else {
             console.log('[Notification-Email] Sent. ID:', data.id);
             notificationStats.emailsSent++;
+            recordOutbox({ kind: 'system', to: emailAddress, subject: title, title, message, type, html: htmlContent, status: 'sent', detail: data.id });
         }
     } catch (emailErr) {
         console.error('[Notification-Email] Error:', emailErr.message);
@@ -250,62 +302,17 @@ async function sendNotificationEmail(addr, title, message, type, notification) {
 }
 
 function getOtpEmailTemplate(code) {
-    return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>15MARKET - Email Verification</title>
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700;900&family=Inter:wght@400;600;700;900&display=swap');
-            body { margin: 0; padding: 0; background-color: #070a09; font-family: 'Inter', sans-serif; color: #e2ece5; -webkit-font-smoothing: antialiased; }
-            .wrapper { width: 100%; background-color: #070a09; padding: 40px 0; }
-            .container { max-width: 600px; margin: 0 auto; background-color: #101613; border: 1px solid rgba(36, 156, 108, 0.15); border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); }
-            .header { padding: 40px 32px 32px; text-align: center; background: linear-gradient(180deg, rgba(36, 156, 108, 0.1) 0%, rgba(36, 156, 108, 0) 100%); border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
-            .logo { font-family: 'Comfortaa', cursive; font-weight: 900; font-size: 28px; color: #249C6C; text-decoration: none; letter-spacing: -0.5px; }
-            .content { padding: 40px 32px; }
-            .title { font-family: 'Comfortaa', cursive; font-weight: 900; font-size: 22px; color: #ffffff; text-align: center; margin: 0 0 8px 0; }
-            .subtitle { font-size: 13px; color: rgba(226, 236, 229, 0.5); text-align: center; margin: 0 0 32px 0; font-weight: 400; }
-            .code-card { background: rgba(36, 156, 108, 0.08); border: 1px solid rgba(36, 156, 108, 0.2); border-radius: 20px; padding: 32px; margin-bottom: 32px; text-align: center; }
-            .code-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: rgba(226, 236, 229, 0.4); margin-bottom: 16px; }
-            .code { font-family: 'Inter', monospace; font-weight: 900; font-size: 42px; letter-spacing: 12px; color: #249C6C; margin: 0; line-height: 1.2; text-shadow: 0 0 30px rgba(36, 156, 108, 0.3); }
-            .instructions { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 24px; margin-bottom: 32px; }
-            .instructions p { font-size: 14px; line-height: 1.7; color: rgba(226, 236, 229, 0.75); margin: 0; }
-            .instructions strong { color: #e2ece5; font-weight: 700; }
-            .footer { padding: 32px; background-color: rgba(0, 0, 0, 0.2); border-top: 1px solid rgba(255, 255, 255, 0.02); text-align: center; font-size: 11px; color: rgba(226, 236, 229, 0.35); }
-            .footer p { margin: 0 0 8px 0; }
-            .footer a { color: #249C6C; text-decoration: none; }
-            .expiry-note { font-size: 11px; color: rgba(226, 236, 229, 0.3); text-align: center; margin-top: 16px; }
-        </style>
-    </head>
-    <body>
-        <div class="wrapper">
-            <div class="container">
-                <div class="header">
-                    <a href="https://15market.com" class="logo">15MARKET</a>
-                </div>
-                <div class="content">
-                    <h2 class="title">Verify Your Email</h2>
-                    <p class="subtitle">Use the code below to complete your verificaion.</p>
-                    <div class="code-card">
-                        <div class="code-label">Verification Code</div>
-                        <div class="code">${code}</div>
-                    </div>
-                    <div class="instructions">
-                        <p>Enter this <strong>one-time code</strong> on the application page. This code will expire in <strong>10 minutes</strong>.</p>
-                    </div>
-                    <p class="expiry-note">If you did not request this code, ignore this email.</p>
-                </div>
-                <div class="footer">
-                    <p>&copy; 2026 15MARKET. All rights reserved.</p>
-                    <p><a href="https://15market.com">15market.com</a></p>
-                </div>
-            </div>
+    return getEmailShell(`
+        <h2 class="title">Verify Your Email</h2>
+        <p style="font-size: 13px; color: #7b8a82; text-align: center; margin: 0 0 28px 0;">Use the code below to complete your verification.</p>
+        <div class="msg" style="text-align: center;">
+            <div class="code-label">Verification Code</div>
+            <div class="code">${code}</div>
         </div>
-    </body>
-    </html>
-    `;
+        <div class="msg" style="margin-top: 20px;">
+            <p style="font-size: 14px; line-height: 1.7; margin: 0;">Enter this <strong style="color:#0a261a;">one-time code</strong> on the application page. It expires in <strong style="color:#0a261a;">10 minutes</strong>. If you did not request this code, ignore this email.</p>
+        </div>
+    `);
 }
 
 async function sendOtpEmail(emailAddress, code) {
@@ -318,18 +325,53 @@ async function sendOtpEmail(emailAddress, code) {
         const { data, error } = await resend.emails.send({
             from: process.env.RESEND_FROM || '15MARKET <onboarding@resend.dev>',
             to: [emailAddress],
-            subject: '15MARKET: Your Email Verification Code',
+            subject: 'Your Email Verification Code',
             html: htmlContent
         });
         if (error) {
             console.error('[OTP-Email] Resend error:', error.message);
+            recordOutbox({ kind: 'system', to: emailAddress, subject: 'Your Email Verification Code', title: 'Email verification', message: `A verification code was issued (delivery failed: ${error.message})`, html: htmlContent, status: 'failed', detail: error.message });
             return false;
         }
         console.log('[OTP-Email] Sent to', emailAddress, 'ID:', data?.id);
+        recordOutbox({ kind: 'system', to: emailAddress, subject: 'Your Email Verification Code', title: 'Email verification', message: 'A verification code was issued and delivered.', html: htmlContent, status: 'sent', detail: data?.id || '' });
         return true;
     } catch (err) {
         console.error('[OTP-Email] Failed:', err.message);
         return false;
+    }
+}
+
+// ─── Admin-composed email (Mail console) ────────────────────────────────
+// Same plain design, composed from the admin panel. Records to the outbox
+// as a 'manual' entry on every attempt.
+async function sendAdminEmail({ to, subject, message, type = 'info' }) {
+    const title = String(subject || 'A message from 15market').trim();
+    const body = String(message || '').trim();
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return { ok: false, error: 'A valid recipient email is required' };
+    if (!body) return { ok: false, error: 'Message body required' };
+    const htmlContent = getEmailTemplate(title, body, type);
+    if (!resend) {
+        console.log(`[Admin-Email] Resend not configured. Would send "${title}" to ${to}`);
+        recordOutbox({ kind: 'manual', to, subject: title, title, message: body, type, html: htmlContent, status: 'failed', detail: 'RESEND_API_KEY not configured' });
+        return { ok: true, mock: true };
+    }
+    try {
+        const { data, error } = await resend.emails.send({
+            from: process.env.RESEND_FROM || '15MARKET <onboarding@resend.dev>',
+            to: [to],
+            subject: title,
+            html: htmlContent
+        });
+        if (error) {
+            recordOutbox({ kind: 'manual', to, subject: title, title, message: body, type, html: htmlContent, status: 'failed', detail: error.message });
+            return { ok: false, error: error.message };
+        }
+        recordOutbox({ kind: 'manual', to, subject: title, title, message: body, type, html: htmlContent, status: 'sent', detail: data?.id || '' });
+        return { ok: true, id: data?.id };
+    } catch (err) {
+        recordOutbox({ kind: 'manual', to, subject: title, title, message: body, type, html: htmlContent, status: 'failed', detail: err.message });
+        return { ok: false, error: err.message };
     }
 }
 
@@ -342,6 +384,12 @@ module.exports = {
     notifyUser,
     notifyUserWithPush,
     sendOneSignalPush,
+    sendNotificationEmail,
     sendOtpEmail,
+    sendAdminEmail,
+    listOutbox,
+    getEmail,
+    getEmailTemplate,
+    getOtpEmailTemplate,
     getStats
 };

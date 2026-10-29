@@ -288,6 +288,11 @@ function profileToRow(profile, includeTrades, includeOnboarding = true, includeC
         referral_suspended: profile.referralSuspended === true,
         referral_rate_override: profile.referralRateOverride != null ? profile.referralRateOverride : null,
         referral_slashed: profile.referralSlashed ?? 0,
+        // Platform suspension (migration 012): the whole-account kill switch.
+        suspended: profile.suspended === true,
+        suspended_at: profile.suspendedAt != null ? Number(profile.suspendedAt) : null,
+        suspended_by: profile.suspendedBy || null,
+        suspend_note: profile.suspendNote ? String(profile.suspendNote).slice(0, 300) : null,
         updated_at: new Date().toISOString()
     };
     if (includeChainRecon) {
@@ -376,6 +381,13 @@ function rowToProfile(row) {
         ...(row.referral_suspended === true ? { referralSuspended: true } : {}),
         ...(row.referral_rate_override != null ? { referralRateOverride: Number(row.referral_rate_override) } : {}),
         ...(row.referral_slashed != null ? { referralSlashed: Number(row.referral_slashed) } : {}),
+        // Platform suspension (migration 012). Only SET when the row carries
+        // it — same rule as the referral keys so a pre-migration row never
+        // wipes a locally-persisted suspension.
+        ...(row.suspended === true ? { suspended: true } : {}),
+        ...(row.suspended_at != null ? { suspendedAt: Number(row.suspended_at) } : {}),
+        ...(row.suspended_by ? { suspendedBy: row.suspended_by } : {}),
+        ...(row.suspend_note ? { suspendNote: row.suspend_note } : {}),
         onboarded: row.onboarded === true || onboardedAt != null || !!row.username,
         onboardedAt,
         chainBaseline: row.chain_baseline != null ? Number(row.chain_baseline) : null,
@@ -395,6 +407,7 @@ class ProfileService {
         this.sbFullPayload = true;       // false once optional columns are known to be missing
         this.sbChainReconAvailable = true; // false once the chain-recon columns are known to be missing
         this.sbColumnsProbed = false;
+        this.sbSuspendAvailable = true;  // false once the suspension columns are known to be missing (012)
         this.sbTradeTableAvailable = null;
         this.sbIdempotencyAvailable = null; // null = unprobed, false = table missing
     this.sbReferralAvailable = null;    // same, for referral columns (009)
@@ -579,6 +592,16 @@ class ProfileService {
         } catch (e) {
             this.sbRefWithdrawalsAvailable = true;
             console.warn('[Supabase] Withdrawal table probe failed:', e.message);
+        }
+        // Platform-suspension columns (migration 012). The generic 400-strip
+        // self-heals either way; the probe covers it up front.
+        try {
+            const spRes = await supabaseRequest('/rest/v1/profiles?select=suspended,suspended_at,suspended_by,suspend_note&limit=1', { timeout: 20000 });
+            this.sbSuspendAvailable = spRes.ok;
+            if (!spRes.ok) console.warn('[Supabase] suspended columns NOT present — run supabase-migration.sql (migration 012); platform suspension is memory/file only until then.');
+        } catch (e) {
+            this.sbSuspendAvailable = true;
+            console.warn('[Supabase] Suspension column probe failed:', e.message);
         }
     }
 
@@ -1003,6 +1026,12 @@ class ProfileService {
                 // 010 admin controls strip with the rest — a payload carrying
                 // them while the columns are gone 400s the entire upsert.
                 delete a.referral_suspended; delete a.referral_rate_override; delete a.referral_slashed;
+            }
+        }
+        // Same protection for the suspension columns (012).
+        if (this.sbSuspendAvailable === false) {
+            for (const a of attempts) {
+                delete a.suspended; delete a.suspended_at; delete a.suspended_by; delete a.suspend_note;
             }
         }
         // Self-healing column discovery: PostgREST 400s name the missing
@@ -1592,6 +1621,57 @@ class ProfileService {
             console.warn('[Referral] WARNING: referral admin columns missing in Supabase — suspension is memory/file only. Run 010_referral_admin.sql.');
         }
         return { ok: true, suspended: suspended === true };
+    }
+
+    // ── Platform suspension (migration 012) ───────────────────────────────
+    // The whole-account kill switch: a suspended user is locked out of the
+    // platform entirely. Reason is optional and shown to the user.
+    async setSuspension(address, suspended, by = 'admin', note = '') {
+        const addr = String(address || '').toLowerCase();
+        if (!addr) return { ok: false, status: 400, error: 'Address required' };
+        const patch = suspended === true
+            ? {
+                suspended: true,
+                suspendedAt: Date.now(),
+                suspendedBy: String(by || 'admin').slice(0, 120),
+                suspendNote: String(note || '').trim().slice(0, 300) || null
+            }
+            : { suspended: false, suspendedAt: null, suspendedBy: null, suspendNote: null };
+        this.upsert(addr, patch);
+        if (SUPABASE_ENABLED) await this.syncToSupabase(addr).catch(() => false);
+        if (this.sbSuspendAvailable === false) {
+            console.warn('[Profiles] WARNING: suspended columns missing in Supabase — platform suspension is memory/file only. Run supabase-migration.sql (migration 012).');
+        }
+        return { ok: true, suspended: suspended === true, profile: this.profiles[addr] };
+    }
+
+    isSuspended(address) {
+        const addr = String(address || '').toLowerCase();
+        const p = this.profiles[addr];
+        return p?.suspended === true;
+    }
+
+    // Slim directory rows for the admin Users panel — no trades, no wallets,
+    // no referral internals. Identity + access state only.
+    listDirectory() {
+        return Object.entries(this.profiles).map(([addr, p]) => ({
+            address: p.address || addr,
+            username: p.username || null,
+            email: p.email || p.verifiedEmail || null,
+            discord: p.discord || null,
+            xHandle: p.xHandle || null,
+            country: p.country || null,
+            avatar: p.avatar || null,
+            balance: p.balance != null ? Number(p.balance) : 0,
+            onboarded: p.onboarded === true || !!p.onboardedAt || !!p.username,
+            onboardedAt: p.onboardedAt != null ? Number(p.onboardedAt) : null,
+            createdAt: p.createdAt != null ? Number(p.createdAt) : null,
+            updatedAt: p.updatedAt != null ? Number(p.updatedAt) : null,
+            suspended: p.suspended === true,
+            suspendedAt: p.suspendedAt != null ? Number(p.suspendedAt) : null,
+            suspendedBy: p.suspendedBy || null,
+            suspendNote: p.suspendNote || null
+        })).sort((a, b) => (b.createdAt || b.updatedAt || 0) - (a.createdAt || a.updatedAt || 0));
     }
 
     // Set a per-user commission rate override in PERCENT (null clears the

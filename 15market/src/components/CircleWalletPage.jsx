@@ -84,6 +84,12 @@ export function CircleWalletPage({
     onWithdraw,
     triggerGlobalRefresh
 }) {
+    // External-wallet-only rails (CCTP burn & mint funding): the cross-chain
+    // CCTP flow must be signed by an EOA the user actually controls.
+    // Accounts created with email / Discord / any other auth method own ONLY
+    // the Privy embedded wallet — the Transfer Hub hides every CCTP option
+    // for them.
+    const isExternalWalletUser = !!wallets?.some(w => w.address && w.address.startsWith('0x') && w.walletClientType !== 'privy');
     // Authoritative Main Wallet (EVM external wallet if connected, otherwise Privy embedded wallet)
     const mainWalletObj = wallets?.find(w => w.address && w.address.startsWith('0x') && w.walletClientType !== 'privy')
         || wallets?.find(w => w.address && w.address.startsWith('0x'));
@@ -999,6 +1005,12 @@ export function CircleWalletPage({
     const handleConfirmFunding = async () => {
         if (!fundingAmount || parseFloat(fundingAmount) <= 0) return;
 
+        // Hard stop behind the UI gate: every EVM USDC path on this page is
+        // CCTP burn & mint, and those rails are external-wallet-only.
+        if (!isExternalWalletUser && fundingType === 'usdc' && selectedToken.id !== 'sol') {
+            return notify('Cross-chain USDC transfers are only available for external wallet users', 'error');
+        }
+
         setFundingStep('confirming');
         setCctpStep(0);
         setCctpLogs([]);
@@ -1899,22 +1911,27 @@ export function CircleWalletPage({
                                                                 <p className={`text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all ${isLight ? 'text-black/60 group-hover:text-[#1A6140]' : 'text-white/60 group-hover:text-[#1A6140]'}`}>Native Tokens</p>
                                                             </div>
                                                         </button>
-                                                        {/* Divider Line */}
-                                                        <div className={`w-[2px] h-16 md:h-24 bg-[#1A6140]/40 mx-2 md:mx-12 rounded-full`}></div>
+                                                        {/* The USDC rail is CCTP burn & mint — external
+                                                            wallet users only. Auth-created accounts
+                                                            (email/Discord/...) never see it. */}
+                                                        {isExternalWalletUser && (<>
+                                                            {/* Divider Line */}
+                                                            <div className={`w-[2px] h-16 md:h-24 bg-[#1A6140]/40 mx-2 md:mx-12 rounded-full`}></div>
 
-                                                        <button
-                                                            onClick={() => setFundingType('usdc')}
-                                                            className="flex flex-col items-center gap-4 md:gap-6 transition-all hover:scale-110 active:scale-95 group"
-                                                        >
-                                                            <div className="relative flex items-center justify-center">
-                                                                <img
-                                                                    src="/usdc.png"
-                                                                    alt="USDC Logo"
-                                                                    className={`w-[3.3rem] h-[3.3rem] md:w-[4.95rem] md:h-[4.95rem] object-contain transition-all opacity-70 group-hover:opacity-100 -translate-y-[2vh] ${isLight ? 'brightness-0' : 'brightness-0 invert'} group-hover:[filter:brightness(0)_saturate(100%)_invert(64%)_sepia(26%)_saturate(1028%)_hue-rotate(101deg)_brightness(88%)_contrast(82%)]`}
-                                                                />
-                                                                <p className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap ${isLight ? 'text-black/60 group-hover:text-[#1A6140]' : 'text-white/60 group-hover:text-[#1A6140]'}`}>USDC</p>
-                                                            </div>
-                                                        </button>
+                                                            <button
+                                                                onClick={() => setFundingType('usdc')}
+                                                                className="flex flex-col items-center gap-4 md:gap-6 transition-all hover:scale-110 active:scale-95 group"
+                                                            >
+                                                                <div className="relative flex items-center justify-center">
+                                                                    <img
+                                                                        src="/usdc.png"
+                                                                        alt="USDC Logo"
+                                                                        className={`w-[3.3rem] h-[3.3rem] md:w-[4.95rem] md:h-[4.95rem] object-contain transition-all opacity-70 group-hover:opacity-100 -translate-y-[2vh] ${isLight ? 'brightness-0' : 'brightness-0 invert'} group-hover:[filter:brightness(0)_saturate(100%)_invert(64%)_sepia(26%)_saturate(1028%)_hue-rotate(101deg)_brightness(88%)_contrast(82%)]`}
+                                                                    />
+                                                                    <p className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap ${isLight ? 'text-black/60 group-hover:text-[#1A6140]' : 'text-white/60 group-hover:text-[#1A6140]'}`}>USDC</p>
+                                                                </div>
+                                                            </button>
+                                                        </>)}
                                                     </div>
                                                 </div>
 
@@ -1955,13 +1972,17 @@ export function CircleWalletPage({
                                                                 className="h-5 md:h-10 object-contain drop-shadow-[0_0_10px_rgba(26, 97, 64,0.3)] relative z-30"
                                                                 style={{ filter: 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)' }}
                                                             />
-                                                            <div className={`relative z-30 text-white opacity-40 scale-75 md:scale-100`}>
-                                                                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                                                                    <path d="M1 1L11 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 3" />
-                                                                    <path d="M11 1L1 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 3" />
-                                                                </svg>
-                                                            </div>
-                                                            <span className="relative z-30 text-[9px] md:text-xs font-black tracking-widest text-[#1A6140]">CCTP</span>
+                                                            {/* The CCTP label only on external-wallet rails —
+                                                                auth-created accounts run the embedded rails. */}
+                                                            {isExternalWalletUser && (<>
+                                                                <div className={`relative z-30 text-white opacity-40 scale-75 md:scale-100`}>
+                                                                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                                                                        <path d="M1 1L11 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 3" />
+                                                                        <path d="M11 1L1 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 3" />
+                                                                    </svg>
+                                                                </div>
+                                                                <span className="relative z-30 text-[9px] md:text-xs font-black tracking-widest text-[#1A6140]">CCTP</span>
+                                                            </>)}
                                                             <div className={`relative z-30 text-white opacity-40 scale-75 md:scale-100`}>
                                                                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                                                                     <path d="M1 1L11 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 3" />

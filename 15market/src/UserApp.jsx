@@ -2415,6 +2415,21 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       }
     });
 
+    // Access control — an admin suspension lands mid-session and locks the
+    // app on the spot; reinstatement lifts the gate live.
+    const unbindSuspend = socketService.on('account_suspended', (data) => {
+      if (!data?.address || !address || String(data.address).toLowerCase() !== String(address).toLowerCase()) return;
+      console.log('[Access] Account suspended by admin');
+      setUserProfile(prev => prev ? { ...prev, suspended: true, suspendNote: data.note ?? prev.suspendNote, suspendedAt: data.suspendedAt ?? prev.suspendedAt } : prev);
+      notify('Access to your account has been suspended', 'error');
+    });
+    const unbindReinstate = socketService.on('account_reinstated', (data) => {
+      if (!data?.address || !address || String(data.address).toLowerCase() !== String(address).toLowerCase()) return;
+      console.log('[Access] Account reinstated by admin');
+      setUserProfile(prev => prev ? { ...prev, suspended: false } : prev);
+      notify('Access restored — welcome back', 'success');
+    });
+
     const unbindProviderUpdate = socketService.on('provider_application_update', (appStatus) => {
       setUserProfile(prev => {
         if (!prev) return prev;
@@ -2437,6 +2452,8 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       unbindMacro24h();
       unbindSettled();
       unbindBroadcast();
+      unbindSuspend();
+      unbindReinstate();
       unbindProviderUpdate();
     };
   }, [notify, updateEvmSessionBal, refetchEvmBalance, address, evmSessionWallet]);
@@ -3334,6 +3351,14 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
             </AnimatePresence>
           )}
 
+          {/* Access kill switch — a suspended account sees nothing but this. */}
+          {userProfile?.suspended === true && (
+            <SuspensionGate
+              note={userProfile?.suspendNote}
+              at={userProfile?.suspendedAt}
+            />
+          )}
+
           {view === "dashboard" ? (
             <DashboardPage
               onBack={() => setView("trading")}
@@ -3846,4 +3871,45 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       </ErrorBoundary>
     </div>
   );
+}
+
+
+// SuspensionGate � the whole-account kill switch view. A suspended user
+// gets nothing but this: the platform canvas, a sealed lock, the message.
+function SuspensionGate({ note, at }) {
+    return (
+        <div className="fixed inset-0 z-[9500] flex items-center justify-center overflow-hidden"
+            style={{ fontFamily: '"Comfortaa", cursive', backgroundColor: '#050505' }}>
+            {/* Platform dressing � green radiance + carbon weave */}
+            <div className="absolute inset-0"
+                style={{ background: 'radial-gradient(circle at 50% 38%, rgba(26,97,64,0.42) 0%, rgba(5,5,5,0) 58%), radial-gradient(circle at 50% 115%, rgba(26,97,64,0.28) 0%, rgba(5,5,5,0) 60%)' }} />
+            <div className="absolute inset-0 opacity-[0.13] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
+            <div className="relative flex flex-col items-center text-center gap-6 px-10">
+                <motion.div
+                    initial={{ scale: 0.4, rotate: -12, opacity: 0 }}
+                    animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    className="relative flex items-center justify-center w-28 h-28 rounded-full border border-red-500/40"
+                    style={{ background: 'radial-gradient(circle at 50% 30%, rgba(255,77,77,0.35) 0%, rgba(255,77,77,0.08) 70%, rgba(5,5,5,0) 100%)', boxShadow: '0 0 80px -10px rgba(255,77,77,0.55)' }}
+                >
+                    <Lock size={46} strokeWidth={2.5} className="text-red-400" />
+                    <motion.span className="absolute inset-0 rounded-full border-2 border-red-500/50"
+                        animate={{ scale: [1, 1.45], opacity: [0.7, 0] }}
+                        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }} />
+                </motion.div>
+                <div>
+                    <p className="text-2xl md:text-3xl font-black text-white tracking-tight leading-tight">ACCESS SUSPENDED</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-red-400 mt-3">An administrator has locked this account</p>
+                </div>
+                <p className="max-w-[320px] md:max-w-md text-xs md:text-sm font-medium text-white/60 leading-relaxed">
+                    {note ? note : 'Your access to the platform has been suspended. Trading, transfers and every other feature are locked until an administrator reinstates your account.'}
+                </p>
+                {at ? (
+                    <p className="text-[8px] font-black uppercase tracking-widest text-white/25">
+                        {new Date(Number(at)).toLocaleString([], { year: '2-digit', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                ) : null}
+            </div>
+        </div>
+    );
 }

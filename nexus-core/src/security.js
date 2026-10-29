@@ -94,6 +94,8 @@ const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || '').toLowerCase().trim
 const ALL_PERMISSIONS = [
   'ref.withdrawals',    // approve / cancel referral commission payouts
   'ref.manage',         // suspend users, set commission rates, slash commission
+  'users.manage',       // user directory: view all users, suspend / reinstate
+  'emails.send',        // Mail console: read the outbox, compose + send
   'platform.settings',  // maintenance mode, trading halt, banner settings
   'broadcast.send',     // live global broadcasts
   'trades.maintenance', // resolve stuck trades
@@ -106,7 +108,7 @@ const ALL_PERMISSIONS = [
 
 const ROLE_DEFAULTS = {
   root: ['*'],
-  admin: ['ref.withdrawals', 'ref.manage', 'platform.settings', 'broadcast.send', 'trades.maintenance',
+  admin: ['ref.withdrawals', 'ref.manage', 'users.manage', 'emails.send', 'platform.settings', 'broadcast.send', 'trades.maintenance',
           'dashboard.overview', 'dashboard.analytics', 'dashboard.siem', 'dashboard.security'],
   moderator: ['ref.withdrawals']
 };

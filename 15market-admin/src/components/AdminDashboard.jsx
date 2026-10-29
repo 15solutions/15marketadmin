@@ -31,6 +31,7 @@ import {
     Mail,
     Landmark,
     ChevronDown,
+    ChevronRight,
     LogOut,
     LayoutDashboard,
     ChevronsLeft,
@@ -44,7 +45,9 @@ import {
     Pencil,
     Megaphone,
     Undo2,
-    CalendarClock
+    CalendarClock,
+    UserCog,
+    Send
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
@@ -61,6 +64,8 @@ import { ThemeToggle } from "./ui/ThemeToggle";
 const NAV = [
     { key: 'overview', label: 'Overview', hint: 'Metrics · Trade index', icon: LayoutDashboard },
     { key: 'analytics', label: 'Analytics', hint: 'Globe · Reach · Users', icon: Globe },
+    { key: 'users', label: 'Users', hint: 'Directory · Access control', icon: UserCog },
+    { key: 'mail', label: 'Mail', hint: 'Outbox · Compose', icon: Mail },
     { key: 'referrals', label: 'Referral Program', hint: 'Participants · Earnings · Requests', icon: Users },
     { key: 'broadcast', label: 'Broadcast', hint: 'Live banner · Alerts', icon: Radio },
     { key: 'siem', label: 'SIEM', hint: 'Threats · Intrusions', icon: ShieldAlert },
@@ -1101,6 +1106,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const hasPerm = (p) => isRoot || adminPerms.includes('*') || adminPerms.includes(p);
     const canRequests = hasPerm('ref.withdrawals');
     const canReferral = hasPerm('ref.manage');
+    const canUsers = hasPerm('users.manage');
+    const canMail = hasPerm('emails.send');
     const canSettings = hasPerm('platform.settings');
     const canBroadcast = hasPerm('broadcast.send');
 
@@ -1112,6 +1119,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const visibleNav = NAV.filter(t =>
         t.key === 'overview' ? hasPerm('dashboard.overview')
             : t.key === 'analytics' ? hasPerm('dashboard.analytics')
+            : t.key === 'users' ? canUsers
+            : t.key === 'mail' ? canMail
             : t.key === 'referrals' ? canReferrals
             : t.key === 'broadcast' ? canBroadcast
             : t.key === 'siem' ? hasPerm('dashboard.siem')
@@ -1147,6 +1156,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const [siemEvents, setSiemEvents] = useState([]);
     const [siemSummary, setSiemSummary] = useState(null);
     const [siemBusy, setSiemBusy] = useState(false);
+    // Watchlist (≥5 failed admin logins in 10m — flagged for blocking) and
+    // the live blocklist (IPs choked from the entire platform).
+    const [siemFlagged, setSiemFlagged] = useState([]);
+    const [siemBlocked, setSiemBlocked] = useState([]);
+    const [blockBusy, setBlockBusy] = useState(''); // ip being (un)blocked
 
     const fetchSiem = async () => {
         setSiemBusy(true);
@@ -1156,9 +1170,31 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 const data = await res.json().catch(() => ({}));
                 setSiemEvents(Array.isArray(data.events) ? data.events : []);
                 setSiemSummary(data.summary || null);
+                setSiemFlagged(Array.isArray(data.flaggedIPs) ? data.flaggedIPs : []);
+                setSiemBlocked(Array.isArray(data.blockedIPs) ? data.blockedIPs : []);
             }
         } catch (e) { /* feed stays as-is */ }
         finally { setSiemBusy(false); }
+    };
+
+    // Block / unblock an IP across the entire platform. The backend refuses
+    // the console's own address (no self-lockout).
+    const handleToggleBlock = async (ip, blocked) => {
+        setBlockBusy(ip);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/siem/${blocked ? 'unblock' : 'block'}`, {
+                method: 'POST',
+                body: JSON.stringify({ ip })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Failed');
+            notify(blocked ? `IP ${ip} restored — access reinstated` : `IP ${ip} blocked platform-wide`, 'success');
+            setSiemBlocked(Array.isArray(data.blockedIPs) ? data.blockedIPs : []);
+            if (!blocked) setSiemFlagged(prev => prev.filter(f => f.ip !== ip));
+            fetchSiem();
+        } catch (e) {
+            notify(e.message, 'error');
+        } finally { setBlockBusy(''); }
     };
 
     const clearSiem = async () => {
@@ -1173,8 +1209,147 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     };
 
     useEffect(() => {
-        if (adminTab === 'siem') fetchSiem();
+        if (adminTab !== 'siem') return;
+        fetchSiem();
+        // The watchlist/blocklist live separately from the alert stream
+        // (info-severity events aren't socket-pushed) — refresh quietly on
+        // a slow tick while the console sits on this tab.
+        const t = setInterval(fetchSiem, 30000);
+        return () => clearInterval(t);
     }, [adminTab, dataEpoch]);
+
+    // ── Users — the platform directory with the access kill switch ──────
+    const [userList, setUserList] = useState([]);
+    const [userSearch, setUserSearch] = useState('');
+    const [userBusy, setUserBusy] = useState(false);
+    const [expandedUsers, setExpandedUsers] = useState(() => new Set());
+    const [suspendBusy, setSuspendBusy] = useState('');
+
+    const fetchUsers = async () => {
+        setUserBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/users`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) setUserList(Array.isArray(data.users) ? data.users : []);
+            else throw new Error(data.error || 'Could not load users');
+        } catch (e) {
+            notify('Users load failed: ' + e.message, 'error');
+        } finally { setUserBusy(false); }
+    };
+
+    useEffect(() => {
+        if (adminTab === 'users' && canUsers) fetchUsers();
+    }, [adminTab, canUsers, dataEpoch]);
+
+    // Suspend / reinstate a whole account — the platform kill switch. The
+    // backend pushes account_suspended / account_reinstated back over the
+    // socket, which is also our refresh trigger below.
+    const handleSuspendUser = async (address, suspend, note = '') => {
+        setSuspendBusy(address);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/users/suspend`, {
+                method: 'POST',
+                body: JSON.stringify({ address, suspended: suspend, note })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Failed');
+            notify(suspend
+                ? `${address.slice(0, 6)}…${address.slice(-4)} suspended — locked out of the platform`
+                : `${address.slice(0, 6)}…${address.slice(-4)} reinstated — access restored`, 'success');
+            fetchUsers();
+        } catch (e) {
+            notify(e.message, 'error');
+        } finally { setSuspendBusy(''); }
+    };
+
+    const toggleUserExpand = (address) => {
+        setExpandedUsers(prev => {
+            const next = new Set(prev);
+            next.has(address) ? next.delete(address) : next.add(address);
+            return next;
+        });
+    };
+
+    const filteredUsers = userList.filter(u => {
+        const q = userSearch.trim().toLowerCase();
+        if (!q) return true;
+        return (u.username || '').toLowerCase().includes(q)
+            || (u.address || '').toLowerCase().includes(q)
+            || (u.email || '').toLowerCase().includes(q)
+            || (u.discord || '').toLowerCase().includes(q)
+            || (u.xHandle || '').toLowerCase().includes(q);
+    });
+
+    // Live push — a suspension/reinstatement made anywhere refreshes here.
+    useEffect(() => {
+        const unbind = socketService.on('account_suspended', () => { if (adminTab === 'users') fetchUsers(); });
+        const unbind2 = socketService.on('account_reinstated', () => { if (adminTab === 'users') fetchUsers(); });
+        return () => { unbind(); unbind2(); };
+    }, [adminTab]);
+
+    // ── Mail — platform email console (outbox + compose) ────────────────
+    const [mailList, setMailList] = useState([]);
+    const [mailBusy, setMailBusy] = useState(false);
+    const [mailFilter, setMailFilter] = useState('all'); // all | system | manual
+    const [mailReader, setMailReader] = useState(null);
+    const [mailCompose, setMailCompose] = useState(false);
+    const [mailDraft, setMailDraft] = useState({ to: '', subject: '', message: '', type: 'info' });
+    const [mailSendBusy, setMailSendBusy] = useState(false);
+
+    const fetchMails = async () => {
+        setMailBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/emails`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) setMailList(Array.isArray(data.emails) ? data.emails : []);
+            else throw new Error(data.error || 'Could not load the outbox');
+        } catch (e) {
+            notify('Mail load failed: ' + e.message, 'error');
+        } finally { setMailBusy(false); }
+    };
+
+    useEffect(() => {
+        if (adminTab === 'mail' && canMail) fetchMails();
+    }, [adminTab, canMail, dataEpoch]);
+
+    // Reader open — pulls the full stored email (design HTML) for preview.
+    const openMail = async (m) => {
+        setMailReader({ ...m, loadingFull: true });
+        setMailCompose(false);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/emails/${encodeURIComponent(m.id)}`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.email) setMailReader(data.email);
+            else setMailReader(m);
+        } catch (e) {
+            setMailReader(m); // head without preview still reads fine
+        }
+    };
+
+    const sendMail = async () => {
+        if (!mailDraft.to.trim()) return notify('Recipient email required', 'error');
+        if (!mailDraft.message.trim()) return notify('Message body required', 'error');
+        setMailSendBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/emails/send`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    to: mailDraft.to.trim(),
+                    subject: mailDraft.subject.trim() || 'A message from 15market',
+                    message: mailDraft.message,
+                    type: mailDraft.type
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Send failed');
+            notify(data.mock ? 'Mail recorded — Resend key not configured on this backend' : 'Email sent', 'success');
+            setMailCompose(false);
+            setMailDraft({ to: '', subject: '', message: '', type: 'info' });
+            fetchMails();
+        } catch (e) {
+            notify(e.message, 'error');
+        } finally { setMailSendBusy(false); }
+    };
 
     // ── Admins & Moderators (root-only, migration 011) ───────────────────
     const [adminRoster, setAdminRoster] = useState([]);
@@ -1273,13 +1448,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     // Permission presets for the (re)assign UI. Mirrors the backend defaults;
     // 'admins.manage' is never grantable — it is the root's birthright.
     const ROLE_PRESETS = {
-        admin: ['ref.withdrawals', 'ref.manage', 'platform.settings', 'broadcast.send', 'trades.maintenance',
+        admin: ['ref.withdrawals', 'ref.manage', 'users.manage', 'emails.send', 'platform.settings', 'broadcast.send', 'trades.maintenance',
                 'dashboard.overview', 'dashboard.analytics', 'dashboard.siem', 'dashboard.security'],
         moderator: ['ref.withdrawals']
     };
     const GRANTABLE_PERMS = [
         { tag: 'ref.withdrawals', label: 'Withdrawal requests' },
         { tag: 'ref.manage', label: 'Referral management' },
+        { tag: 'users.manage', label: 'Users · directory & access' },
+        { tag: 'emails.send', label: 'Mail · outbox & compose' },
         { tag: 'platform.settings', label: 'Platform settings' },
         { tag: 'broadcast.send', label: 'Broadcasts' },
         { tag: 'trades.maintenance', label: 'Trade maintenance' },
@@ -1887,6 +2064,304 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     </div>
                 )}
 
+                {/* USERS — the directory with the access kill switch.
+                    Plain numbered rows like every other list in this console;
+                    a row expands to its details, the suspend chip is the
+                    whole-account choke. */}
+                {activeNav === 'users' && canUsers && (
+                    <div className="w-full flex flex-col gap-6 min-w-0">
+                        {/* Head */}
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-[#1A6140]/10 text-[#1A6140] flex items-center justify-center">
+                                    <UserCog size={15} />
+                                </div>
+                                <div>
+                                    <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Users</div>
+                                    <div className="text-[8px] font-black uppercase tracking-widest opacity-40">
+                                        {userList.length} accounts · suspension locks the whole platform
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    value={userSearch}
+                                    onChange={e => setUserSearch(e.target.value)}
+                                    placeholder="Search address, username, email…"
+                                    className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold outline-none w-44 md:w-56 transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                />
+                                <button
+                                    onClick={fetchUsers}
+                                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                >
+                                    <span className="inline-flex items-center gap-2"><RefreshCw size={11} className={userBusy ? 'animate-spin' : ''} /> Refresh</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Column legend */}
+                        <div className={`hidden md:grid md:grid-cols-[34px_1fr_110px_96px_110px] gap-3 items-center px-2 text-[7px] font-black uppercase tracking-[0.25em] opacity-30 pb-1 border-b ${isLight ? 'border-black/10' : 'border-white/10'}`}>
+                            <span>#</span><span>User</span><span>Balance</span><span>Access</span><span className="text-right">Joined</span>
+                        </div>
+
+                        {/* Rows */}
+                        <div className={`flex flex-col min-w-0 max-h-[560px] overflow-y-auto no-scrollbar border-y ${isLight ? 'border-black/5' : 'border-white/10'}`}>
+                            {filteredUsers.length === 0 && (
+                                <div className="py-6 px-2 text-center text-[9px] font-medium opacity-40">
+                                    {userBusy ? 'Loading directory…' : (userSearch ? 'No users match that search' : 'No users registered yet')}
+                                </div>
+                            )}
+                            {filteredUsers.map((u, i) => {
+                                const addr = u.address || '';
+                                const short = `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+                                const open = expandedUsers.has(addr);
+                                const suspended = u.suspended === true;
+                                const joinedAt = u.createdAt || u.onboardedAt;
+                                return (
+                                    <div key={addr || i} className={`${suspended ? (isLight ? 'bg-red-500/5' : 'bg-red-500/[0.04]') : ''}`}>
+                                        <div
+                                            onClick={() => toggleUserExpand(addr)}
+                                            className={`grid grid-cols-[28px_1fr_70px_74px] md:grid-cols-[34px_1fr_110px_96px_110px] gap-3 items-center px-2 py-2.5 border-b cursor-pointer transition-colors ${isLight ? 'border-black/5 hover:bg-black/[0.03]' : 'border-white/5 hover:bg-white/[0.03]'}`}
+                                        >
+                                            <span className="text-[9px] font-black tabular-nums opacity-30">{String(i + 1).padStart(2, '0')}</span>
+                                            <div className="min-w-0 flex items-center gap-2">
+                                                {u.avatar ? (
+                                                    <img src={u.avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-none" />
+                                                ) : (
+                                                    <div className="w-6 h-6 rounded-full bg-[#1A6140]/15 text-[#1A6140] flex items-center justify-center flex-none">
+                                                        <UserCog size={11} />
+                                                    </div>
+                                                )}
+                                                <div className="min-w-0">
+                                                    <div className={`text-[10px] font-black truncate ${isLight ? 'text-black' : 'text-white'}`}>
+                                                        {u.username || short}
+                                                        {u.username && <span className="ml-2 opacity-40 font-mono text-[8px] font-normal">{short}</span>}
+                                                    </div>
+                                                    <div className="text-[7px] font-black uppercase tracking-widest opacity-30 truncate">
+                                                        {u.email ? u.email : (u.discord ? `Discord: ${u.discord}` : (u.xHandle ? `@${u.xHandle}` : 'Wallet account'))}
+                                                    </div>
+                                                </div>
+                                                {(u.email || u.discord || u.xHandle) && (
+                                                    <span className={`hidden xl:flex-none text-[6px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${u.email ? 'bg-sky-500/10 text-sky-500' : u.discord ? 'bg-indigo-500/10 text-indigo-400' : 'bg-sky-500/10 text-sky-500'}`}>Auth-linked</span>
+                                                )}
+                                            </div>
+                                            <span className={`text-[10px] font-black tabular-nums truncate ${isLight ? 'text-black' : 'text-white'}`}>{(Number(u.balance) || 0).toFixed(2)}</span>
+                                            <span className="hidden md:block">
+                                                <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${suspended ? 'bg-red-500/15 text-red-500' : 'text-[#1A6140]'}`}>
+                                                    {suspended ? '● Suspended' : '● Active'}
+                                                </span>
+                                            </span>
+                                            <span className="hidden md:block text-[8px] opacity-30 font-mono text-right">
+                                                {joinedAt ? new Date(joinedAt).toLocaleDateString([], { year: '2-digit', month: 'short', day: '2-digit' }) : '—'}
+                                            </span>
+                                            <ChevronRight size={12} className={`md:hidden transition-transform ${open ? 'rotate-90' : ''} opacity-30 absolute right-3`} />
+                                        </div>
+                                        {open && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                transition={{ duration: 0.18 }}
+                                                className={`overflow-hidden px-2 pb-3 pt-1 border-b ${isLight ? 'border-black/5' : 'border-white/5'}`}
+                                            >
+                                                <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-6 flex-wrap text-[9px]">
+                                                    <div className="flex flex-col gap-1 min-w-[220px] flex-1">
+                                                        <span className="text-[7px] font-black uppercase tracking-widest opacity-30">Details</span>
+                                                        <span className={`font-mono ${isLight ? 'text-black/70' : 'text-white/70'}`}>{addr}</span>
+                                                        <span className="opacity-50">
+                                                            {u.email ? <span>Email: <b>{u.email}</b></span> : null}
+                                                            {u.discord ? <span> · Discord: <b>{u.discord}</b></span> : null}
+                                                            {u.xHandle ? <span> · X: <b>@{u.xHandle}</b></span> : null}
+                                                            {u.country ? <span> · {u.country}</span> : null}
+                                                            {!u.email && !u.discord && !u.xHandle ? <span>No auth links — external wallet only</span> : null}
+                                                        </span>
+                                                        {suspended && (
+                                                            <span className="text-red-500 font-bold">
+                                                                Suspended {u.suspendedAt ? new Date(u.suspendedAt).toLocaleString([], { year: '2-digit', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''} by {u.suspendedBy || 'admin'}{u.suspendNote ? ` — "${u.suspendNote}"` : ''}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 flex-none">
+                                                        {suspended ? (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleSuspendUser(addr, false); }}
+                                                                disabled={suspendBusy === addr}
+                                                                className="px-3 py-2 rounded-xl bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-40"
+                                                            >
+                                                                {suspendBusy === addr ? '…' : 'Reinstate Access'}
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleSuspendUser(addr, true); }}
+                                                                disabled={suspendBusy === addr}
+                                                                className="px-3 py-2 rounded-xl border border-red-500/40 text-red-500 text-[8px] font-black uppercase tracking-widest hover:bg-red-500/10 disabled:opacity-40"
+                                                            >
+                                                                {suspendBusy === addr ? '…' : 'Suspend User'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* MAIL — platform email console. Left rail: the outbox of
+                    every automated + admin-sent email; right: the reader, or
+                    the compose pane. Same plain design as the emails
+                    themselves (logo header, company + no-reply footer). */}
+                {activeNav === 'mail' && canMail && (
+                    <div className="w-full flex flex-col gap-4 min-w-0">
+                        {/* Head */}
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-[#1A6140]/10 text-[#1A6140] flex items-center justify-center">
+                                    <Mail size={15} />
+                                </div>
+                                <div>
+                                    <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Mail</div>
+                                    <div className="text-[8px] font-black uppercase tracking-widest opacity-40">
+                                        {mailList.length} in the outbox · automated &amp; manual
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setMailFilter(prev => prev === 'all' ? 'system' : prev === 'system' ? 'manual' : 'all')}
+                                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                >
+                                    Filter: {mailFilter}
+                                </button>
+                                <button
+                                    onClick={fetchMails}
+                                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                >
+                                    <span className="inline-flex items-center gap-2"><RefreshCw size={11} className={mailBusy ? 'animate-spin' : ''} /> Refresh</span>
+                                </button>
+                                <button
+                                    onClick={() => { setMailCompose(true); setMailReader(null); }}
+                                    className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-[#1A6140] text-white hover:brightness-110 inline-flex items-center gap-2"
+                                >
+                                    <Send size={11} /> Compose
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Outbox rows */}
+                        <div className={`flex flex-col min-w-0 max-h-[560px] overflow-y-auto no-scrollbar border-y ${isLight ? 'border-black/5' : 'border-white/10'}`}>
+                            {mailList.filter(m => mailFilter === 'all' || m.kind === mailFilter).length === 0 && (
+                                <div className="py-6 px-2 text-center text-[9px] font-medium opacity-40">
+                                    {mailBusy ? 'Loading outbox…' : 'No emails recorded yet'}
+                                </div>
+                            )}
+                            {mailList.filter(m => mailFilter === 'all' || m.kind === mailFilter).map((m, i) => (
+                                <div
+                                    key={m.id || i}
+                                    onClick={() => openMail(m)}
+                                    className={`flex items-center gap-3 px-2 py-2.5 border-b cursor-pointer transition-colors ${isLight ? 'border-black/5 hover:bg-black/[0.03]' : 'border-white/5 hover:bg-white/[0.03]'} ${mailReader?.id === m.id ? (isLight ? 'bg-[#1A6140]/5' : 'bg-[#1A6140]/10') : ''}`}
+                                >
+                                    <span className={`flex-none text-[6px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${m.kind === 'manual' ? 'bg-sky-500/10 text-sky-500' : 'bg-[#1A6140]/10 text-[#1A6140]'}`}>
+                                        {m.kind === 'manual' ? 'Sent' : 'System'}
+                                    </span>
+                                    <span className="w-40 md:w-52 min-w-0 text-[10px] font-bold truncate flex-none" style={{ color: isLight ? '#0a261a' : '#fff' }}>{m.to}</span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className={`text-[10px] font-black truncate ${isLight ? 'text-black' : 'text-white'}`}>
+                                            {m.status === 'failed' ? <span className="text-red-500 mr-1.5">✗</span> : ''}
+                                            {m.subject || m.title}
+                                        </div>
+                                        <div className="text-[8px] opacity-40 truncate">{(m.message || '').slice(0, 90)}</div>
+                                    </div>
+                                    <div className="flex-none text-[8px] opacity-30 font-mono text-right">
+                                        {new Date(m.at).toLocaleString([], { year: '2-digit', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Compose pane — the normal email surface */}
+                        {mailCompose && (
+                            <div className={`border rounded-2xl p-4 flex flex-col gap-3 ${isLight ? 'border-black/10 bg-white/60' : 'border-white/10 bg-white/[0.02]'}`}>
+                                <div className="text-[8px] font-black uppercase tracking-[0.25em] opacity-40">Compose — carries the platform design</div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <input
+                                        value={mailDraft.to}
+                                        onChange={e => setMailDraft(prev => ({ ...prev, to: e.target.value }))}
+                                        placeholder="To — recipient@email.com"
+                                        className={`px-3 py-2.5 rounded-xl border text-[11px] font-bold outline-none transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    />
+                                    <input
+                                        value={mailDraft.subject}
+                                        onChange={e => setMailDraft(prev => ({ ...prev, subject: e.target.value }))}
+                                        placeholder="Subject"
+                                        className={`px-3 py-2.5 rounded-xl border text-[11px] font-bold outline-none transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    />
+                                </div>
+                                <textarea
+                                    value={mailDraft.message}
+                                    onChange={e => setMailDraft(prev => ({ ...prev, message: e.target.value }))}
+                                    placeholder="Write the message…"
+                                    className={`w-full h-28 p-3 rounded-xl border text-[11px] font-medium resize-none outline-none transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                />
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <span className="text-[7px] font-black uppercase tracking-widest opacity-30">
+                                        Footer auto: 15market (c) 2026 · no-reply warning — replies will not be read
+                                    </span>
+                                    <button
+                                        onClick={sendMail}
+                                        disabled={mailSendBusy || !mailDraft.to.trim() || !mailDraft.message.trim()}
+                                        className="px-4 py-2.5 rounded-xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-40 inline-flex items-center gap-2"
+                                    >
+                                        <Send size={11} /> {mailSendBusy ? 'Sending…' : 'Send Email'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Reader pane */}
+                        {mailReader && !mailCompose && (
+                            <div className={`border rounded-2xl p-5 flex flex-col gap-3 ${isLight ? 'border-black/10 bg-white/60' : 'border-white/10 bg-white/[0.02]'}`}>
+                                <div className="flex items-start justify-between gap-3 flex-wrap">
+                                    <div className="min-w-0">
+                                        <div className={`text-sm font-black tracking-tight ${isLight ? 'text-black' : 'text-white'}`}>{mailReader.subject || mailReader.title}</div>
+                                        <div className="text-[8px] font-black uppercase tracking-widest opacity-40 mt-1">
+                                            To {mailReader.to} · {mailReader.kind === 'manual' ? 'manual send' : 'automated system mail'} · {new Date(mailReader.at).toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setMailReader(null)}
+                                        className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                                {mailReader.status === 'failed' && (
+                                    <div className="text-[9px] font-black uppercase tracking-widest text-red-500">Delivery failed — {mailReader.detail || 'unknown error'}</div>
+                                )}
+                                {/* The stored design previewed exactly as it landed in a client */}
+                                {mailReader.loadingFull ? (
+                                    <div className={`px-4 py-10 rounded-xl border text-center text-[9px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'border-black/10' : 'border-white/10'}`}>Loading design…</div>
+                                ) : mailReader.html ? (
+                                    <iframe
+                                        title="email-preview"
+                                        srcDoc={mailReader.html}
+                                        sandbox=""
+                                        className="w-full h-[420px] rounded-xl border bg-white"
+                                        style={{ borderColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }}
+                                    />
+                                ) : (
+                                    <div className={`px-4 py-3 rounded-xl text-[11px] leading-relaxed ${isLight ? 'bg-[#F4F6F5] text-black/70' : 'bg-white/5 text-white/70'}`}>
+                                        {mailReader.message || '(no body content)'}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* SIEM — security information & event management. Watchers on
                     every admin/referral call classify brute force, privilege
                     tampering and request floods; events stream live to this
@@ -1941,17 +2416,66 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         </div>
 
+                        {/* Watchlist & blocklist — the throttle the console
+                            controls. Flagged = ≥5 failed admin logins in 10m
+                            from one IP (mark it for blocking); blocked = IPs
+                            refused on every route, both sides. */}
+                        {(siemFlagged.length > 0 || siemBlocked.length > 0) && (
+                            <div className={`w-full border rounded-2xl px-3 py-2.5 ${isLight ? 'border-black/10 bg-white/60' : 'border-white/10 bg-white/[0.02]'}`}>
+                                <div className="flex items-center gap-2 text-[7px] font-black uppercase tracking-[0.25em] opacity-40 mb-2">
+                                    <Ban size={10} /> IP choke — watchlist &amp; blocklist
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    {siemBlocked.map(b => (
+                                        <div key={`blk-${b.ip}`} className="flex items-center gap-2 min-w-0">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-none" />
+                                            <span className={`text-[9px] font-mono font-bold flex-1 min-w-0 truncate ${isLight ? 'text-red-600' : 'text-red-400'}`}>{b.ip}</span>
+                                            <span className="text-[7px] font-black uppercase tracking-widest opacity-30 flex-none">{b.by || 'admin'}</span>
+                                            <button
+                                                onClick={() => handleToggleBlock(b.ip, true)}
+                                                disabled={blockBusy === b.ip}
+                                                className={`px-2 py-1 rounded-md border text-[7px] font-black uppercase tracking-widest transition-colors flex-none ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'} disabled:opacity-40`}
+                                            >
+                                                Unblock
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {siemFlagged.filter(f => !siemBlocked.some(b => b.ip === f.ip)).map(f => (
+                                        <div key={`flg-${f.ip}`} className="flex items-center gap-2 min-w-0">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-none animate-pulse" />
+                                            <span className={`text-[9px] font-mono font-bold flex-1 min-w-0 truncate ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>{f.ip}</span>
+                                            <span className="text-[7px] font-black uppercase tracking-widest text-amber-500 flex-none">{f.attempts} failed logins · flagged</span>
+                                            <button
+                                                onClick={() => handleToggleBlock(f.ip, false)}
+                                                disabled={blockBusy === f.ip}
+                                                className="px-2 py-1 rounded-md border border-red-500/30 text-red-500 text-[7px] font-black uppercase tracking-widest hover:bg-red-500/10 flex-none disabled:opacity-40"
+                                            >
+                                                {blockBusy === f.ip ? '…' : 'Block'}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Event feed — plain rows, no boxes */}
                         <div className={`flex flex-col min-w-0 max-h-[520px] overflow-y-auto no-scrollbar border-y ${isLight ? 'border-black/5' : 'border-white/10'}`}>
                             {siemEvents.length === 0 && (
                                 <div className="py-6 px-2 text-center text-[9px] font-medium opacity-40">
-                                    No security events recorded. Authentication, tamper and rate watchers are live on every admin &amp; referral call.
+                                    No security events recorded. Authentication, tamper and rate watchers are live on every call.
                                 </div>
                             )}
                             {siemEvents.map((ev, i) => {
                                 const sevColors = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', info: '#3b82f6' };
                                 const sev = sevColors[ev.severity] || '#6b7280';
-                                const typeLabels = { AUTH_FAILURE: 'Auth failure', AUTH_BRUTEFORCE: 'Brute force', ADMIN_TAMPER: 'Admin tamper', RATE_ABUSE: 'Rate abuse' };
+                                const typeLabels = {
+                                    AUTH_FAILURE: 'Auth failure', AUTH_BRUTEFORCE: 'Brute force',
+                                    ADMIN_TAMPER: 'Admin tamper', RATE_ABUSE: 'Rate abuse',
+                                    ADMIN_LOGIN: 'Admin login', IP_BLOCKED: 'IP blocked',
+                                    IP_UNBLOCKED: 'IP unblocked', USER_SUSPENDED: 'User access change'
+                                };
+                                const blockedNow = siemBlocked.some(b => b.ip === ev.ip);
+                                const blockable = ev.ip && ev.ip !== 'unknown' && ev.ip !== 'admin';
                                 return (
                                     <div key={ev.id || i} className={`flex items-start gap-3 px-2 lg:px-3 py-2.5 border-b last:border-b-0 ${isLight ? 'border-black/5' : 'border-white/5'}`}>
                                         <div className="w-1.5 h-1.5 rounded-full flex-none mt-1.5" style={{ backgroundColor: sev }} />
@@ -1959,9 +2483,22 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: sev }}>{typeLabels[ev.type] || ev.type}</span>
                                                 <span className="text-[8px] font-mono opacity-30 uppercase">{ev.ip}</span>
+                                                {blockedNow && <span className="text-[7px] font-black uppercase tracking-widest text-red-500 border border-red-500/30 rounded px-1 py-0.5">choked</span>}
                                             </div>
                                             <div className={`text-[10px] font-medium mt-0.5 ${isLight ? 'text-black/70' : 'text-white/70'}`}>{ev.message}</div>
                                         </div>
+                                        {blockable && (
+                                            <button
+                                                onClick={() => handleToggleBlock(ev.ip, blockedNow)}
+                                                disabled={blockBusy === ev.ip}
+                                                title={blockedNow ? 'Restore access' : 'Block this IP across the platform'}
+                                                className={`flex-none p-1.5 rounded-md border transition-colors ${blockedNow
+                                                    ? `border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 ${isLight ? '' : ''}`
+                                                    : `border-red-500/30 text-red-500 hover:bg-red-500/10 ${isLight ? '' : ''}`} disabled:opacity-40`}
+                                            >
+                                                {blockBusy === ev.ip ? <RefreshCw size={10} className="animate-spin" /> : <Ban size={10} />}
+                                            </button>
+                                        )}
                                         <div className="flex-none text-[8px] opacity-30 font-mono">{new Date(ev.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
                                     </div>
                                 );

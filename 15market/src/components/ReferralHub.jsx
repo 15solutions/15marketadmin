@@ -163,6 +163,9 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
 
     const card = `p-4 rounded-[24px] border ${isLight ? 'bg-white border-black/5 shadow-[0_4px_12px_rgba(26,97,64,0.08)]' : 'bg-[#151515] border-white/5 shadow-xl'}`;
     const chipText = isLight ? 'text-black/40' : 'text-white/40';
+    // Effective commission rate: an admin per-user override (percent)
+    // replaces both program rates; the program default is 10%.
+    const myRate = info?.rateOverride != null && Number.isFinite(Number(info.rateOverride)) ? Number(info.rateOverride) : 10;
 
     return (
         <div className={`ref-hub min-h-screen md:h-screen w-full flex flex-col md:overflow-hidden ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#0A0A0A]'} ${isLight ? 'text-[#0a261a]' : 'text-white'}`}
@@ -216,7 +219,7 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
 
             {/* Scrollable page body — desktop shows a thin green scrollbar */}
             <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar ref-scroll">
-                <div className="max-w-[1200px] mx-auto px-4 md:px-8 mt-4 mb-12 flex flex-col gap-5">
+                <div className="max-w-[1200px] mx-auto px-4 md:px-8 mt-2 mb-6 flex flex-col gap-3 md:gap-5">
                 {error && (
                     <div className={`p-4 rounded-2xl border text-xs font-bold text-red-400 ${isLight ? 'bg-red-500/10 border-red-500/20' : 'bg-red-500/10 border-red-500/30'}`}>
                         ⚠️ {error}
@@ -229,7 +232,7 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                     </div>
                 ) : !enrolled ? (
                     /* ── PRE-ENROLLMENT: ref-code entry + sectioned briefing + enroll ── */
-                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-5 max-w-2xl mx-auto w-full">
+                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 md:gap-5 max-w-2xl mx-auto w-full">
 
                         {/* ENTRY: enter a referral code (verified + stored) · Enroll beside it */}
                         <div className={card}>
@@ -286,15 +289,15 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                                 <span className="w-6 h-6 rounded-full bg-[#1A6140] text-white text-[10px] font-black flex items-center justify-center">1</span>
                                 <h2 className="text-lg font-black uppercase tracking-tighter">Enrollment</h2>
                             </div>
-                            <ol className="flex flex-col gap-3">
+                            <ol className="flex flex-col gap-2">
                                 {[
-                                    <>Have a 15market account. Sign up with <b>email, Google, Discord or a wallet</b> if you haven't yet, and pick a display name at onboarding.</>,
-                                    <>Come back to this page and tap <b>Enroll</b> below. That mints your unique referral code and shareable link instantly. It's free and takes one tap.</>,
-                                    <>Share your <b>link</b> (or read out your <b>code</b>). Friends can enter either during signup, or later in Settings under Referral Program.</>
+                                    <>Have a 15market account — <b>email, Google, Discord or a wallet</b>.</>,
+                                    <>Tap <b>Enroll</b> below. Your code + shareable link are minted instantly. Free, one tap.</>,
+                                    <>Share your <b>link</b> or <b>code</b>. Friends enter it at signup, or later in Settings.</>
                                 ].map((s, i) => (
                                     <li key={i} className="flex gap-3">
                                         <span className="shrink-0 w-5 h-5 rounded-full bg-[#1A6140]/15 text-[#1A6140] text-[9px] font-black flex items-center justify-center mt-0.5">{i + 1}</span>
-                                        <span className={`text-xs font-bold leading-relaxed ${isLight ? 'text-[#0a261a]/70' : 'text-white/60'}`}>{s}</span>
+                                        <span className={`text-[11px] md:text-xs font-bold leading-snug ${isLight ? 'text-[#0a261a]/70' : 'text-white/60'}`}>{s}</span>
                                     </li>
                                 ))}
                             </ol>
@@ -306,23 +309,26 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                                 <span className="w-6 h-6 rounded-full bg-[#1A6140] text-white text-[10px] font-black flex items-center justify-center">2</span>
                                 <h2 className="text-lg font-black uppercase tracking-tighter">Commission</h2>
                             </div>
-                            <p className={`text-xs font-bold leading-relaxed mb-4 ${isLight ? 'text-[#0a261a]/60' : 'text-white/50'}`}>
-                                Every user you refer is yours forever. You earn two separate commissions on their activity: deposits and trading volume.
+                            <p className={`text-[11px] md:text-xs font-bold leading-snug mb-3 ${isLight ? 'text-[#0a261a]/60' : 'text-white/50'}`}>
+                                Every user you refer is yours forever. You earn two commissions on their activity: deposits and trading volume.
                             </p>
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="p-4 rounded-2xl bg-[#1A6140]/10 border border-[#1A6140]/25">
+                                <div className="p-3 md:p-4 rounded-2xl bg-[#1A6140]/10 border border-[#1A6140]/25">
                                     <Percent size={16} className="text-[#1A6140] mb-2" />
-                                    <p className="text-2xl font-black text-[#1A6140]">10%</p>
+                                    <p className="text-xl md:text-2xl font-black text-[#1A6140]">{myRate}%</p>
                                     <p className="text-[9px] font-black uppercase tracking-widest mt-1 text-[#1A6140]">Deposit commission</p>
                                     <p className={`text-[8px] font-bold mt-1 ${chipText}`}>On every USDC your referrals deposit</p>
                                 </div>
-                                <div className="p-4 rounded-2xl bg-[#1A6140]/10 border border-[#1A6140]/25">
+                                <div className="p-3 md:p-4 rounded-2xl bg-[#1A6140]/10 border border-[#1A6140]/25">
                                     <TrendingUp size={16} className="text-[#1A6140] mb-2" />
-                                    <p className="text-2xl font-black text-[#1A6140]">10%</p>
+                                    <p className="text-xl md:text-2xl font-black text-[#1A6140]">{myRate}%</p>
                                     <p className="text-[9px] font-black uppercase tracking-widest mt-1 text-[#1A6140]">Volume commission</p>
                                     <p className={`text-[8px] font-bold mt-1 ${chipText}`}>On everything they stake and trade</p>
                                 </div>
                             </div>
+                            <p className={`text-[9px] font-black uppercase tracking-widest mt-3 ${chipText}`}>
+                                Your commission rate · <span className="text-[#1A6140]">{myRate}%</span>{info?.rateOverride != null && ' (set by the team)'}
+                            </p>
                         </div>
 
                         {/* SECTION 3: PAYOUT */}
@@ -331,8 +337,8 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                                 <span className="w-6 h-6 rounded-full bg-[#1A6140] text-white text-[10px] font-black flex items-center justify-center">3</span>
                                 <h2 className="text-lg font-black uppercase tracking-tighter">Payout</h2>
                             </div>
-                            <p className={`text-xs font-bold leading-relaxed ${isLight ? 'text-[#0a261a]/60' : 'text-white/50'}`}>
-                                Payouts are manual (off-chain). You apply for a withdrawal of a chosen amount once your available commission reaches ${MIN_WITHDRAWAL} USDC, and the team sends it. No on-chain transfers, nothing automatic.
+                            <p className={`text-[11px] md:text-xs font-bold leading-snug ${isLight ? 'text-[#0a261a]/60' : 'text-white/50'}`}>
+                                Payouts are manual (off-chain). Once your available commission reaches ${MIN_WITHDRAWAL} USDC you apply for a withdrawal of a chosen amount and the team sends it.
                             </p>
                         </div>
 
@@ -340,7 +346,7 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                             ref={enrollCtaRef}
                             onClick={enroll}
                             disabled={enrolling}
-                            className="w-full py-5 bg-[#1A6140] text-white rounded-[24px] font-black uppercase tracking-widest text-xs shadow-[0_15px_30px_-10px_rgba(26,97,64,0.4)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                            className="w-full py-4 md:py-5 bg-[#1A6140] text-white rounded-[24px] font-black uppercase tracking-widest text-xs shadow-[0_15px_30px_-10px_rgba(26,97,64,0.4)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
                         >
                             <Sparkles size={16} />{enrolling ? 'Enrolling…' : 'Enroll now, get my code'}
                         </button>
@@ -348,7 +354,7 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                     </motion.div>
                 ) : (
                     /* ── ENROLLED: referral dashboard ── */
-                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-5 max-w-2xl mx-auto w-full">
+                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 md:gap-5 max-w-2xl mx-auto w-full">
                         {/* Code + link */}
                         <div className={card}>
                             <div className="flex items-center gap-2 mb-3">
@@ -375,22 +381,22 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                             </div>
                         </div>
 
-                        {/* Metrics */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {/* Metrics — all three on one row on mobile */}
+                        <div className="grid grid-cols-3 gap-2 md:gap-3">
                             <div className={card}>
                                 <Users size={14} className="text-[#1A6140] mb-2" />
-                                <p className="text-2xl font-black">{stats?.count ?? 0}</p>
-                                <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${chipText}`}>Users referred</p>
+                                <p className="text-lg md:text-2xl font-black">{stats?.count ?? 0}</p>
+                                <p className={`text-[7px] md:text-[8px] font-black uppercase tracking-widest mt-1 ${chipText}`}>Users referred</p>
                             </div>
                             <div className={card}>
                                 <TrendingUp size={14} className="text-[#1A6140] mb-2" />
-                                <p className="text-2xl font-black text-[#1A6140]">{fmt(stats?.totalCommission)}</p>
-                                <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${chipText}`}>Commission made</p>
+                                <p className="text-lg md:text-2xl font-black text-[#1A6140]">{fmt(stats?.totalCommission)}</p>
+                                <p className={`text-[7px] md:text-[8px] font-black uppercase tracking-widest mt-1 ${chipText}`}>Commission · {myRate}%</p>
                             </div>
                             <div className={card}>
                                 <Wallet size={14} className="text-[#1A6140] mb-2" />
-                                <p className="text-2xl font-black">{stats ? fmtUsd0(stats.totalDeposits + stats.totalVolume) : '$0'}</p>
-                                <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${chipText}`}>Their deposits + volume</p>
+                                <p className="text-lg md:text-2xl font-black">{stats ? fmtUsd0(stats.totalDeposits + stats.totalVolume) : '$0'}</p>
+                                <p className={`text-[7px] md:text-[8px] font-black uppercase tracking-widest mt-1 ${chipText}`}>Their deposits + vol</p>
                             </div>
                         </div>
                         {stats && stats.count > 0 && (
@@ -405,8 +411,8 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                                 <LogOut size={14} className="text-[#1A6140]" />
                                 <p className="text-[10px] font-black uppercase tracking-widest">Withdrawal request</p>
                             </div>
-                            <p className={`text-[9px] font-bold mb-4 ${chipText}`}>
-                                Not on-chain and nothing automatic. You submit a withdrawal request with the amount, the payout chain and your destination wallet address — the team processes it manually. Minimum {fmt(MIN_WITHDRAWAL)}.
+                            <p className={`text-[11px] md:text-xs font-bold leading-snug mb-3 ${chipText}`}>
+                                Submit the amount, payout chain and destination wallet — the team processes requests manually. Minimum {fmt(MIN_WITHDRAWAL)}.
                             </p>
 
                             {suspended && (
