@@ -227,7 +227,7 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
     return (
         <div ref={stripRef} className={`w-full ${isV1 ? 'h-5 md:h-6 lg:h-10 ' + v1Bg : 'h-7 md:h-7 lg:h-10 bg-[#1A6140]'} relative z-[45] overflow-hidden`} style={{ fontFamily: '"Comfortaa", cursive' }}>
             {/* Smooth Transition Layer for Broadcasts */}
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence mode="wait">
                 {activeBroadcast ? (
                     <motion.div
                         key="broadcast-ticker"

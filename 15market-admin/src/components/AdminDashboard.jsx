@@ -1943,55 +1943,68 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </button>
                         </div>
 
-                        {/* ── Broadcast ledger — every transmission listed with
-                            its own flip-clock countdown, editable and
-                            withdrawable while live ───────────────────────── */}
-                        <div className="mt-7 flex items-center justify-between gap-3 flex-wrap">
-                            <div className="flex items-center gap-2">
-                                <Megaphone size={13} className={isLight ? 'text-black/50' : 'text-white/50'} />
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Broadcast log</span>
+                        {/* ── Broadcast ledger — same list language as the SIEM
+                            feed and the Overview trade index: plain numbered
+                            rows, no boxes, column legend, divide-y ──────── */}
+                        <div className="mt-7 flex items-center gap-4 flex-wrap">
+                            <div>
+                                <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>{String(broadcastList.length).padStart(2, '0')}</div>
+                                <div className="text-[8px] font-black uppercase tracking-widest opacity-40">Indexed in feed</div>
                             </div>
-                            <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
-                                {broadcastList.filter(b => b.status === 'LIVE').length} live · {broadcastList.length} total
-                            </span>
+                            <div className={`h-8 w-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
+                            <div>
+                                <div className="text-lg font-black tracking-tighter text-[#1A6140]">{broadcastList.filter(b => b.status === 'LIVE').length}</div>
+                                <div className="text-[8px] font-black uppercase tracking-widest opacity-40">Live now</div>
+                            </div>
+                            <div className="ml-auto flex items-center gap-2">
+                                <Megaphone size={12} className={isLight ? 'text-black/40' : 'text-white/40'} />
+                                <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black' : 'text-white'}`}>Broadcast log</span>
+                            </div>
                         </div>
 
-                        <div className="mt-2 flex flex-col gap-2">
+                        <div className="mt-3 overflow-x-auto no-scrollbar">
+                        <div className="min-w-[700px] flex flex-col">
+                        {/* Column legend — headers for each data column */}
+                        <div className={`grid grid-cols-[36px_minmax(0,1fr)_100px_148px_64px_92px] gap-3 px-3 pb-2 text-[7px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
+                            <span>#</span><span>Message</span><span>Status</span><span>Countdown</span><span>Time</span><span></span>
+                        </div>
+                        <div className={`flex flex-col max-h-[520px] overflow-y-auto no-scrollbar divide-y ${isLight ? 'divide-black/5' : 'divide-white/5'}`}>
                             {broadcastLoading && !broadcastList.length && (
-                                <div className={`p-4 text-[10px] font-black uppercase tracking-widest opacity-30 animate-pulse ${isLight ? 'text-black' : 'text-white'}`}>
+                                <div className="py-6 text-center text-[9px] font-black uppercase tracking-widest opacity-30 animate-pulse">
                                     Reading billboards…
                                 </div>
                             )}
                             {!broadcastLoading && !broadcastList.length && (
-                                <div className={`p-4 text-[10px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
-                                    No transmissions yet — send one and it will appear here with its countdown.
+                                <div className="py-10 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
+                                    No transmissions yet
                                 </div>
                             )}
-                            {broadcastList.map(b => {
+                            {broadcastList.map((b, i) => {
                                 const remain = b.status === 'LIVE' ? Math.max(0, Math.ceil((b.expiry - Date.now()) / 1000)) : 0;
                                 const isEditing = editingBroadcastId === String(b.id);
                                 const busy = busyBroadcastId === String(b.id);
                                 const statusChip = b.status === 'LIVE'
-                                    ? { label: '● Live', cls: 'text-[#1A6140] bg-[#1A6140]/15' }
+                                    ? { label: '● Live', cls: 'text-[#1A6140] bg-[#1A6140]/10' }
                                     : b.status === 'WITHDRAWN'
                                         ? { label: '✕ Withdrawn', cls: 'text-red-500 bg-red-500/10' }
                                         : { label: 'Expired', cls: 'opacity-40 bg-black/5' };
                                 return (
-                                    <div
+                                    <motion.div
+                                        initial={{ x: -16, opacity: 0 }}
+                                        animate={{ x: 0, opacity: 1 }}
                                         key={b.id}
-                                        className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all ${isLight
-                                            ? (b.status === 'LIVE' ? 'bg-white border-[#1A6140]/25 shadow-[0_8px_20px_-12px_rgba(26,97,64,0.25)]' : 'bg-white/60 border-black/10 opacity-70')
-                                            : (b.status === 'LIVE' ? 'bg-[#1A6140]/[0.07] border-[#1A6140]/30' : 'bg-white/[0.03] border-white/5 opacity-60')}`}
+                                        className={`px-3 py-2.5 grid grid-cols-[36px_minmax(0,1fr)_100px_148px_64px_92px] items-center gap-3 min-w-0 transition-colors ${b.status === 'LIVE' ? '' : 'opacity-60'} ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
                                     >
-                                        {/* message block */}
-                                        <div className="flex-1 min-w-0">
+                                        <span className="text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
+                                        {/* Message column */}
+                                        <div className="min-w-0">
                                             {isEditing ? (
-                                                <div className="flex flex-col gap-2">
+                                                <div className="flex flex-col gap-2 py-1">
                                                     <textarea
                                                         autoFocus
                                                         value={editBroadcastDraft}
                                                         onChange={(e) => setEditBroadcastDraft(e.target.value)}
-                                                        className={`w-full h-16 p-2.5 rounded-xl border text-xs font-bold resize-none outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                                        className={`w-full h-14 p-2.5 rounded-xl border text-xs font-bold resize-none outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
                                                     />
                                                     <div className="flex items-center gap-2">
                                                         <button
@@ -2007,49 +2020,56 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <p className={`text-xs font-bold truncate ${b.status === 'WITHDRAWN' ? 'line-through' : ''} ${isLight ? 'text-black' : 'text-white'}`}>
+                                                    <p className={`text-[10px] font-black uppercase tracking-wide truncate ${b.status === 'WITHDRAWN' ? 'line-through' : ''} ${isLight ? 'text-black' : 'text-white'}`}>
                                                         {b.message || b.text}
                                                     </p>
-                                                    <div className="mt-1 flex items-center gap-2 flex-wrap">
-                                                        <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${statusChip.cls}`}>{statusChip.label}</span>
-                                                        <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
-                                                            {b.type} · {new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                                            {b.editedAt ? ' · edited' : ''}
-                                                        </span>
+                                                    <div className="mt-0.5 flex items-center gap-2">
+                                                        <span className="text-[7px] font-mono opacity-30 uppercase">{b.type}</span>
+                                                        {b.editedAt && <span className="text-[7px] font-black uppercase tracking-widest opacity-30">edited</span>}
                                                     </div>
                                                 </>
                                             )}
                                         </div>
-
-                                        {/* countdown — flips while live */}
-                                        {b.status === 'LIVE' && !isEditing && (
-                                            <FlipBroadcastClock seconds={remain} />
-                                        )}
-
-                                        {/* actions */}
-                                        {!isEditing && b.status === 'LIVE' && (
-                                            <div className="flex items-center gap-1.5 shrink-0">
-                                                <button
-                                                    title="Edit message"
-                                                    onClick={() => { setEditingBroadcastId(String(b.id)); setEditBroadcastDraft(b.message || b.text || ""); }}
-                                                    className={`p-2 rounded-xl border transition-all hover:scale-105 ${isLight ? 'border-black/10 hover:bg-black/5 text-black/60' : 'border-white/10 hover:bg-white/10 text-white/60'}`}
-                                                >
-                                                    <Pencil size={13} />
-                                                </button>
-                                                <button
-                                                    title="Withdraw broadcast (clears the user banner now)"
-                                                    onClick={() => handleWithdrawBroadcast(b.id)}
-                                                    disabled={busy}
-                                                    className="p-2 rounded-xl border border-red-500/25 text-red-500/80 hover:bg-red-500/10 hover:scale-105 transition-all disabled:opacity-40"
-                                                >
-                                                    <Undo2 size={13} />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                        {/* Status column */}
+                                        <div>
+                                            <span className={`px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${statusChip.cls}`}>{statusChip.label}</span>
+                                        </div>
+                                        {/* Countdown column — flips while live */}
+                                        <div className="min-w-0">
+                                            {b.status === 'LIVE' && !isEditing
+                                                ? <FlipBroadcastClock seconds={remain} />
+                                                : <span className="text-[9px] font-mono opacity-30">—</span>}
+                                        </div>
+                                        {/* Time column */}
+                                        <div className="flex-none text-[8px] opacity-30 font-mono">{new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                        {/* Actions column */}
+                                        <div className="flex items-center gap-1.5 justify-end">
+                                            {!isEditing && b.status === 'LIVE' && (
+                                                <>
+                                                    <button
+                                                        title="Edit message"
+                                                        onClick={() => { setEditingBroadcastId(String(b.id)); setEditBroadcastDraft(b.message || b.text || ""); }}
+                                                        className={`p-2 rounded-xl border transition-all hover:scale-105 ${isLight ? 'border-black/10 hover:bg-black/5 text-black/60' : 'border-white/10 hover:bg-white/10 text-white/60'}`}
+                                                    >
+                                                        <Pencil size={13} />
+                                                    </button>
+                                                    <button
+                                                        title="Withdraw broadcast (clears the user banner now)"
+                                                        onClick={() => handleWithdrawBroadcast(b.id)}
+                                                        disabled={busy}
+                                                        className="p-2 rounded-xl border border-red-500/25 text-red-500/80 hover:bg-red-500/10 hover:scale-105 transition-all disabled:opacity-40"
+                                                    >
+                                                        <Undo2 size={13} />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </motion.div>
                                 );
                             })}
                         </div>
+                        </div>{/* min-w table body (x-scrolled on phones) */}
+                        </div>{/* — overflow-x: headers + rows swipe together */}
                     </div>
                 )}
 
