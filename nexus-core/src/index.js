@@ -2693,9 +2693,56 @@ app.post('/admin/trades/:id/payout-retry', async (req, res) => {
   }
 });
 
+// ── Broadcast scheduler — pending transmissions flip LIVE at go-live ────
+// A 1s sweep activates scheduled broadcasts exactly on time: expiry extends
+// from the go-live moment, the banner emits to every client, and maintenance
+// broadcasts engage the maintenance flag. Cancelled entries never activate.
+setInterval(() => {
+  const now = Date.now();
+  for (const b of recentBroadcasts) {
+    if (b.scheduled && !b.cancelled && !b.withdrawn && b.goLiveAt && now >= b.goLiveAt) {
+      b.scheduled = false;
+      b.wentLiveAt = now;
+      if (!b.expiresFromGoLive && b.durationMs) b.expiry = b.goLiveAt + b.durationMs;
+      activeBroadcast = b;
+      rememberBroadcast(b);
+      io.emit('broadcast', b);
+      if (b.type === 'MAINTENANCE') io.emit('settings_update', { maintenanceMode: true, systemBanner: b.message });
+      console.log(`[Scheduler] Broadcast #${b.id} went LIVE: ${b.message}`);
+    }
+  }
+  if (activeBroadcast && activeBroadcast.expiry <= now) activeBroadcast = null;
+}, 1000);
+
 app.post('/admin/broadcast', requirePerm('broadcast.send'), (req, res) => {
-  const { message, type, expiry } = req.body;
+  const { message, type, expiry, scheduleSeconds } = req.body;
   if (!message || !String(message).trim()) return res.status(400).json({ error: 'Message required' });
+
+  const durationMs = Number(req.body.durationSeconds) > 0
+    ? Number(req.body.durationSeconds) * 1000
+    : 60000; // default live window
+
+  if (Number(scheduleSeconds) > 0) {
+    // ── SCHEDULED transmission: stored and armed, users see NOTHING yet ──
+    const broadcast = {
+      id: Date.now(),
+      message: String(message),
+      text: String(message),
+      type: type || 'ANNOUNCEMENT',
+      scheduled: true,
+      goLiveAt: Date.now() + Number(scheduleSeconds) * 1000,
+      durationMs,
+      expiry: Date.now() + Number(scheduleSeconds) * 1000 + durationMs, // not active until armed
+      timestamp: Date.now(),
+      sender: req.admin?.email || 'ADMIN',
+      withdrawn: false,
+      cancelled: false
+    };
+    rememberBroadcast(broadcast);
+    io.emit('broadcast_schedule', { id: broadcast.id, goLiveAt: broadcast.goLiveAt, message: broadcast.message });
+    console.log(`[Admin] Broadcast scheduled (+${scheduleSeconds}s): ${message}`);
+    return res.json({ success: true, scheduled: true, broadcast });
+  }
 
   const broadcast = {
     id: Date.now(),
@@ -2704,7 +2751,7 @@ app.post('/admin/broadcast', requirePerm('broadcast.send'), (req, res) => {
     // in sync so every banner consumer renders the same payload.
     text: String(message),
     type: type || 'ANNOUNCEMENT',
-    expiry: expiry || (Date.now() + 60000),
+    expiry: expiry || (Date.now() + durationMs),
     timestamp: Date.now(),
     sender: req.admin?.email || 'ADMIN',
     withdrawn: false
@@ -2729,8 +2776,11 @@ app.get('/admin/broadcasts', requirePerm('broadcast.send'), (req, res) => {
   const list = recentBroadcasts.map(b => ({
     ...b,
     // Status is computed live, never stored — an entry expires just by its
-    // own clock passing, exactly like the client banner does.
-    status: b.withdrawn ? 'WITHDRAWN' : (b.expiry <= now ? 'EXPIRED' : 'LIVE')
+    // own clock passing, exactly like the client banner does. SCHEDULED
+    // entries count down to their go-live instead.
+    status: b.cancelled ? 'CANCELLED'
+      : b.withdrawn ? 'WITHDRAWN'
+      : (b.scheduled && b.goLiveAt > now ? 'SCHEDULED' : (b.expiry <= now ? 'EXPIRED' : 'LIVE'))
   }));
   res.json({ broadcasts: list, active: activeBroadcast || null });
 });
@@ -2761,14 +2811,21 @@ app.post('/admin/broadcast/:id', requirePerm('broadcast.send'), (req, res) => {
   b.editedAt = Date.now();
 
   rememberBroadcast(b);
-  if (activeBroadcast && String(activeBroadcast.id) === id) {
-    activeBroadcast = b;
-  }
-  io.emit('broadcast', b);
-  console.log(`[Admin] Broadcast #${id} edited: ${b.message}`);
+  // Re-emit only if this transmission is actually on air NOW — a scheduled
+  // entry that is still waiting must never reach the user banner early.
+  const isOnAir = !b.withdrawn && !b.cancelled && !b.scheduled && b.expiry > Date.now();
+  if (isOnAir) {
+    if (activeBroadcast && String(activeBroadcast.id) === id) {
+      activeBroadcast = b;
+    }
+    io.emit('broadcast', b);
+    console.log(`[Admin] Broadcast #${id} edited: ${b.message}`);
 
-  if (b.type === 'MAINTENANCE' && b.expiry > Date.now()) {
-    io.emit('settings_update', { maintenanceMode: true, systemBanner: b.message });
+    if (b.type === 'MAINTENANCE') {
+      io.emit('settings_update', { maintenanceMode: true, systemBanner: b.message });
+    }
+  } else {
+    console.log(`[Admin] Broadcast #${id} edited (not on air): ${b.message}`);
   }
 
   res.json({ success: true, broadcast: b });
@@ -2783,6 +2840,17 @@ app.post('/admin/broadcast/:id/withdraw', requirePerm('broadcast.send'), (req, r
   if (idx === -1) return res.status(404).json({ error: 'Broadcast not found' });
 
   const b = recentBroadcasts[idx];
+  // A still-pending SCHEDULED entry never went on air — withdrawing it is a
+  // CANCEL: abort the transmission silently, nothing to un-emit.
+  if (b.scheduled) {
+    if (b.cancelled) return res.json({ success: true, broadcast: b, cancelled: true });
+    b.cancelled = true;
+    b.cancelledAt = Date.now();
+    rememberBroadcast(b);
+    console.log(`[Admin] Scheduled broadcast #${id} cancelled before go-live`);
+    return res.json({ success: true, broadcast: b, cancelled: true });
+  }
+
   if (b.withdrawn) return res.json({ success: true, broadcast: b });
 
   b.withdrawn = true;

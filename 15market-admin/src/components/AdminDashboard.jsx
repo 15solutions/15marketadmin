@@ -140,6 +140,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     
     const [broadcastText, setBroadcastText] = useState("");
     const [broadcastDuration, setBroadcastDuration] = useState(60); // seconds
+    // Go-live scheduling: 0 = transmit NOW; > 0 = armed to fire minutes later
+    // (the backend holds it and flips it live exactly at its go-live moment).
+    const [scheduleSeconds, setScheduleSeconds] = useState(0); // 0 | 300 | 900 | 1800 | 3600
     const [isSaving, setIsSaving] = useState(false);
     // Broadcast ledger listed under the composer: each entry carries its own
     // flip-clock countdown, plus edit/withdraw controls while it is live.
@@ -1004,8 +1007,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 method: 'POST',
                 body: JSON.stringify({
                     message: broadcastText,
-                    expiry: Date.now() + broadcastDuration * 1000,
-                    type: 'MANUAL_ADMIN'
+                    durationSeconds: broadcastDuration,
+                    type: 'MANUAL_ADMIN',
+                    ...(scheduleSeconds > 0 ? { scheduleSeconds } : {})
                 })
             });
 
@@ -1014,7 +1018,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 throw new Error(body.error || "Broadcast failed");
             }
 
-            notify("Global Broadcast Initiated", "success");
+            notify(scheduleSeconds > 0
+                ? `Broadcast armed — goes live in ${scheduleSeconds / 60} min`
+                : "Global Broadcast Initiated", "success");
             setBroadcastText("");
             fetchBroadcasts();
         } catch (e) {
@@ -1022,6 +1028,23 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // Cancel a still-pending SCHEDULED transmission from the ledger row —
+    // the backend aborts it before go-live, so users never see it.
+    const handleCancelBroadcast = async (id) => {
+        setBusyBroadcastId(id);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/broadcast/${id}/withdraw`, { method: 'POST' });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || "Cancel failed");
+            }
+            notify("Scheduled broadcast cancelled", "success");
+            fetchBroadcasts();
+        } catch (e) {
+            notify("Cancel Error: " + e.message, "error");
+        } finally { setBusyBroadcastId(null); }
     };
 
     const handleSaveBroadcastEdit = async (id) => {
@@ -1096,8 +1119,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     }, [adminTab, canBroadcast, dataEpoch]);
 
     useEffect(() => {
+        // Any on-air pulse AND any schedule/cancel pulse refresh the ledger.
         const unbind = socketService.on('broadcast', () => { fetchBroadcastsRef.current?.(); });
-        return unbind;
+        const unbindSched = socketService.on('broadcast_schedule', () => { fetchBroadcastsRef.current?.(); });
+        return () => { unbind(); unbindSched(); };
     }, []);
 
     useEffect(() => {
@@ -1951,6 +1976,33 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             className={`w-full h-24 md:h-28 p-4 rounded-2xl border text-sm font-bold resize-none overflow-hidden transition-all outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
                         />
 
+                        {/* Schedule row — transmit NOW or arm it to fire later;
+                            when armed, the backend holds the message until its
+                            go-live moment and flips it live automatically. */}
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                            <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>Schedule</span>
+                            <button
+                                onClick={() => setScheduleSeconds(0)}
+                                className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${scheduleSeconds === 0 ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
+                            >
+                                Now
+                            </button>
+                            {[5, 15, 30, 60].map(m => (
+                                <button
+                                    key={m}
+                                    onClick={() => setScheduleSeconds(m * 60)}
+                                    className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${scheduleSeconds === m * 60 ? 'bg-amber-500 text-white border-amber-500' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
+                                >
+                                    in {m}m
+                                </button>
+                            ))}
+                            {scheduleSeconds > 0 && (
+                                <span className="text-[8px] font-black uppercase tracking-widest text-amber-500 animate-pulse">
+                                    armed · live at {new Date(Date.now() + scheduleSeconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            )}
+                        </div>
+
                         <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-2">
                                 <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>Persistence</span>
@@ -1970,7 +2022,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 className="flex items-center justify-center gap-3 py-3 px-6 bg-[#1A6140] text-white rounded-2xl font-black uppercase tracking-[0.25em] text-[10px] shadow-[0_16px_32px_-10px_rgba(26,97,64,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
                             >
                                 <Radio size={14} />
-                                <span>{isSaving ? 'Transmitting…' : 'Transmit Broadcast'}</span>
+                                <span>{isSaving ? 'Transmitting…' : scheduleSeconds > 0 ? 'Arm Broadcast' : 'Transmit Broadcast'}</span>
                             </button>
                         </div>
 
@@ -1987,6 +2039,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div className="text-lg font-black tracking-tighter text-[#1A6140]">{broadcastList.filter(b => b.status === 'LIVE').length}</div>
                                 <div className="text-[8px] font-black uppercase tracking-widest opacity-40">Live now</div>
                             </div>
+                            {broadcastList.filter(b => b.status === 'SCHEDULED').length > 0 && (
+                                <>
+                                    <div className={`h-8 w-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
+                                    <div>
+                                        <div className="text-lg font-black tracking-tighter text-amber-500">{broadcastList.filter(b => b.status === 'SCHEDULED').length}</div>
+                                        <div className="text-[8px] font-black uppercase tracking-widest opacity-40">Armed</div>
+                                    </div>
+                                </>
+                            )}
                             <div className="ml-auto flex items-center gap-2">
                                 <Megaphone size={12} className={isLight ? 'text-black/40' : 'text-white/40'} />
                                 <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black' : 'text-white'}`}>Broadcast log</span>
@@ -2011,20 +2072,26 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 </div>
                             )}
                             {broadcastList.map((b, i) => {
-                                const remain = b.status === 'LIVE' ? Math.max(0, Math.ceil((b.expiry - Date.now()) / 1000)) : 0;
+                                const now = Date.now();
+                                const remain = b.status === 'LIVE' ? Math.max(0, Math.ceil((b.expiry - now) / 1000)) : 0;
+                                const toGoLive = b.status === 'SCHEDULED' ? Math.max(0, Math.ceil((b.goLiveAt - now) / 1000)) : 0;
                                 const isEditing = editingBroadcastId === String(b.id);
                                 const busy = busyBroadcastId === String(b.id);
                                 const statusChip = b.status === 'LIVE'
                                     ? { label: '● Live', cls: 'text-[#1A6140] bg-[#1A6140]/10' }
-                                    : b.status === 'WITHDRAWN'
-                                        ? { label: '✕ Withdrawn', cls: 'text-red-500 bg-red-500/10' }
-                                        : { label: 'Expired', cls: 'opacity-40 bg-black/5' };
+                                    : b.status === 'SCHEDULED'
+                                        ? { label: '◷ Scheduled', cls: 'text-amber-500 bg-amber-500/10' }
+                                        : b.status === 'WITHDRAWN'
+                                            ? { label: '✕ Withdrawn', cls: 'text-red-500 bg-red-500/10' }
+                                            : b.status === 'CANCELLED'
+                                                ? { label: '⊘ Cancelled', cls: 'text-orange-500/80 bg-orange-500/10' }
+                                                : { label: 'Expired', cls: 'opacity-40 bg-black/5' };
                                 return (
                                     <motion.div
                                         initial={{ x: -16, opacity: 0 }}
                                         animate={{ x: 0, opacity: 1 }}
                                         key={b.id}
-                                        className={`px-3 py-2.5 grid grid-cols-[36px_minmax(0,1fr)_100px_148px_64px_92px] items-center gap-3 min-w-0 transition-colors ${b.status === 'LIVE' ? '' : 'opacity-60'} ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
+                                        className={`px-3 py-2.5 grid grid-cols-[36px_minmax(0,1fr)_100px_148px_64px_92px] items-center gap-3 min-w-0 transition-colors ${(b.status === 'LIVE' || b.status === 'SCHEDULED') ? '' : 'opacity-60'} ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
                                     >
                                         <span className="text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
                                         {/* Message column */}
@@ -2042,7 +2109,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                             onClick={() => handleSaveBroadcastEdit(b.id)}
                                                             disabled={busy}
                                                             className="px-4 py-1.5 rounded-lg bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest disabled:opacity-40"
-                                                        >Save & re-emit</button>
+                                                        >Save</button>
                                                         <button
                                                             onClick={() => { setEditingBroadcastId(null); setEditBroadcastDraft(""); }}
                                                             className={`px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest ${isLight ? 'border-black/10 text-black/50' : 'border-white/10 text-white/50'}`}
@@ -2051,12 +2118,17 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <p className={`text-[10px] font-black uppercase tracking-wide truncate ${b.status === 'WITHDRAWN' ? 'line-through' : ''} ${isLight ? 'text-black' : 'text-white'}`}>
+                                                    <p className={`text-[10px] font-black uppercase tracking-wide truncate ${b.status === 'WITHDRAWN' || b.status === 'CANCELLED' ? 'line-through' : ''} ${isLight ? 'text-black' : 'text-white'}`}>
                                                         {b.message || b.text}
                                                     </p>
                                                     <div className="mt-0.5 flex items-center gap-2">
                                                         <span className="text-[7px] font-mono opacity-30 uppercase">{b.type}</span>
                                                         {b.editedAt && <span className="text-[7px] font-black uppercase tracking-widest opacity-30">edited</span>}
+                                                        {b.status === 'SCHEDULED' && (
+                                                            <span className="text-[7px] font-black uppercase tracking-widest text-amber-500">
+                                                                live at {new Date(b.goLiveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </>
                                             )}
@@ -2065,11 +2137,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         <div>
                                             <span className={`px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${statusChip.cls}`}>{statusChip.label}</span>
                                         </div>
-                                        {/* Countdown column — flips while live */}
+                                        {/* Countdown column — flips to go-live or expiry */}
                                         <div className="min-w-0">
-                                            {b.status === 'LIVE' && !isEditing
-                                                ? <FlipBroadcastClock seconds={remain} />
-                                                : <span className="text-[9px] font-mono opacity-30">—</span>}
+                                            {b.status === 'SCHEDULED' && !isEditing
+                                                ? <FlipBroadcastClock seconds={toGoLive} />
+                                                : b.status === 'LIVE' && !isEditing
+                                                    ? <FlipBroadcastClock seconds={remain} />
+                                                    : <span className="text-[9px] font-mono opacity-30">—</span>}
                                         </div>
                                         {/* Time column */}
                                         <div className="flex-none text-[8px] opacity-30 font-mono">{new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
@@ -2091,6 +2165,25 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                         className="p-2 rounded-xl border border-red-500/25 text-red-500/80 hover:bg-red-500/10 hover:scale-105 transition-all disabled:opacity-40"
                                                     >
                                                         <Undo2 size={13} />
+                                                    </button>
+                                                </>
+                                            )}
+                                            {!isEditing && b.status === 'SCHEDULED' && (
+                                                <>
+                                                    <button
+                                                        title="Edit message"
+                                                        onClick={() => { setEditingBroadcastId(String(b.id)); setEditBroadcastDraft(b.message || b.text || ""); }}
+                                                        className={`p-2 rounded-xl border transition-all hover:scale-105 ${isLight ? 'border-black/10 hover:bg-black/5 text-black/60' : 'border-white/10 hover:bg-white/10 text-white/60'}`}
+                                                    >
+                                                        <Pencil size={13} />
+                                                    </button>
+                                                    <button
+                                                        title="Cancel scheduled broadcast (never goes live)"
+                                                        onClick={() => handleCancelBroadcast(b.id)}
+                                                        disabled={busy}
+                                                        className="p-2 rounded-xl border border-red-500/25 text-red-500/80 hover:bg-red-500/10 hover:scale-105 transition-all disabled:opacity-40"
+                                                    >
+                                                        <X size={13} />
                                                     </button>
                                                 </>
                                             )}
