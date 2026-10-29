@@ -266,10 +266,20 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
                             </motion.div>
                         )}
 
-                        {/* ── Edge masks: text dissolves in behind the icon, out at the wrap ── */}
+                        {/* ── Edge masks: the text dissolves INTO the microphone —
+                            opaque right up to the icon zone, gone before it can
+                            slide under — and dissolves out at the right wrap ── */}
                         {phase === 'announce' && (
                             <>
-                                <div className={`absolute left-0 top-0 bottom-0 w-16 z-[5] bg-gradient-to-r pointer-events-none ${isV1 ? (isLight ? 'from-white' : 'from-[#0a0a0a]') : 'from-[#1A6140]'}`} />
+                                <div
+                                    className="absolute left-0 top-0 bottom-0 z-[5] pointer-events-none"
+                                    style={{
+                                        width: 72,
+                                        background: isV1
+                                            ? `linear-gradient(to right, ${isLight ? '#ffffff' : '#0a0a0a'} 0%, ${isLight ? '#ffffff' : '#0a0a0a'} 40%, rgba(0,0,0,0) 100%)`
+                                            : 'linear-gradient(to right, #1A6140 0%, #1A6140 40%, rgba(26,97,64,0) 100%)'
+                                    }}
+                                />
                                 <div className={`absolute right-0 top-0 bottom-0 w-16 z-[5] bg-gradient-to-l pointer-events-none ${isV1 ? (isLight ? 'from-white' : 'from-[#0a0a0a]') : 'from-[#1A6140]'}`} />
                             </>
                         )}
@@ -340,19 +350,10 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
                                     >
                                         <Megaphone size={isV1 ? 15 : 13} fill="currentColor" strokeWidth={2.4} className="drop-shadow-[0_0_6px_currentColor]" />
                                     </motion.span>
-                                    {/* Shout bars flicking beside the mouth (staggered equalizer) */}
-                                    <span className="absolute left-full top-1/2 -translate-y-1/2 ml-1 flex items-end gap-[2px] h-3">
-                                        {[0, 1, 2].map((b) => (
-                                            <motion.span
-                                                key={`bar-${b}`}
-                                                className="w-[2px] rounded-full bg-current"
-                                                animate={{ height: ['30%', '100%', '45%'] }}
-                                                transition={{ duration: 0.7, repeat: Infinity, delay: b * 0.14, ease: 'easeInOut' }}
-                                            />
-                                        ))}
-                                    </span>
-                                    {/* Sprint trail: diamond sparks whipping backwards */}
-                                    {[0, 1, 2].map((s) => (
+                                    {/* Sprint trail: diamond sparks whipping backwards.
+                                        Only while the icon is MOVING — parked, the mic
+                                        stands alone with nothing beside it. */}
+                                    {phase !== 'announce' && [0, 1, 2].map((s) => (
                                         <motion.span
                                             key={`trail-${s}`}
                                             className="absolute right-[-2px] top-1/2 w-1.5 h-1.5 bg-current"
