@@ -97,12 +97,17 @@ const ALL_PERMISSIONS = [
   'platform.settings',  // maintenance mode, trading halt, banner settings
   'broadcast.send',     // live global broadcasts
   'trades.maintenance', // resolve stuck trades
+  'dashboard.overview', // see the Overview section (metrics + trade index)
+  'dashboard.analytics',// see the Analytics section (globe, reach, users)
+  'dashboard.siem',     // see the SIEM threat feed
+  'dashboard.security', // see the Security section (protocols + admin roster)
   'admins.manage'       // create admins/moderators — root-only, NOT grantable
 ];
 
 const ROLE_DEFAULTS = {
   root: ['*'],
-  admin: ['ref.withdrawals', 'ref.manage', 'platform.settings', 'broadcast.send', 'trades.maintenance'],
+  admin: ['ref.withdrawals', 'ref.manage', 'platform.settings', 'broadcast.send', 'trades.maintenance',
+          'dashboard.overview', 'dashboard.analytics', 'dashboard.siem', 'dashboard.security'],
   moderator: ['ref.withdrawals']
 };
 

@@ -1069,11 +1069,23 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const canSettings = hasPerm('platform.settings');
     const canBroadcast = hasPerm('broadcast.send');
 
-    // Sidebar: only sections the signed-in admin is allowed to open.
+    // Sidebar: EVERY section is permission-gated. A role handed exactly ONE
+    // section gets a clean DEDICATED page for that task alone — no sidebar,
+    // no tab bar, none of the other dashboards. Two or more sections get a
+    // nav that lists only what the role owns.
     const canReferrals = canRequests || canReferral;
-    const visibleNav = NAV.filter(t => (t.key === 'referrals' ? canReferrals : t.key === 'broadcast' ? canBroadcast : true));
-    // Fall back to Overview if a permission change hid the saved section.
-    const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : 'overview';
+    const visibleNav = NAV.filter(t =>
+        t.key === 'overview' ? hasPerm('dashboard.overview')
+            : t.key === 'analytics' ? hasPerm('dashboard.analytics')
+            : t.key === 'referrals' ? canReferrals
+            : t.key === 'broadcast' ? canBroadcast
+            : t.key === 'siem' ? hasPerm('dashboard.siem')
+            : t.key === 'security' ? hasPerm('dashboard.security')
+            : true
+    );
+    const dedicatedMode = visibleNav.length <= 1;
+    // Fall back to the FIRST section this role actually owns.
+    const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : (visibleNav[0]?.key || 'overview');
 
     // Broadcast ledger: load when the tab opens, refresh on any fresh socket
     // pulse (a transmission/edit/withdrawal from anywhere re-fetches
@@ -1223,13 +1235,21 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
     // Permission presets for the (re)assign UI. Mirrors the backend defaults;
     // 'admins.manage' is never grantable — it is the root's birthright.
-    const ROLE_PRESETS = { admin: ['ref.withdrawals', 'ref.manage', 'platform.settings', 'broadcast.send', 'trades.maintenance'], moderator: ['ref.withdrawals'] };
+    const ROLE_PRESETS = {
+        admin: ['ref.withdrawals', 'ref.manage', 'platform.settings', 'broadcast.send', 'trades.maintenance',
+                'dashboard.overview', 'dashboard.analytics', 'dashboard.siem', 'dashboard.security'],
+        moderator: ['ref.withdrawals']
+    };
     const GRANTABLE_PERMS = [
         { tag: 'ref.withdrawals', label: 'Withdrawal requests' },
         { tag: 'ref.manage', label: 'Referral management' },
         { tag: 'platform.settings', label: 'Platform settings' },
         { tag: 'broadcast.send', label: 'Broadcasts' },
-        { tag: 'trades.maintenance', label: 'Trade maintenance' }
+        { tag: 'trades.maintenance', label: 'Trade maintenance' },
+        { tag: 'dashboard.overview', label: 'Overview dashboard' },
+        { tag: 'dashboard.analytics', label: 'Analytics' },
+        { tag: 'dashboard.siem', label: 'SIEM feed' },
+        { tag: 'dashboard.security', label: 'Security' }
     ];
 
     const AdminCard = ({ title, icon: Icon, children, accent = "#1A6140" }) => (
@@ -1261,8 +1281,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#1A6140]/3 rounded-full blur-[120px]" />
             </div>
 
-            {/* Sidebar — desktop operations menu (mobile gets the tab bar) */}
-            <nav className={`relative z-50 flex-none hidden md:flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-white/60 border-[#1A6140]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
+            {/* Sidebar — desktop operations menu (mobile gets the tab bar).
+                A dedicated single-task dashboard hides it entirely: their
+                page IS the whole UI. */}
+            {!dedicatedMode && (<nav
+                className={`relative z-50 flex-none hidden md:flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-white/60 border-[#1A6140]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
                 {/* Brand head — same wordmark as the user side, ADMIN beside it */}
                 <div className="flex-none px-4 pt-5 pb-4 flex items-center gap-3 overflow-hidden">
                     {sidebarOpen ? (
@@ -1360,13 +1383,16 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </div>
                     )}
                 </div>
-            </nav>
+            </nav>)}
 
             {/* Main column */}
             <div className="flex-1 flex flex-col min-w-0">
 
-                {/* MOBILE top bar — brand + quick identity, above the scroller. */}
-                <div className={`md:hidden flex-none flex items-center gap-3 px-4 py-2.5 z-40 ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}>
+                {/* Top bar — brand + quick identity, above the scroller. On
+                    desktop it only appears for DEDICATED single-task dashboards
+                    (they have no sidebar, so identity lives here); the full
+                    console keeps its desktop sidebar and shows this on mobile. */}
+                <div className={`${dedicatedMode ? '' : 'md:hidden'} flex-none flex items-center gap-3 px-4 py-2.5 z-40 ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}>
                     <img
                         src={isLight ? '/goblogo.png' : '/gowlogo.png'}
                         alt="15market"
@@ -1374,6 +1400,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     />
                     <span className={`w-px h-7 flex-none ${isLight ? 'bg-black/10' : 'bg-white/15'}`} />
                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#1A6140] flex-none">Admin</span>
+                    {dedicatedMode && (
+                        <span className={`text-[9px] font-black uppercase tracking-[0.25em] opacity-50 truncate ${isLight ? 'text-black' : 'text-white'}`}>
+                            {visibleNav[0]?.label}
+                        </span>
+                    )}
                     <div className="ml-auto flex items-center gap-2">
                         <ThemeToggle compact theme={themeState} onToggle={toggleTheme} />
                         {auth?.email && (
@@ -1393,7 +1424,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     <GlobalTradeScroller theme={themeState} />
                 </div>
 
-            <main className="flex-1 overflow-y-auto no-scrollbar p-4 pb-32 md:pb-6 md:p-6 lg:p-8 lg:pb-6 z-10">
+            <main className={`flex-1 overflow-y-auto no-scrollbar p-4 ${dedicatedMode ? 'pb-8' : 'pb-32'} md:pb-6 md:p-6 lg:p-8 lg:pb-6 z-10`}>
 
                 {activeNav === 'overview' && (
                 <div className="w-full flex flex-col gap-6 min-w-0">
@@ -2488,7 +2519,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
              </main>
 
             {/* MOBILE bottom tab bar — the five sections, glass strip, safe-area aware.
-                Badges (pending withdrawals) show as amber dots. */}
+                Badges (pending withdrawals) show as amber dots. Hidden on a
+                dedicated single-task dashboard — one task needs no nav. */}
+            {!dedicatedMode && (
             <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] flex items-stretch border-t backdrop-blur-3xl px-1.5 pt-1 overflow-x-auto no-scrollbar ${isLight ? 'bg-white/85 border-black/10' : 'bg-[#0A0A0A]/90 border-white/10'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
                 {visibleNav.map(t => {
                     const Icon = t.icon;
@@ -2512,6 +2545,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     );
                 })}
             </div>
+            )}
 
             {/* Persistence Layer Status — slim strip inside the main column */}
             <footer className={`hidden md:flex flex-none px-6 py-2.5 border-t backdrop-blur-3xl flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#0A0A0A]/60 border-white/5'}`}>
