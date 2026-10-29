@@ -11,6 +11,7 @@ import { LatencyMeter } from "./LatencyMeter";
 import ArcABI from "../abi/ArcPrediction.json";
 import { KEEPER_URL_ARC, ARC_CONTRACT_ADDRESS, ARC_RPC, ADMIN_TOKEN } from "../constants";
 import { socketService } from "../utils/socket";
+import NotifyFlash from "./NotifyFlash";
 import { parseEther } from "viem";
 import GlobalLoader from "./GlobalLoader";
 import { useCreateWallet, usePrivy, useWallets } from '@privy-io/react-auth';
@@ -1568,13 +1569,18 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 )}
             </AnimatePresence>
 
+            {/* Confirmation takeover — same full-screen / blurred-box surface
+                as every other notify() in the platform. Errors are inferred
+                from the message since this legacy host carries plain strings. */}
             {toast && (
-                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[300]">
-                    <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} exit={{opacity:0,y:20}}
-                        className="bg-[#133a2a] text-white px-6 py-3 rounded-2xl shadow-2xl text-xs font-black uppercase tracking-widest">
-                        {toast}
-                    </motion.div>
-                </div>
+                <AnimatePresence>
+                    <NotifyFlash
+                        key={toast}
+                        message={toast}
+                        kind={/fail|error|invalid|too large/i.test(toast) ? 'error' : 'success'}
+                        onClose={() => setToast(null)}
+                    />
+                </AnimatePresence>
             )}
         </div>
     );

@@ -48,7 +48,7 @@ import { ActiveTradesSidebar } from "./components/ActiveTradesSidebar";
 import { MascotLoader } from "./components/MascotLoader";
 import CustomChart from './components/CustomChart';
 import MobileTradeView from './components/MobileTradeView';
-import Toast from "./components/Toast";
+import NotifyFlash from "./components/NotifyFlash";
 import SuccessOverlay from "./components/SuccessOverlay";
 import { ThemeToggle } from "./components/ThemeToggle";
 import SideHistoryPane from "./components/SideHistoryPane";
@@ -2403,8 +2403,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     const unbindBroadcast = socketService.on('broadcast', (data) => {
       if (!data || data.withdrawn) return; // withdrawals clear silently — no toast, no banner
       console.log(`[Broadcast] New announcement: ${data.message}`);
-      // Show notification instantly
-      notify(`📢 ${data.message}`, 'info');
+      // No confirmation toast — the scroller banner IS the announcement.
 
       // Update system banner if it's maintenance or emergency
       if (data.type === 'MAINTENANCE' || data.type === 'EMERGENCY') {
@@ -3318,19 +3317,21 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
           <DissolveTransition isAnimating={isAnimatingTheme} targetTheme={targetTheme} />
 
-          {/* Global toast host — every failure/success message flows through
-              notify(), which writes the `toast` state. Without this host every
-              message (deposit/withdraw errors especially) rendered as nothing
-              and flows looked completely dead to the user. */}
+          {/* Global confirmation host — every success/failure/notice flows
+              through notify() and takes the screen: full-screen platform
+              backdrop on mobile, centered blurred glass card on desktop.
+              Without this host every message (deposit/withdraw errors
+              especially) rendered as nothing and flows looked dead. */}
           {toast && (
-            <Toast
-              key={toast.id}
-              message={toast.message}
-              type={toast.type}
-              onClick={toast.onClick}
-              onClose={() => setToast(null)}
-              isSmallScreen={isSmallScreen}
-            />
+            <AnimatePresence>
+              <NotifyFlash
+                key={toast.id}
+                message={toast.message}
+                kind={toast.type}
+                onClick={toast.onClick}
+                onClose={closeToast}
+              />
+            </AnimatePresence>
           )}
 
           {view === "dashboard" ? (

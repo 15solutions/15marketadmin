@@ -29,7 +29,6 @@ export default function App() {
             <Suspense fallback={<div style={{ color: '#fff', background: '#050505' }}>loading portal…</div>}>
                 <AdminPortal
                     onBack={() => {}}
-                    notify={(msg) => console.log('[notify]', msg)}
                 />
             </Suspense>
         </ErrorBoundary>

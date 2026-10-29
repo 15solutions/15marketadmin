@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Shield, Mail, Lock, Loader2, CheckCircle2, AlertTriangle, UserPlus } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { getSession, sessionValid, clearSession, loginWithPassword, refreshSession } from "../utils/adminAuth";
+import NotifyFlash from "./ui/NotifyFlash";
 
 const AdminDashboard = React.lazy(() => import("./AdminDashboard").then(m => ({ default: m.AdminDashboard })));
 
@@ -29,6 +30,17 @@ export function AdminPortal({ onBack, notify }) {
     const [loginError, setLoginError] = useState('');
     const [bootMsg, setBootMsg] = useState(null);
     const isLight = localStorage.getItem("15market_theme") === 'light';
+
+    // ─── Confirmation host — the console's notify() used to be a dead-end
+    // console.log. Every success/failure/notice now takes the screen
+    // (full-screen platform backdrop on mobile, blurred glass card on
+    // desktop) via NotifyFlash.
+    const [flash, setFlash] = useState(null); // { id, message, kind }
+    const flashNotify = useCallback((message, kind) => {
+        setFlash({ id: Date.now(), message: String(message), kind: kind || 'success' });
+    }, []);
+    // Callers may inject their own sink (debug harnesses) — default to the flash host.
+    const notifyFn = notify || flashNotify;
 
     const loadAuthContext = useCallback(async () => {
         try {
@@ -132,20 +144,38 @@ export function AdminPortal({ onBack, notify }) {
         setAuth(null);
         setBootStatus(null);
         setStatus('login');
-        notify?.('Signed out of the admin portal', 'success');
+        notifyFn('Signed out of the admin portal', 'success');
     };
+
+    // The confirmation overlay — lives above both the dashboard and the
+    // login screen.
+    const flashLayer = (
+        <AnimatePresence>
+            {flash && (
+                <NotifyFlash
+                    key={flash.id}
+                    message={flash.message}
+                    kind={flash.kind}
+                    onClose={() => setFlash(null)}
+                />
+            )}
+        </AnimatePresence>
+    );
 
     // ─── Authed → full dashboard (its own full-bleed shell) ──────────────
     if (status === 'ready' && auth) {
         return (
-            <React.Suspense fallback={<FullScreenSpinner isLight={isLight} label="Mounting ops console…" />}>
-                <AdminDashboard
-                    onBack={onBack || (() => window.location.href = '/')}
-                    theme={localStorage.getItem("15market_theme") || "dark"}
-                    notify={notify}
-                    auth={{ ...auth, signOut }}
-                />
-            </React.Suspense>
+            <>
+                <React.Suspense fallback={<FullScreenSpinner isLight={isLight} label="Mounting ops console…" />}>
+                    <AdminDashboard
+                        onBack={onBack || (() => window.location.href = '/')}
+                        theme={localStorage.getItem("15market_theme") || "dark"}
+                        notify={notifyFn}
+                        auth={{ ...auth, signOut }}
+                    />
+                </React.Suspense>
+                {flashLayer}
+            </>
         );
     }
     if (status !== 'login') {
@@ -283,6 +313,7 @@ export function AdminPortal({ onBack, notify }) {
                     </AnimatePresence>
                 </div>
             </div>
+            {flashLayer}
         </motion.div>
     );
 }
