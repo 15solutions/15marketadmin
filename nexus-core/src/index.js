@@ -2722,7 +2722,13 @@ app.post('/admin/broadcast', requirePerm('broadcast.send'), (req, res) => {
     ? Number(req.body.durationSeconds) * 1000
     : 60000; // default live window
 
-  if (Number(scheduleSeconds) > 0) {
+  // Armed broadcasts: an absolute go-live timestamp (`scheduleAt`, ms) or a
+  // relative one (`scheduleSeconds`) — any future moment.
+  const scheduleAt = Number(req.body.scheduleAt) > Date.now()
+    ? Number(req.body.scheduleAt)
+    : (Number(scheduleSeconds) > 0 ? Date.now() + Number(scheduleSeconds) * 1000 : null);
+
+  if (scheduleAt) {
     // ── SCHEDULED transmission: stored and armed, users see NOTHING yet ──
     const broadcast = {
       id: Date.now(),
@@ -2730,9 +2736,9 @@ app.post('/admin/broadcast', requirePerm('broadcast.send'), (req, res) => {
       text: String(message),
       type: type || 'ANNOUNCEMENT',
       scheduled: true,
-      goLiveAt: Date.now() + Number(scheduleSeconds) * 1000,
+      goLiveAt: scheduleAt,
       durationMs,
-      expiry: Date.now() + Number(scheduleSeconds) * 1000 + durationMs, // not active until armed
+      expiry: scheduleAt + durationMs, // not active until armed
       timestamp: Date.now(),
       sender: req.admin?.email || 'ADMIN',
       withdrawn: false,
@@ -2740,7 +2746,7 @@ app.post('/admin/broadcast', requirePerm('broadcast.send'), (req, res) => {
     };
     rememberBroadcast(broadcast);
     io.emit('broadcast_schedule', { id: broadcast.id, goLiveAt: broadcast.goLiveAt, message: broadcast.message });
-    console.log(`[Admin] Broadcast scheduled (+${scheduleSeconds}s): ${message}`);
+    console.log(`[Admin] Broadcast scheduled for ${new Date(scheduleAt).toISOString()}: ${message}`);
     return res.json({ success: true, scheduled: true, broadcast });
   }
 

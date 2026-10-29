@@ -43,7 +43,8 @@ import {
     Radar,
     Pencil,
     Megaphone,
-    Undo2
+    Undo2,
+    CalendarClock
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
@@ -140,9 +141,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     
     const [broadcastText, setBroadcastText] = useState("");
     const [broadcastDuration, setBroadcastDuration] = useState(60); // seconds
-    // Go-live scheduling: 0 = transmit NOW; > 0 = armed to fire minutes later
-    // (the backend holds it and flips it live exactly at its go-live moment).
-    const [scheduleSeconds, setScheduleSeconds] = useState(0); // 0 | 300 | 900 | 1800 | 3600
+    // Go-live scheduling: "Now" transmits immediately; "Schedule" opens the
+    // date+time picker, an absolute go-live moment the backend holds the
+    // message for and flips live automatically.
+    const [scheduleMode, setScheduleMode] = useState(false);
+    const [scheduleDate, setScheduleDate] = useState(""); // datetime-local string
     const [isSaving, setIsSaving] = useState(false);
     // Broadcast ledger listed under the composer: each entry carries its own
     // flip-clock countdown, plus edit/withdraw controls while it is live.
@@ -1001,6 +1004,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const handleUpdateBroadcast = async () => {
         if (!broadcastText.trim()) return notify("Enter broadcast message", "error");
 
+        let goLiveAt = null;
+        if (scheduleMode) {
+            if (!scheduleDate) return notify("Pick a go-live date and time", "error");
+            goLiveAt = new Date(scheduleDate).getTime();
+            if (!(goLiveAt > Date.now() + 15000)) return notify("Go-live must be at least 15 seconds ahead", "error");
+        }
+
         setIsSaving(true);
         try {
             const res = await adminFetch(`${KEEPER_URL_ARC}/admin/broadcast`, {
@@ -1009,7 +1019,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     message: broadcastText,
                     durationSeconds: broadcastDuration,
                     type: 'MANUAL_ADMIN',
-                    ...(scheduleSeconds > 0 ? { scheduleSeconds } : {})
+                    ...(goLiveAt ? { scheduleAt: goLiveAt } : {})
                 })
             });
 
@@ -1018,10 +1028,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 throw new Error(body.error || "Broadcast failed");
             }
 
-            notify(scheduleSeconds > 0
-                ? `Broadcast armed — goes live in ${scheduleSeconds / 60} min`
+            notify(goLiveAt
+                ? `Broadcast armed — goes live ${new Date(goLiveAt).toLocaleString([], { hour: '2-digit', minute: '2-digit' })}`
                 : "Global Broadcast Initiated", "success");
             setBroadcastText("");
+            setScheduleMode(false);
+            setScheduleDate("");
             fetchBroadcasts();
         } catch (e) {
             notify("Broadcast Error: " + e.message, "error");
@@ -1976,30 +1988,51 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             className={`w-full h-24 md:h-28 p-4 rounded-2xl border text-sm font-bold resize-none overflow-hidden transition-all outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
                         />
 
-                        {/* Schedule row — transmit NOW or arm it to fire later;
-                            when armed, the backend holds the message until its
-                            go-live moment and flips it live automatically. */}
+                        {/* Schedule control — transmit NOW, or open the branded
+                            date+time picker and arm an absolute go-live moment
+                            the backend holds the message for. */}
                         <div className="mt-2 flex items-center gap-2 flex-wrap">
                             <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>Schedule</span>
                             <button
-                                onClick={() => setScheduleSeconds(0)}
-                                className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${scheduleSeconds === 0 ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
+                                onClick={() => { setScheduleMode(false); setScheduleDate(""); }}
+                                className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${!scheduleMode ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
                             >
                                 Now
                             </button>
-                            {[5, 15, 30, 60].map(m => (
-                                <button
-                                    key={m}
-                                    onClick={() => setScheduleSeconds(m * 60)}
-                                    className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${scheduleSeconds === m * 60 ? 'bg-amber-500 text-white border-amber-500' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
-                                >
-                                    in {m}m
-                                </button>
-                            ))}
-                            {scheduleSeconds > 0 && (
-                                <span className="text-[8px] font-black uppercase tracking-widest text-amber-500 animate-pulse">
-                                    armed · live at {new Date(Date.now() + scheduleSeconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
+                            <button
+                                onClick={() => setScheduleMode(true)}
+                                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${scheduleMode ? 'bg-amber-500 text-white border-amber-500' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
+                            >
+                                <CalendarClock size={12} />
+                                For later
+                            </button>
+                            {scheduleMode && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {/* Go-live moment — native picker themed per mode
+                                        (colorScheme flips the calendar to dark) */}
+                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${isLight ? 'bg-white border-black/10' : 'bg-black/40 border-white/10'}`}>
+                                        <CalendarClock size={12} className="text-amber-500 flex-none" />
+                                        <input
+                                            type="datetime-local"
+                                            value={scheduleDate}
+                                            min={new Date(Date.now() + 20000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                            onChange={(e) => setScheduleDate(e.target.value)}
+                                            className={`bg-transparent text-[11px] font-black tracking-wide outline-none ${isLight ? 'text-black' : 'text-white'}`}
+                                            style={{ colorScheme: isLight ? 'light' : 'dark' }}
+                                        />
+                                    </div>
+                                    {scheduleDate && (() => {
+                                        const go = new Date(scheduleDate).getTime();
+                                        const ahead = Math.round((go - Date.now()) / 1000);
+                                        return ahead <= 15 ? (
+                                            <span className="text-[8px] font-black uppercase tracking-widest text-red-500">past time — pick a future moment</span>
+                                        ) : (
+                                            <span className="text-[8px] font-black uppercase tracking-widest text-amber-500">
+                                                live {new Date(go).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} · in {Math.floor(ahead / 60)}m {String(ahead % 60).padStart(2, '0')}s
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
                             )}
                         </div>
 
@@ -2022,7 +2055,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 className="flex items-center justify-center gap-3 py-3 px-6 bg-[#1A6140] text-white rounded-2xl font-black uppercase tracking-[0.25em] text-[10px] shadow-[0_16px_32px_-10px_rgba(26,97,64,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
                             >
                                 <Radio size={14} />
-                                <span>{isSaving ? 'Transmitting…' : scheduleSeconds > 0 ? 'Arm Broadcast' : 'Transmit Broadcast'}</span>
+                                <span>{isSaving ? 'Transmitting…' : scheduleMode ? 'Arm Broadcast' : 'Transmit Broadcast'}</span>
                             </button>
                         </div>
 
