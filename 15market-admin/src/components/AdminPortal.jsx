@@ -48,9 +48,18 @@ export function AdminPortal({ onBack, notify }) {
                 headers: { Authorization: `Bearer ${getSession()?.accessToken || ''}` },
                 signal: AbortSignal.timeout(55000)
             });
-            if (res.status === 401) { clearSession(); setStatus('login'); return; }
             if (!res.ok) {
-                setLoginError('Admin store unreachable. Try again in a moment.');
+                // Surface the server's real reason instead of bouncing silently.
+                const body = await res.json().catch(() => ({}));
+                if (res.status === 401) {
+                    clearSession();
+                    setLoginError(body.error || 'Your session was rejected. Please sign in again.');
+                } else if (res.status === 403) {
+                    clearSession();
+                    setLoginError(body.error || 'This account is not an administrator.');
+                } else {
+                    setLoginError(body.error || 'Admin store unreachable. Try again in a moment.');
+                }
                 setStatus('login');
                 return;
             }

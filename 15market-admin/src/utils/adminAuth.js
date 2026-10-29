@@ -58,6 +58,11 @@ export async function loginWithPassword(email, password) {
         const msg = data.error_description || data.error || data.msg || 'Invalid email or password';
         throw new Error(String(msg).replace(/^Invalid login credentials$/i, 'Invalid email or password'));
     }
+    // Never persist a token-less session: it would pass the login step and then
+    // fail silently on the first authenticated call.
+    if (!(data.session?.access_token || data.access_token)) {
+        throw new Error('Sign-in succeeded but no session was returned. Please try again.');
+    }
     saveSession({
         accessToken: data.session?.access_token || data.access_token,
         refreshToken: data.session?.refresh_token || data.refresh_token,

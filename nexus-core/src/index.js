@@ -294,7 +294,20 @@ app.post('/admin/auth/login', async (req, res) => {
             ip,
             meta: { email: maskEmail }
         });
-        return res.json({ user: data.user, session: data.session });
+        // Supabase's password grant returns the session FLAT ({ access_token,
+        // refresh_token, expires_in, user, ... }) — there is no nested `session`
+        // key. Re-shape it so the portal receives the tokens it stores.
+        const session = data.session || {
+            access_token: data.access_token,
+            refresh_token: data.refresh_token,
+            expires_in: data.expires_in,
+            expires_at: data.expires_at,
+            token_type: data.token_type
+        };
+        if (!session.access_token) {
+            return res.status(502).json({ error: 'Authentication upstream returned no session' });
+        }
+        return res.json({ user: data.user, session });
     } catch (e) {
         return res.status(502).json({ error: 'Authentication upstream unreachable', detail: e.message });
     }
