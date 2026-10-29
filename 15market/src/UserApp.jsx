@@ -2401,6 +2401,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     });
 
     const unbindBroadcast = socketService.on('broadcast', (data) => {
+      if (!data || data.withdrawn) return; // withdrawals clear silently — no toast, no banner
       console.log(`[Broadcast] New announcement: ${data.message}`);
       // Show notification instantly
       notify(`📢 ${data.message}`, 'info');

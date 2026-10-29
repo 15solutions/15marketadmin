@@ -69,23 +69,22 @@ const NAV = [
 // ── Broadcast FLIP CLOCK ─────────────────────────────────────────────────────
 // Same flip-digit tiles the trade cards use (verbatim tile style): a digit
 // flips in 3D every tick. Counting MM:SS — broadcasts run 1–60 minutes.
+// Digit changes remount via key (instead of AnimatePresence exits) so a
+// one-hour countdown cannot stack hundreds of invisible exit layers.
 function FlipBroadcastDigit({ digit }) {
     return (
         <div className="relative w-[16px] h-[23px] bg-[#0c0e12] border border-white/15 rounded-[4px] shadow-[0_1px_4px_rgba(0,0,0,0.6)] overflow-hidden flex items-center justify-center select-none">
             <div className="absolute inset-x-0 top-1/2 h-[1px] bg-black/80 z-20" />
-            <AnimatePresence mode="popLayout" initial={false}>
-                <motion.div
-                    key={digit}
-                    initial={{ rotateX: -90, opacity: 0 }}
-                    animate={{ rotateX: 0, opacity: 1 }}
-                    exit={{ rotateX: 90, opacity: 0 }}
-                    transition={{ duration: 0.22, ease: [0.25, 1, 0.5, 1] }}
-                    style={{ transformOrigin: "center center", transformStyle: "preserve-3d" }}
-                    className="absolute inset-0 flex items-center justify-center font-mono font-black text-[12px] text-white tabular-nums tracking-tighter"
-                >
-                    {digit}
-                </motion.div>
-            </AnimatePresence>
+            <motion.div
+                key={digit}
+                initial={{ rotateX: -90, opacity: 0 }}
+                animate={{ rotateX: 0, opacity: 1 }}
+                transition={{ duration: 0.22, ease: [0.25, 1, 0.5, 1] }}
+                style={{ transformOrigin: "center center", transformStyle: "preserve-3d" }}
+                className="absolute inset-0 flex items-center justify-center font-mono font-black text-[12px] text-white tabular-nums tracking-tighter"
+            >
+                {digit}
+            </motion.div>
             <div className="absolute inset-0 bg-gradient-to-b from-white/[0.12] via-transparent to-black/30 pointer-events-none z-10" />
         </div>
     );
@@ -1061,9 +1060,24 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         } finally { setBusyBroadcastId(null); }
     };
 
-    // Load the ledger when the tab opens, refresh on any fresh socket pulse
-    // (a transmission/edit/withdrawal from anywhere re-fetches instantly), and
-    // tick the flip clocks once per second while the tab is mounted.
+    // ── Auth context (Supabase-Auth admin) ──────────────────────────────
+    const isRoot = auth?.isRoot === true || auth?.role === 'root';
+    const adminPerms = auth?.permissions || [];
+    const hasPerm = (p) => isRoot || adminPerms.includes('*') || adminPerms.includes(p);
+    const canRequests = hasPerm('ref.withdrawals');
+    const canReferral = hasPerm('ref.manage');
+    const canSettings = hasPerm('platform.settings');
+    const canBroadcast = hasPerm('broadcast.send');
+
+    // Sidebar: only sections the signed-in admin is allowed to open.
+    const canReferrals = canRequests || canReferral;
+    const visibleNav = NAV.filter(t => (t.key === 'referrals' ? canReferrals : t.key === 'broadcast' ? canBroadcast : true));
+    // Fall back to Overview if a permission change hid the saved section.
+    const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : 'overview';
+
+    // Broadcast ledger: load when the tab opens, refresh on any fresh socket
+    // pulse (a transmission/edit/withdrawal from anywhere re-fetches
+    // instantly), and tick the flip clocks once per second while mounted.
     useEffect(() => {
         if (adminTab !== 'broadcast' || !canBroadcast) return;
         fetchBroadcasts();
@@ -1079,21 +1093,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         const tick = setInterval(() => setBroadcastTick(t => t + 1), 1000);
         return () => clearInterval(tick);
     }, [adminTab, canBroadcast]);
-
-    // ── Auth context (Supabase-Auth admin) ──────────────────────────────
-    const isRoot = auth?.isRoot === true || auth?.role === 'root';
-    const adminPerms = auth?.permissions || [];
-    const hasPerm = (p) => isRoot || adminPerms.includes('*') || adminPerms.includes(p);
-    const canRequests = hasPerm('ref.withdrawals');
-    const canReferral = hasPerm('ref.manage');
-    const canSettings = hasPerm('platform.settings');
-    const canBroadcast = hasPerm('broadcast.send');
-
-    // Sidebar: only sections the signed-in admin is allowed to open.
-    const canReferrals = canRequests || canReferral;
-    const visibleNav = NAV.filter(t => (t.key === 'referrals' ? canReferrals : t.key === 'broadcast' ? canBroadcast : true));
-    // Fall back to Overview if a permission change hid the saved section.
-    const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : 'overview';
 
     // ── SIEM — live threat/abuse feed (backend ring buffer + siem_alert) ──
     const [siemEvents, setSiemEvents] = useState([]);
@@ -1318,14 +1317,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 {/* Bottom rail: theme switch + collapse toggle + identity */}
                 <div className={`flex-none p-3 flex flex-col gap-1.5 border-t ${isLight ? 'border-black/5' : 'bg-transparent border-white/5'}`}>
                     {sidebarOpen ? (
-                        <div className="flex items-center gap-3 px-3 py-1">
-                            <span
-                                className="text-[9px] font-black uppercase tracking-widest flex-none"
-                                style={{ color: isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)' }}
-                            >
-                                Theme
-                            </span>
-                            <ThemeToggle theme={themeState} onToggle={toggleTheme} />
+                        <div className="flex items-center px-3 py-1">
+                            <ThemeToggle compact theme={themeState} onToggle={toggleTheme} />
                         </div>
                     ) : (
                         <button
@@ -1382,7 +1375,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     <span className={`w-px h-7 flex-none ${isLight ? 'bg-black/10' : 'bg-white/15'}`} />
                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#1A6140] flex-none">Admin</span>
                     <div className="ml-auto flex items-center gap-2">
-                        <ThemeToggle theme={themeState} onToggle={toggleTheme} />
+                        <ThemeToggle compact theme={themeState} onToggle={toggleTheme} />
                         {auth?.email && (
                             <button
                                 onClick={auth.signOut || auth.onSignOut}
