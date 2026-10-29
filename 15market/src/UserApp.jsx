@@ -2162,6 +2162,12 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
 
 
+  // Always points at the CURRENT market. The 200ms pulse loop below reads it so
+  // a tick from the previous asset's closure can never publish that asset's
+  // price (e.g. BTC) while the new asset (e.g. ETH) is selected.
+  const activeMarketIdRef = useRef(activeMarket?.id?.toLowerCase());
+  activeMarketIdRef.current = activeMarket?.id?.toLowerCase();
+
   const [globalTickerTrades, setGlobalTickerTrades] = useState([]);
 
   useEffect(() => {
@@ -2265,7 +2271,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
   // This achieves the "standardized/consistent" flow we discussed
   useEffect(() => {
     const pulseLoop = setInterval(() => {
-      const currentAssetId = activeMarket?.id?.toLowerCase();
+      const currentAssetId = activeMarketIdRef.current;
       const p = oraclePricesRef.current[currentAssetId];
       const sourceTs = oraclePricesRef.current.ts[currentAssetId] || Date.now();
 
@@ -3591,7 +3597,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                           boxShadow: theme === 'light' ? '0 0 16px rgba(0,0,0,0.10), 0 0 4px rgba(0,0,0,0.05)' : 'none',
                         }}>
                         <CustomChart
-                          symbol={activeMarket?.binance || 'BTCUSDT'}
+                          symbol={activeMarket?.binance || `${String(activeMarket?.id || 'eth').toUpperCase()}USDT`}
                           theme={theme}
                           network={network}
                           activeMarket={activeMarket}

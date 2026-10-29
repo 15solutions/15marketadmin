@@ -167,6 +167,11 @@ function WheelRow({ token, index, wheelPos, boxH, onTap, activeAssetSymbol, isLi
   );
 }
 
+// A real tick for an asset never sits this far from the previous real tick.
+// Anything beyond it is a foreign/stale value (another asset's price, a
+// placeholder) and must never reach the line.
+const MAX_TICK_DEVIATION = 0.10;
+
 /**
  * MobileSteppedChart — High-performance Canvas stepped-line (ladder) chart.
  * Renders the exact stepped line, soft area fill, dashed strike line,
@@ -197,6 +202,19 @@ function MobileSteppedChart({
   useEffect(() => { activeTradesRef.current = activeTrades; }, [activeTrades]);
 
   const numericPrice = parseFloat(currentPrice) || 0;
+
+  // Props are not tagged by symbol: right after an asset switch they can still
+  // carry the previous asset's price (e.g. BTC while ETH is selected). A value
+  // is only accepted when it agrees with the last real price THIS symbol's own
+  // feed delivered; with no such reference there is nothing to validate
+  // against, so it is ignored rather than guessed.
+  const isPlausibleForSymbol = (p) => {
+    const ref = priceSocketService.getLatestPrice(symbolRef.current || '');
+    if (!(ref > 0)) return false;
+    if (Math.abs(p - ref) / ref > MAX_TICK_DEVIATION) return false;
+    const cur = interpolatedPriceRef.current;
+    return !(cur !== null && Math.abs(p - cur) / cur > MAX_TICK_DEVIATION);
+  };
 
   // Seed the buffer with the backend's REAL recent history on mount / symbol
   // change so the chart opens already complete and correctly scaled, instead of
@@ -229,6 +247,14 @@ function MobileSteppedChart({
         }
         if (!seeded.length) return;
         seeded.sort((a, b) => a.t - b.t);
+        // Drop outliers: anything far from the window's median is not a real
+        // tick for this asset and would blow up the Y scale.
+        const sortedP = seeded.map(x => x.p).sort((a, b) => a - b);
+        const median = sortedP[Math.floor(sortedP.length / 2)];
+        for (let i = seeded.length - 1; i >= 0; i--) {
+          if (Math.abs(seeded[i].p - median) / median > MAX_TICK_DEVIATION) seeded.splice(i, 1);
+        }
+        if (!seeded.length) return;
         // Same easing as the live loop (0.45 / 50ms) so the seeded window has an
         // identical smooth finish to the streaming tail.
         const smoothed = [{ t: seeded[0].t, p: seeded[0].p }];
@@ -245,6 +271,9 @@ function MobileSteppedChart({
         if (newest && isFinite(newest.p) && newest.p > 0) {
           if (interpolatedPriceRef.current === null) interpolatedPriceRef.current = newest.p;
           if (targetPriceRef.current === null) targetPriceRef.current = newest.p;
+          // Re-frame the Y scale on the full seeded window in one step.
+          yMinRef.current = null;
+          yMaxRef.current = null;
         }
       } catch {
         // Network blip: live ticks still fill the chart normally.
@@ -264,7 +293,8 @@ function MobileSteppedChart({
     const handlePrice = (data) => {
       if (data && data.source === 'backend' && data.key === symKey) {
         const p = parseFloat(data.price);
-        if (!isNaN(p) && p > 0) {
+        const prev = interpolatedPriceRef.current;
+        if (!isNaN(p) && p > 0 && !(prev !== null && Math.abs(p - prev) / prev > MAX_TICK_DEVIATION)) {
           targetPriceRef.current = p;
           if (interpolatedPriceRef.current === null) {
             interpolatedPriceRef.current = p;
@@ -287,7 +317,7 @@ function MobileSteppedChart({
       (t.symbol || '').toLowerCase() === symKey
     );
     const p = active ? parseFloat(active.livePrice || active.lastTickPrice) : NaN;
-    if (!isNaN(p) && p > 0) {
+    if (!isNaN(p) && p > 0 && isPlausibleForSymbol(p)) {
       targetPriceRef.current = p;
       if (interpolatedPriceRef.current === null) {
         interpolatedPriceRef.current = p;
@@ -297,7 +327,7 @@ function MobileSteppedChart({
 
   // Sync with prop currentPrice if provided
   useEffect(() => {
-    if (numericPrice > 0) {
+    if (numericPrice > 0 && isPlausibleForSymbol(numericPrice)) {
       targetPriceRef.current = numericPrice;
       if (interpolatedPriceRef.current === null) {
         interpolatedPriceRef.current = numericPrice;

@@ -7,7 +7,12 @@ import { KEEPER_URL_ARC } from '../constants';
  * HIGH PERFORMANCE: Optimized drawing routines to avoid lags and redundant allocations.
  * Now includes trade entry markers with LIVE countdown badges rendered on canvas.
  */
-function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], currentPrice, windowMs = 20000, priceHistory = [] }) {
+// A real tick for an asset never sits this far from the previous real tick.
+// Anything beyond it is a foreign/stale value (another asset's price, a
+// placeholder) and must never reach the line.
+const MAX_TICK_DEVIATION = 0.10;
+
+function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], currentPrice, windowMs = 20000 }) {
     const canvasRef = useRef(null);
     const priceHistoryRef = useRef([]);
     const rafRef = useRef(null);
@@ -57,6 +62,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             const price = parseFloat(data.price);
             if (isNaN(price) || price <= 0) return;
             const prev = interpolatedPriceRef.current;
+            // Reject ticks that are wildly off the price we are already drawing.
+            if (prev !== null && Math.abs(price - prev) / prev > MAX_TICK_DEVIATION) return;
             // Snap immediately if this is the first tick or a large jump (>0.5%)
             const isLargeJump = prev !== null && Math.abs(price - prev) / prev > 0.005;
             if (prev === null || isLargeJump) {
@@ -85,28 +92,14 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
         priceHistoryRef.current = [];
         symbolRef._resetAt = Date.now();
 
-        // The parent may already hold real points (it streams them itself) —
-        // use them straight away, no round trip needed.
-        // IMPORTANT: only accept them when a socket tick already arrived for
-        // THIS symbol (targetPriceRef is non-null), so stale points from the
-        // previous symbol don't become the chart seed.
-        if (Array.isArray(priceHistory) && priceHistory.length && targetPriceRef.current !== null) {
-            const seedPts = [];
-            for (const p of priceHistory) {
-                if (!p) continue;
-                const t = Number(p.t);
-                const v = Number(p.p);
-                if (isFinite(t) && isFinite(v) && v > 0) seedPts.push({ t, p: v });
-            }
-            if (seedPts.length) priceHistoryRef.current = seedPts.slice(-1200);
-        }
-
+        // The parent's priceHistory buffer is deliberately NOT used as a seed:
+        // it is not tagged by symbol, so right after an asset switch it can
+        // still hold the previous asset's points.
+        //
         // Do NOT seed targetPriceRef / interpolatedPriceRef from the currentPrice
-        // prop here. The prop may still hold the previous symbol's price while
-        // the parent hasn't received a tick for the new symbol yet. Seeding from
-        // it causes a visible spike: the chart starts at the old/wrong price,
-        // then slams down to the real price as the easing loop runs.
-        // The async history fetch below sets the correct seed once it arrives.
+        // prop here either. The prop may still hold the previous symbol's price
+        // while the parent hasn't received a tick for the new symbol yet. Only
+        // this symbol's own backend feed / history may set the price.
 
         // Pull the backend's recent price history so the chart renders a full,
         // correctly-scaled window on frame one (no "wait for the form").
@@ -129,6 +122,14 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                 }
                 if (!seeded.length) return;
                 seeded.sort((a, b) => a.t - b.t);
+                // Drop outliers: anything far from the window's median price is
+                // not a real tick for this asset and would blow up the Y scale.
+                const sortedP = seeded.map(x => x.p).sort((a, b) => a - b);
+                const median = sortedP[Math.floor(sortedP.length / 2)];
+                for (let i = seeded.length - 1; i >= 0; i--) {
+                    if (Math.abs(seeded[i].p - median) / median > MAX_TICK_DEVIATION) seeded.splice(i, 1);
+                }
+                if (!seeded.length) return;
                 // Reproduce the live line's easing (0.45 per 50ms tick) over the
                 // seeded series so the opening window has the SAME smooth finish
                 // as the streaming tail — no rough "seam" where they meet.
@@ -147,6 +148,10 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                     if (targetPriceRef.current === null) targetPriceRef.current = newest.p;
                     if (interpolatedPriceRef.current === null) interpolatedPriceRef.current = newest.p;
                     if (startTimeRef.current === null) startTimeRef.current = Date.now();
+                    // Re-frame the Y scale on the full seeded window in one step
+                    // so the view never visibly zooms out as history lands.
+                    yMinRef.current = null;
+                    yMaxRef.current = null;
                 }
             } catch {
                 // Network blip: the live stream still fills the chart normally.
@@ -165,10 +170,16 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
     useEffect(() => {
         const p = parseFloat(currentPrice);
         if (!isNaN(p) && p > 0) {
-            // Guard: only update when the chart is already initialised for this
-            // symbol OR when the prop is for a symbol we haven't received a
-            // history tick for in a reasonable time (>3 s after symbol reset).
-            const alreadyInit = targetPriceRef.current !== null;
+            // The prop is NOT tagged by symbol, so right after an asset switch
+            // it can still carry the previous asset's price (e.g. BTC while ETH
+            // is selected). Only accept it when it agrees with the last real
+            // price this symbol's own feed delivered; with no such reference
+            // there is nothing to validate against, so ignore it.
+            const ref = priceSocketService.getLatestPrice(symbolRef.current || '');
+            if (!(ref > 0) || Math.abs(p - ref) / ref > MAX_TICK_DEVIATION) return;
+            const prevT = targetPriceRef.current;
+            if (prevT !== null && Math.abs(p - prevT) / prevT > MAX_TICK_DEVIATION) return;
+            const alreadyInit = prevT !== null;
             const longWait = startTimeRef.current === null && (Date.now() - (symbolRef._resetAt || 0)) > 3000;
             if (alreadyInit || longWait) {
                 targetPriceRef.current = p;
