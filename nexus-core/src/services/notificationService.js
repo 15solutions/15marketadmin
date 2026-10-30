@@ -101,7 +101,7 @@ function getEmailShell(innerHtml) {
             .head { text-align: center; padding-bottom: 30px; }
             /* The logo renders pure white on the dark email background no matter
                which variant ships: crush to black, then invert — alpha survives. */
-            .head img { height: 72px; width: auto; filter: brightness(0) invert(1); }
+            .head img { height: 115px; width: auto; filter: brightness(0) invert(1); }
             .divider { border: none; border-top: 1px solid rgba(255, 255, 255, 0.12); max-width: 540px; }
             .head-divider { margin: 0 auto 34px; }
             .inner { max-width: 540px; margin: 0 auto; }
