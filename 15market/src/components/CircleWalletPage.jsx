@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { Shield, Zap, Send, ArrowDownLeft, ArrowUpRight, Copy, ExternalLink, RefreshCw, X, Check, ArrowLeft, History, Wallet, Globe, Info, ChevronDown, Download, Save, CreditCard, ChevronLeft, ChevronRight, Nfc } from 'lucide-react';
+import { Shield, Zap, Send, ArrowDownLeft, ArrowUpRight, Copy, ExternalLink, RefreshCw, X, Check, ArrowLeft, History, Wallet, Globe, Info, ChevronDown, Download, Save, CreditCard, ChevronLeft, ChevronRight, Nfc, Landmark } from 'lucide-react';
 import { KEEPER_URL_ARC } from '../constants';
 import { SUPPORTED_TOKENS } from '../tokens';
 import QRCode from 'qrcode';
@@ -82,6 +82,7 @@ export function CircleWalletPage({
     switchChainAsync,
     onDeposit,
     onWithdraw,
+    onFiatWithdraw,
     triggerGlobalRefresh
 }) {
     // External-wallet-only rails (CCTP burn & mint funding): the cross-chain
@@ -1875,65 +1876,71 @@ export function CircleWalletPage({
                                         {currentWallet.key === 'main' ? (
                                             <div className="flex flex-col items-center justify-center flex-1 pt-6 pb-16 md:py-10 gap-6 relative z-10 w-full h-full md:min-h-[300px] md:pb-0">
                                                 <div className={`w-20 h-20 md:w-24 md:h-24 rounded-[28px] md:rounded-[36px] flex items-center justify-center ${isLight ? 'bg-black/5' : 'bg-white/5'} border ${isLight ? 'border-black/5' : 'border-white/10'} transition-all hover:scale-105 group`}>
-                                                    <CreditCard size={40} className="text-[#1A6140] opacity-80 group-hover:opacity-100 transition-opacity" strokeWidth={1.5} />
+                                                    <Landmark size={40} className="text-[#1A6140] opacity-80 group-hover:opacity-100 transition-opacity" strokeWidth={1.5} />
                                                 </div>
                                                 <div className="text-center">
                                                     <h3 className={`text-[16px] md:text-xl font-black uppercase tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>
-                                                        Fiat <span className="text-[#1A6140]">Funding</span>
+                                                        Fiat <span className="text-[#1A6140]">Withdrawal</span>
                                                     </h3>
                                                     <p className={`text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] mt-3 ${isLight ? 'text-black/40' : 'text-white/40'}`}>
-                                                        USDC Deposits & Withdrawals via Stripe
+                                                        Bank-transfer payouts — available in your country
                                                     </p>
                                                 </div>
 
-                                                <div className="flex items-center gap-3 md:gap-4 mt-6 w-full max-w-[280px]">
-                                                    <button className="flex-1 py-4 md:py-5 rounded-[20px] bg-[#1A6140] text-white font-black uppercase text-[9px] tracking-[0.2em] shadow-xl shadow-[#1A6140]/20 transition-all opacity-50 cursor-not-allowed">
-                                                        Deposit (Soon)
-                                                    </button>
-                                                    <button className={`flex-1 py-4 md:py-5 rounded-[20px] ${isLight ? 'bg-black text-[#1A6140]' : 'bg-white/5 text-[#1A6140] border border-white/10'} font-black uppercase text-[9px] tracking-[0.2em] transition-all opacity-50 cursor-not-allowed`}>
-                                                        Withdraw (Soon)
-                                                    </button>
-                                                </div>
+                                                <button
+                                                    onClick={() => onFiatWithdraw?.()}
+                                                    className="w-full max-w-[280px] py-4 md:py-5 rounded-[20px] bg-[#1A6140] text-white font-black uppercase text-[9px] tracking-[0.2em] shadow-xl shadow-[#1A6140]/20 hover:brightness-110 active:scale-[0.97] transition-all"
+                                                >
+                                                    Fiat Withdrawal Request
+                                                </button>
                                             </div>
                                         ) : !fundingType ? (
                                             <div className="flex flex-col items-center justify-start md:justify-center flex-1 pt-6 pb-16 md:py-10 gap-4 md:gap-16 relative z-10 w-full h-full md:min-h-[300px] md:pb-0">
-                                                {/* TOP SECTION: Funding Buttons */}
-                                                <div className="flex flex-col items-center gap-6 md:gap-16 w-full -translate-y-[5vh] md:-translate-y-[5vh] mt-2 md:mt-0">
-                                                    <h3 className={`text-[10px] md:text-xs font-black uppercase tracking-[0.3em] ${isLight ? 'text-black/40' : 'text-white/40'} mt-1 md:mt-0`}>Select Funding Type</h3>
+                                                {/* TOP SECTION: Funding Buttons — the rails here
+                                                    (native-token burning + USDC CCTP burn & mint)
+                                                    are external-wallet-only. Auth-created accounts
+                                                    (email/Discord/...) run the embedded rails, so
+                                                    they see NOTHING CCTP-related: the trading wallet
+                                                    is Deposit/Withdraw-only and the funding selector
+                                                    doesn't exist for them. */}
+                                                {isExternalWalletUser && (
+                                                    <div className="flex flex-col items-center gap-6 md:gap-16 w-full -translate-y-[5vh] md:-translate-y-[5vh] mt-2 md:mt-0">
+                                                        <h3 className={`text-[10px] md:text-xs font-black uppercase tracking-[0.3em] ${isLight ? 'text-black/40' : 'text-white/40'} mt-1 md:mt-0`}>Select Funding Type</h3>
 
-                                                    <div className="flex items-center justify-center gap-6 md:gap-16 w-full -mt-3 md:mt-0">
-                                                        <button
-                                                            onClick={() => setFundingType('native')}
-                                                            className="flex flex-col items-center gap-4 md:gap-6 transition-all hover:scale-110 active:scale-95 group"
-                                                        >
-                                                            <Globe size={24} className={`md:!w-8 md:!h-8 transition-all ${isLight ? 'text-black/60' : 'text-white/60'} group-hover:text-[#1A6140]`} strokeWidth={1.5} />
-                                                            <div className="text-center">
-                                                                <p className={`text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all ${isLight ? 'text-black/60 group-hover:text-[#1A6140]' : 'text-white/60 group-hover:text-[#1A6140]'}`}>Native Tokens</p>
-                                                            </div>
-                                                        </button>
-                                                        {/* The USDC rail is CCTP burn & mint — external
-                                                            wallet users only. Auth-created accounts
-                                                            (email/Discord/...) never see it. */}
-                                                        {isExternalWalletUser && (<>
-                                                            {/* Divider Line */}
-                                                            <div className={`w-[2px] h-16 md:h-24 bg-[#1A6140]/40 mx-2 md:mx-12 rounded-full`}></div>
-
+                                                        <div className="flex items-center justify-center gap-6 md:gap-16 w-full -mt-3 md:mt-0">
                                                             <button
-                                                                onClick={() => setFundingType('usdc')}
+                                                                onClick={() => setFundingType('native')}
                                                                 className="flex flex-col items-center gap-4 md:gap-6 transition-all hover:scale-110 active:scale-95 group"
                                                             >
-                                                                <div className="relative flex items-center justify-center">
-                                                                    <img
-                                                                        src="/usdc.png"
-                                                                        alt="USDC Logo"
-                                                                        className={`w-[3.3rem] h-[3.3rem] md:w-[4.95rem] md:h-[4.95rem] object-contain transition-all opacity-70 group-hover:opacity-100 -translate-y-[2vh] ${isLight ? 'brightness-0' : 'brightness-0 invert'} group-hover:[filter:brightness(0)_saturate(100%)_invert(64%)_sepia(26%)_saturate(1028%)_hue-rotate(101deg)_brightness(88%)_contrast(82%)]`}
-                                                                    />
-                                                                    <p className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap ${isLight ? 'text-black/60 group-hover:text-[#1A6140]' : 'text-white/60 group-hover:text-[#1A6140]'}`}>USDC</p>
+                                                                <Globe size={24} className={`md:!w-8 md:!h-8 transition-all ${isLight ? 'text-black/60' : 'text-white/60'} group-hover:text-[#1A6140]`} strokeWidth={1.5} />
+                                                                <div className="text-center">
+                                                                    <p className={`text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all ${isLight ? 'text-black/60 group-hover:text-[#1A6140]' : 'text-white/60 group-hover:text-[#1A6140]'}`}>Native Tokens</p>
                                                                 </div>
                                                             </button>
-                                                        </>)}
+                                                            {/* The USDC rail is CCTP burn & mint — external
+                                                                wallet users only. Auth-created accounts
+                                                                (email/Discord/...) never see it. */}
+                                                            <>
+                                                                {/* Divider Line */}
+                                                                <div className={`w-[2px] h-16 md:h-24 bg-[#1A6140]/40 mx-2 md:mx-12 rounded-full`}></div>
+
+                                                                <button
+                                                                    onClick={() => setFundingType('usdc')}
+                                                                    className="flex flex-col items-center gap-4 md:gap-6 transition-all hover:scale-110 active:scale-95 group"
+                                                                >
+                                                                    <div className="relative flex items-center justify-center">
+                                                                        <img
+                                                                            src="/usdc.png"
+                                                                            alt="USDC Logo"
+                                                                            className={`w-[3.3rem] h-[3.3rem] md:w-[4.95rem] md:h-[4.95rem] object-contain transition-all opacity-70 group-hover:opacity-100 -translate-y-[2vh] ${isLight ? 'brightness-0' : 'brightness-0 invert'} group-hover:[filter:brightness(0)_saturate(100%)_invert(64%)_sepia(26%)_saturate(1028%)_hue-rotate(101deg)_brightness(88%)_contrast(82%)]`}
+                                                                        />
+                                                                        <p className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap ${isLight ? 'text-black/60 group-hover:text-[#1A6140]' : 'text-white/60 group-hover:text-[#1A6140]'}`}>USDC</p>
+                                                                    </div>
+                                                                </button>
+                                                            </>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )}
 
                                                 {/* BOTTOM SECTION: Logos and Powered By */}
                                                 <div className={`fixed md:relative bottom-0 left-0 w-full flex flex-col items-center gap-1 md:gap-8 mt-auto md:mt-0 pt-0 pb-0 z-50 md:z-auto safe-bottom pointer-events-none md:pointer-events-auto -translate-y-[3vh] md:translate-y-0`}>

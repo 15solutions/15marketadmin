@@ -399,6 +399,140 @@ app.post('/admin/users/suspend', requirePerm('users.manage'), async (req, res) =
 });
 
 /**
+ * FIAT — request-driven bank payouts. The user picks a funding account
+ * (trading or main), enters their country (Nigeria → bank transfer; every
+ * other country is coming soon), the bank + account details and the amount.
+ * Confirming debits the trading ledger immediately (main-account requests
+ * are held on the ledger until the decision), indexes the request with an
+ * event timeline, and pushes it to the admin console over the socket.
+ * Approve / deny emails the user automatically.
+ */
+const fiat = require('./fiat');
+
+// Mirror of fundingService.creditTradingWallet for debits: session cache
+// first (live display), then the persisted profile balance (source of truth).
+function debitTradingWallet(addr, amount) {
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) return { ok: false, error: 'Invalid amount' };
+    const profile = profiles.get(addr);
+    const current = parseFloat(profile?.balance || 0);
+    if (current < amt) return { ok: false, error: `Insufficient trading balance — ${current.toFixed(2)} USDC available` };
+    const newBalance = Number((current - amt).toFixed(4));
+    profiles.upsert(addr, { balance: newBalance });
+    const session = cache.sessions.get(addr);
+    if (session) session.balance = newBalance;
+    return { ok: true, newBalance };
+}
+
+// Trading-ledger re-credit used when a fiat request is denied.
+function creditTradingLedger(addr, amount) {
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) return;
+    const current = parseFloat(profiles.get(addr)?.balance || 0);
+    const newBalance = Number((current + amt).toFixed(4));
+    profiles.upsert(addr, { balance: newBalance });
+    const session = cache.sessions.get(addr);
+    if (session) session.balance = newBalance;
+}
+
+// Country methods: what rails exist for a given country (typed anywhere —
+// Nigeria unlocks bank transfer, everything else is coming soon for now).
+app.get('/fiat/methods', (req, res) => {
+    res.json(fiat.methodsFor(req.query.country));
+});
+
+app.get('/fiat/withdrawals/:address', (req, res) => {
+    res.json({ withdrawals: fiat.listFor(req.params.address) });
+});
+
+app.post('/fiat/withdraw/:address', (req, res) => {
+    const addr = String(req.params.address || '').toLowerCase();
+    if (!/^0x[a-f0-9]{40}$/.test(addr)) return res.status(400).json({ error: 'Valid account address required' });
+    const source = String(req.body?.source || '').toLowerCase();
+    const amount = Number(req.body?.amount);
+
+    // Debits happen at confirm time: trading is a hard ledger debit, a
+    // main-account request is recorded as a hold (the on-chain main wallet
+    // cannot be locked server-side) and released on denial.
+    let debit = null;
+    if (source === 'trading') {
+        debit = debitTradingWallet(addr, amount);
+        if (!debit.ok) return res.status(400).json({ error: debit.error });
+    }
+
+    const out = fiat.createRequest({
+        address: addr,
+        source,
+        amount,
+        country: req.body?.country,
+        bankName: req.body?.bankName,
+        accountName: req.body?.accountName,
+        accountNumber: req.body?.accountNumber,
+        note: debit && debit.ok ? `Trading ledger debited — balance now ${debit.newBalance} USDC` : 'Main account hold — released on denial'
+    });
+    if (!out.ok) {
+        // Nothing else was touched — but a hard debit above must roll back.
+        if (debit && debit.ok) creditTradingLedger(addr, amount);
+        return res.status(out.status || 400).json({ error: out.error });
+    }
+
+    const ip = clientIP(req);
+    siem.addEvent({
+        type: 'FIAT_REQUESTED',
+        severity: 'info',
+        message: `Fiat withdrawal ${out.request.id} — ${out.request.amount} USDC from ${source} wallet to ${out.request.bankName} ••${out.request.accountNumber.slice(-4)}`,
+        ip,
+        meta: { request: out.request.id, address: addr, source, amount: out.request.amount, bank: out.request.bankName }
+    });
+    io.emit('fiat_withdrawal_new', { id: out.request.id, address: addr });
+    io.to(addr).emit('fiat_withdrawal_update', { id: out.request.id, status: 'pending' });
+    notificationService.notifyUser(addr, 'Fiat Withdrawal Request Submitted',
+        `Your request to withdraw ${out.request.amount} USDC (local fiat payout) from your ${source} wallet has been submitted. The team will review it shortly.`,
+        'info').catch(() => {});
+    res.json({ ok: true, request: out.request });
+});
+
+app.get('/admin/fiat', requirePerm('users.manage'), async (req, res) => {
+    try {
+        await profiles.initSupabase();
+        res.json({ requests: fiat.listAll() });
+    } catch (e) {
+        res.json({ requests: fiat.listAll() });
+    }
+});
+
+app.post('/admin/fiat/:id/decide', requirePerm('users.manage'), async (req, res) => {
+    const id = String(req.params.id || '');
+    const action = String(req.body?.action || '');
+    const by = req.admin?.email || 'admin';
+    const out = fiat.decide(id, action, { by, detail: { note: String(req.body?.note || '').slice(0, 200) } });
+    if (!out.ok) return res.status(out.status || 400).json({ error: out.error });
+
+    const rec = out.request;
+    siem.addEvent({
+        type: action === 'approve' ? 'FIAT_APPROVED' : 'FIAT_DENIED',
+        severity: action === 'approve' ? 'info' : 'medium',
+        message: `Fiat withdrawal ${rec.id} ${rec.status} by ${by} — ${rec.amount} USDC to ${rec.bankName} ••${rec.accountNumber.slice(-4)}`,
+        ip: 'admin',
+        meta: { request: rec.id, address: rec.address, amount: rec.amount }
+    });
+    if (action === 'approve') {
+        notificationService.notifyUser(rec.address, 'Fiat Withdrawal Request Approved',
+            `Good news — your fiat withdrawal request of ${rec.amount} USDC from your ${rec.source} wallet has been approved. The local fiat payout is on its way to your ${rec.bankName} account (${rec.accountNumber.slice(-4)}) and will reflect shortly.`,
+            'success', true).catch(() => {});
+    } else {
+        // A denied request releases the hold: trading debits refund to the
+        // trading ledger; main-account holds simply expire.
+        if (rec.source === 'trading') creditTradingLedger(rec.address, rec.amount);
+        notificationService.notifyUser(rec.address, 'Fiat Withdrawal Request Denied',
+            `Your fiat withdrawal request of ${rec.amount} USDC from your ${rec.source} wallet was denied by an administrator. ${rec.source === 'trading' ? 'The funds have been returned to your trading wallet.' : 'No funds were held from your main wallet.'} Contact support if you believe this is a mistake.`,
+            'error', true).catch(() => {});
+    }
+    io.emit('fiat_withdrawal_update', { id: rec.id, status: rec.status, address: rec.address });
+    res.json({ ok: true, request: rec });
+});
+
+/**
  * MAIL — the email console. Every automated email the platform sends is
  * mirrored to the outbox (notificationService.recordOutbox); admins can read
  * it and compose new mail, which carries the identical plain-design header

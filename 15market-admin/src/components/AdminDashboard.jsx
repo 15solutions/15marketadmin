@@ -47,7 +47,8 @@ import {
     Undo2,
     CalendarClock,
     UserCog,
-    Send
+    Send,
+    Copy
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
@@ -65,6 +66,7 @@ const NAV = [
     { key: 'overview', label: 'Overview', hint: 'Metrics · Trade index', icon: LayoutDashboard },
     { key: 'analytics', label: 'Analytics', hint: 'Globe · Reach · Users', icon: Globe },
     { key: 'users', label: 'Users', hint: 'Directory · Access control', icon: UserCog },
+    { key: 'fiat', label: 'Fiat Withdrawals', hint: 'Bank payout · Requests', icon: Landmark },
     { key: 'mail', label: 'Mail', hint: 'Outbox · Compose', icon: Mail },
     { key: 'referrals', label: 'Referral Program', hint: 'Participants · Earnings · Requests', icon: Users },
     { key: 'broadcast', label: 'Broadcast', hint: 'Live banner · Alerts', icon: Radio },
@@ -1107,6 +1109,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const canRequests = hasPerm('ref.withdrawals');
     const canReferral = hasPerm('ref.manage');
     const canUsers = hasPerm('users.manage');
+    const canFiat = hasPerm('users.manage');
     const canMail = hasPerm('emails.send');
     const canSettings = hasPerm('platform.settings');
     const canBroadcast = hasPerm('broadcast.send');
@@ -1120,6 +1123,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         t.key === 'overview' ? hasPerm('dashboard.overview')
             : t.key === 'analytics' ? hasPerm('dashboard.analytics')
             : t.key === 'users' ? canUsers
+            : t.key === 'fiat' ? canFiat
             : t.key === 'mail' ? canMail
             : t.key === 'referrals' ? canReferrals
             : t.key === 'broadcast' ? canBroadcast
@@ -1351,6 +1355,66 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         } finally { setMailSendBusy(false); }
     };
 
+    // Fiat formatting + expandable row detail — local to the fiat panel.
+    const fmtUsdAdmin = (n) => `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    const Detail = ({ label, value, mono }) => (
+        <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-[7px] font-black uppercase tracking-widest opacity-40">{label}</span>
+            <span className={`text-[9px] font-bold truncate ${isLight ? 'text-black' : 'text-white'} ${mono ? 'font-mono' : ''}`}>{value ? value : '—'}</span>
+        </div>
+    );
+
+    // ── Fiat — bank-payout withdrawal requests (event-driven ledger) ─────
+    const [fiatList, setFiatList] = useState([]);
+    const [fiatBusy, setFiatBusy] = useState(false);
+    const [fiatFilter, setFiatFilter] = useState('pending'); // pending | all | approved | denied
+    const [fiatRead, setFiatRead] = useState(null);          // expanded request id
+    const [fiatDeciding, setFiatDeciding] = useState(null);  // id while an approve/deny POST is in flight
+
+    const fetchFiat = async () => {
+        setFiatBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/fiat`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) setFiatList(Array.isArray(data.requests) ? data.requests : []);
+            else throw new Error(data.error || 'Could not load fiat requests');
+        } catch (e) {
+            notify('Fiat load failed: ' + e.message, 'error');
+        } finally { setFiatBusy(false); }
+    };
+
+    useEffect(() => {
+        if (adminTab === 'fiat' && canFiat) fetchFiat();
+    }, [adminTab, canFiat, dataEpoch]);
+
+    // Event-driven: a new request anywhere or a decision anywhere refreshes live.
+    useEffect(() => {
+        const unbindNew = socketService.on('fiat_withdrawal_new', () => { if (adminTab === 'fiat') fetchFiat(); });
+        const unbindUpd = socketService.on('fiat_withdrawal_update', () => { if (adminTab === 'fiat') fetchFiat(); });
+        return () => { unbindNew(); unbindUpd(); };
+    }, [adminTab]);
+
+    const decideFiat = async (id, action) => {
+        setFiatDeciding(id + ':' + action);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/fiat/${encodeURIComponent(id)}/decide`, {
+                method: 'POST',
+                body: JSON.stringify({ action })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Decision failed');
+            notify(action === 'approve'
+                ? 'Request approved — the user has been notified by email'
+                : 'Request denied — funds released back and the user has been notified by email',
+                action === 'approve' ? 'success' : 'info');
+            fetchFiat();
+        } catch (e) {
+            notify(e.message, 'error');
+        } finally {
+            setFiatDeciding(null);
+        }
+    };
+
     // ── Admins & Moderators (root-only, migration 011) ───────────────────
     const [adminRoster, setAdminRoster] = useState([]);
     const [rosterBusy, setRosterBusy] = useState(false);
@@ -1447,8 +1511,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
     // Permission presets for the (re)assign UI. Mirrors the backend defaults;
     // 'admins.manage' is never grantable — it is the root's birthright.
-    const ROLE_PRESETS = {
-        admin: ['ref.withdrawals', 'ref.manage', 'users.manage', 'emails.send', 'platform.settings', 'broadcast.send', 'trades.maintenance',
+    const ROLE_PRESETS = {        admin: ['ref.withdrawals', 'ref.manage', 'users.manage', 'emails.send', 'platform.settings', 'broadcast.send', 'trades.maintenance',
                 'dashboard.overview', 'dashboard.analytics', 'dashboard.siem', 'dashboard.security'],
         moderator: ['ref.withdrawals']
     };
@@ -2206,6 +2269,129 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     </div>
                                 );
                             })}
+                        </div>
+                    </div>
+                )}
+
+                {/* FIAT — bank-payout withdrawal requests. Event-driven ledger:
+                    every request arrives live over the socket with its own
+                    timeline (requested → approved/denied) fully indexed;
+                    approve or deny right from the row — each decision sends
+                    the automated email automatically. */}
+                {activeNav === 'fiat' && canFiat && (
+                    <div className="w-full flex flex-col gap-4 min-w-0">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-[#1A6140]/10 text-[#1A6140] flex items-center justify-center">
+                                    <Landmark size={15} />
+                                </div>
+                                <div>
+                                    <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Fiat Withdrawals</div>
+                                    <div className="text-[8px] font-black uppercase tracking-widest opacity-40">
+                                        {fiatList.length} indexed · {fiatList.filter(r => r.status === 'pending').length} pending review
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setFiatFilter(prev => prev === 'pending' ? 'all' : prev === 'all' ? 'approved' : prev === 'approved' ? 'denied' : 'pending')}
+                                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                >
+                                    Filter: {fiatFilter}
+                                </button>
+                                <button
+                                    onClick={fetchFiat}
+                                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                >
+                                    <span className="inline-flex items-center gap-2"><RefreshCw size={11} className={fiatBusy ? 'animate-spin' : ''} /> Refresh</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col min-w-0">
+                            {fiatList.filter(r => fiatFilter === 'all' || r.status === fiatFilter).length === 0 && (
+                                <div className="py-6 text-center text-[9px] font-medium opacity-40">
+                                    {fiatBusy ? 'Loading requests…' : 'No withdrawal requests yet'}
+                                </div>
+                            )}
+                            {fiatList.filter(r => fiatFilter === 'all' || r.status === fiatFilter).map((r, i) => (
+                                <div key={r.id} className={`border-b px-2 py-2.5 flex flex-col gap-2 ${isLight ? 'border-black/5' : 'border-white/5'}`}>
+                                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => setFiatRead(prev => prev === r.id ? null : r.id)}>
+                                        <span className="flex-none text-[9px] font-black opacity-30 w-6">{String(i + 1).padStart(2, '0')}</span>
+                                        <span className={`flex-none w-28 md:w-32 text-[9px] font-black uppercase tracking-widest truncate ${isLight ? 'text-black/70' : 'text-white/70'}`}>
+                                            {r.address?.slice(0, 5)}…{r.address?.slice(-4)}
+                                        </span>
+                                        <span className={`flex-none text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${r.source === 'trading' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-sky-500/10 text-sky-500'}`}>
+                                            {r.source}
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <span className={`text-[10px] font-black ${isLight ? 'text-black' : 'text-white'}`}>{fmtUsdAdmin(r.amount)}</span>
+                                            <span className="text-[8px] opacity-40 ml-2">{r.bankName} · {r.country}</span>
+                                        </div>
+                                        {/* Account number + per-row copy icon */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(r.accountNumber || ''); notify?.('Account number copied', 'success'); }}
+                                            title={`Copy account number ${r.accountNumber}`}
+                                            className={`flex-none p-2 rounded-lg border transition-colors ${isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/10 hover:bg-white/5'}`}
+                                        >
+                                            <Copy size={11} />
+                                        </button>
+                                        <span className={`flex-none text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded border ${r.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : r.status === 'approved' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                                            {r.status}
+                                        </span>
+                                        {/* Approve / Deny icons — per row, live decisions.
+                                            Denied requests automatically refund the debit and
+                                            both decisions email the user. */}
+                                        {r.status === 'pending' && (
+                                            <div className="flex-none flex items-center gap-1.5">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); decideFiat(r.id, 'approve'); }}
+                                                    disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
+                                                    title="Approve — pays out, emails the user"
+                                                    className="p-2 rounded-lg bg-[#1A6140] text-white hover:brightness-110 transition-all disabled:opacity-40"
+                                                >
+                                                    <Check size={12} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); decideFiat(r.id, 'deny'); }}
+                                                    disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
+                                                    title="Deny — releases the funds back, emails the user"
+                                                    className="p-2 rounded-lg bg-red-500/90 text-white hover:brightness-110 transition-all disabled:opacity-40"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Expanded audit trail — the full event index */}
+                                    {fiatRead === r.id && (
+                                        <div className={`ml-8 p-3 rounded-2xl border ${isLight ? 'border-black/5 bg-black/[0.02]' : 'border-white/5 bg-white/[0.02]'} grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5`}>
+                                            <Detail label="Request ID" value={r.id} />
+                                            <Detail label="Amount" value={fmtUsdAdmin(r.amount)} />
+                                            <Detail label="Source account" value={r.source} />
+                                            <Detail label="Country / method" value={`${r.country} · ${r.method || 'Bank Transfer'}`} />
+                                            <Detail label="Bank" value={r.bankName} />
+                                            <Detail label="Account name" value={r.accountName} />
+                                            <Detail label="Account number" value={r.accountNumber} mono />
+                                            <Detail label="Submitted" value={new Date(r.createdAt).toLocaleString()} />
+                                            {r.note && <Detail label="Ledger note" value={r.note} />}
+                                            <div className="md:col-span-2 mt-1">
+                                                <p className="text-[7px] font-black uppercase tracking-widest opacity-40 mb-1.5">Event trail</p>
+                                                <div className="flex flex-col gap-1">
+                                                    {(r.timeline || []).map((ev, j) => (
+                                                        <div key={j} className="flex items-center gap-2 text-[8px] font-bold">
+                                                            <span className="text-[#1A6140]">{(ev.event || '').toUpperCase()}</span>
+                                                            <span className="opacity-40">{new Date(ev.at).toLocaleString()}</span>
+                                                            <span className="opacity-30">{ev.by}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}

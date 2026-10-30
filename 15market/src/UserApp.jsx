@@ -25,6 +25,7 @@ import { DashboardPage } from "./components/DashboardPage";
 import ComingSoonPage from "./components/ComingSoonPage";
 import { CircleWalletPage } from "./components/CircleWalletPage";
 import { ReferralHub } from "./components/ReferralHub";
+import { FiatWithdrawPage } from "./components/FiatWithdrawPage";
 
 import HelpPage from "./components/HelpPage";
 
@@ -3415,7 +3416,20 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               smartWalletAddress={smartWalletAddress}
               onDeposit={handleDeposit}
               onWithdraw={handleWithdraw}
+              onFiatWithdraw={() => setView("fiat_withdraw")}
               triggerGlobalRefresh={triggerGlobalRefresh}
+            />
+          ) : view === "fiat_withdraw" ? (
+            <FiatWithdrawPage
+              address={address}
+              isLight={theme === 'light'}
+              notify={notify}
+              sessionBalance={sessionBalance}
+              evmBalance={evmBalance}
+              onBack={() => {
+                setView("circle_wallet");
+                setCircleWalletMode(null);
+              }}
             />
           ) : view === "referral" ? (
             <ReferralHub
