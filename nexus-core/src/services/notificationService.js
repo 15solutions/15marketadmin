@@ -38,7 +38,7 @@ let notificationStats = { sent: 0, failed: 0, emailsSent: 0, emailsFailed: 0, pu
 // One plain design for EVERY email the platform sends: the 15market logo
 // sits directly on the plain white background, content below, and a shared
 // footer carrying the company line + the no-reply warning.
-const EMAIL_LOGO_URL = process.env.EMAIL_LOGO_URL || 'https://15market.online/goblogo.png';
+const EMAIL_LOGO_URL = process.env.EMAIL_LOGO_URL || 'https://15market.online/gowlogo.png';
 const EMAIL_OUTBOX_PATH = path.join(__dirname, '..', '..', 'data', 'email-outbox.json');
 
 // Trade outcomes and copy-trading events carry NO email — they already fire
@@ -96,29 +96,37 @@ function getEmailShell(innerHtml) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700;900&family=Inter:wght@400;600;700&display=swap');
-            body { margin: 0; padding: 0; background-color: #ffffff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0a261a; -webkit-font-smoothing: antialiased; }
-            .plain { width: 100%; background-color: #ffffff; padding: 48px 24px 40px; }
-            .head { text-align: center; padding-bottom: 28px; }
-            .head img { height: 44px; width: auto; }
+            body { margin: 0; padding: 0; background-color: #070a09; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e2ece5; -webkit-font-smoothing: antialiased; }
+            .wrap { width: 100%; background-color: #070a09; padding: 52px 24px 44px; }
+            .head { text-align: center; padding-bottom: 30px; }
+            /* The logo renders pure white on the dark email background no matter
+               which variant ships: crush to black, then invert — alpha survives. */
+            .head img { height: 72px; width: auto; filter: brightness(0) invert(1); }
+            .divider { border: none; border-top: 1px solid rgba(255, 255, 255, 0.12); max-width: 540px; }
+            .head-divider { margin: 0 auto 34px; }
             .inner { max-width: 540px; margin: 0 auto; }
-            .badge { display: inline-block; padding: 6px 14px; border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
-            .title { font-family: 'Comfortaa', cursive; font-weight: 900; font-size: 21px; color: #0a261a; margin: 14px 0 16px; line-height: 1.3; }
-            .msg { background-color: #f4f6f5; border: 1px solid #e7ece9; border-radius: 16px; padding: 24px; font-size: 15px; line-height: 1.65; color: #35443c; margin: 0 0 4px; }
-            .action { display: block; width: 200px; margin: 28px auto 0; padding: 14px 0; background-color: #1A6140; color: #ffffff !important; text-decoration: none; font-weight: 700; font-size: 12px; text-align: center; border-radius: 28px; text-transform: uppercase; letter-spacing: 1px; }
-            .footer { max-width: 540px; margin: 44px auto 0; border-top: 1px solid #e7ece9; padding-top: 18px; text-align: center; font-size: 11px; color: #7b8a82; }
+            .title { font-family: 'Comfortaa', cursive; font-weight: 900; font-size: 24px; color: #ffffff; margin: 0 0 18px; line-height: 1.3; }
+            .msg { font-size: 15px; line-height: 1.7; color: #b9c9c0; margin: 0; }
+            .msg p { margin: 0 0 12px 0; }
+            .msg p:last-child { margin-bottom: 0; }
+            .footer { max-width: 540px; margin: 0 auto; text-align: center; font-size: 11px; color: #6f7f77; }
+            .footer-divider { margin: 40px auto 26px; }
             .footer p { margin: 0 0 6px 0; }
-            .footer .company { font-family: 'Comfortaa', cursive; font-weight: 700; color: #0a261a; }
-            .footer .noreply { color: #a3552e; font-weight: 600; }
-            .code-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #7b8a82; margin-bottom: 14px; }
-            .code { font-family: 'Inter', monospace; font-weight: 900; font-size: 40px; letter-spacing: 12px; color: #1A6140; line-height: 1.2; }
+            .footer .company { font-family: 'Comfortaa', cursive; font-weight: 700; color: #ffffff; }
+            .footer .noreply { color: #e0a166; font-weight: 600; }
+            .code-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #6f7f77; margin-bottom: 16px; }
+            .code { font-family: 'Inter', monospace; font-weight: 900; font-size: 44px; letter-spacing: 14px; color: #2ecc8f; line-height: 1.2; }
+            .fineprint { font-size: 13px; line-height: 1.7; color: #8fa097; }
         </style>
     </head>
     <body>
-        <div class="plain">
+        <div class="wrap">
             <div class="head">
                 <img src="${EMAIL_LOGO_URL}" alt="15market" />
             </div>
+            <hr class="divider head-divider" />
             <div class="inner">${innerHtml}</div>
+            <hr class="divider footer-divider" />
             <div class="footer">
                 <p><span class="company">15market</span> (c) 2026 · All rights reserved</p>
                 <p class="noreply">Warning: this is a no-reply email address. Replies to this email will not be read or processed.</p>
@@ -135,22 +143,13 @@ function init(io) {
 }
 
 function getEmailTemplate(title, message, type) {
-    const typeColors = {
-        success: '#249C6C',
-        warning: '#FF8C00',
-        info: '#3182CE',
-        error: '#FF6B6B'
-    };
-    const color = typeColors[type] || '#249C6C';
+    // Body-only layout: title + message directly under the header divider.
+    // No type badge, no buttons — the email IS the message.
     return getEmailShell(`
-        <div style="text-align: center; margin-bottom: 20px;">
-            <span class="badge" style="color: ${color}; background-color: ${color}1a;">${type}</span>
-        </div>
         <h2 class="title">${title}</h2>
         <div class="msg">
-            <p class="message-text">${message}</p>
+            <p>${message}</p>
         </div>
-        <a href="https://15market.online" class="action">Launch Dashboard</a>
     `);
 }
 
@@ -304,14 +303,12 @@ async function sendNotificationEmail(addr, title, message, type, notification) {
 function getOtpEmailTemplate(code) {
     return getEmailShell(`
         <h2 class="title">Verify Your Email</h2>
-        <p style="font-size: 13px; color: #7b8a82; text-align: center; margin: 0 0 28px 0;">Use the code below to complete your verification.</p>
-        <div class="msg" style="text-align: center;">
+        <p class="msg" style="margin-bottom: 30px;">Use the code below to complete your verification.</p>
+        <div style="text-align: center;">
             <div class="code-label">Verification Code</div>
             <div class="code">${code}</div>
         </div>
-        <div class="msg" style="margin-top: 20px;">
-            <p style="font-size: 14px; line-height: 1.7; margin: 0;">Enter this <strong style="color:#0a261a;">one-time code</strong> on the application page. It expires in <strong style="color:#0a261a;">10 minutes</strong>. If you did not request this code, ignore this email.</p>
-        </div>
+        <p class="fineprint" style="margin: 30px 0 0;">Enter this <strong style="color:#e2ece5;">one-time code</strong> on the application page. It expires in <strong style="color:#e2ece5;">10 minutes</strong>. If you did not request this code, ignore this email.</p>
     `);
 }
 
