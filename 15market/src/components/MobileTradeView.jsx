@@ -1662,14 +1662,9 @@ export default function MobileTradeView({
                 {isExecuting ? (
                   <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 ) : (
-                  <>
-                    <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
-                      YES <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={yesCents} />¢</span>
-                    </span>
-                    <span className="text-[9px] font-bold tabular-nums opacity-80 tracking-wide">
-                      ≈ {currentStake > 0 ? (currentStake / Math.max(0.01, yesShare)).toFixed(2) : '0.00'} shares
-                    </span>
-                  </>
+                  <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
+                    YES <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={yesCents} />¢</span>
+                  </span>
                 )}
               </button>
 
@@ -1683,14 +1678,9 @@ export default function MobileTradeView({
                 {isExecuting ? (
                   <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 ) : (
-                  <>
-                    <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
-                      NO <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={noCents} />¢</span>
-                    </span>
-                    <span className="text-[9px] font-bold tabular-nums opacity-80 tracking-wide">
-                      ≈ {currentStake > 0 ? (currentStake / Math.max(0.01, noShare)).toFixed(2) : '0.00'} shares
-                    </span>
-                  </>
+                  <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
+                    NO <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={noCents} />¢</span>
+                  </span>
                 )}
               </button>
             </div>
