@@ -57,6 +57,7 @@ import { socketService } from "../utils/socket";
 import { COUNTRY_CENTER } from "./ui/places";
 import { RouteGlobe } from "./ui/route-globe";
 import { ThemeToggle } from "./ui/ThemeToggle";
+import { DailyChange } from "./DailyChange";
 
 // Sidebar navigation: collapsible icon rail ↔ full menu. "Referral Program"
 // hosts the participants list (with earnings), the withdrawal request queue
@@ -187,17 +188,17 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
     // THE metric rows, shared by the desktop side panels and the mobile strip.
     const platformStats = useMemo(() => ([
-        { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7' },
-        { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6' },
-        { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' },
-        { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true }
-    ]), [stats.totalWallets, stats.totalTrades, stats.activeStakesTotal, stats.treasuryBalance]);
+        { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7', daily: stats.daily?.totalWallets },
+        { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6', daily: stats.daily?.totalTrades },
+        { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b', daily: stats.daily?.activeStakesTotal },
+        { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true, daily: stats.daily?.treasuryBalance }
+    ]), [stats.totalWallets, stats.totalTrades, stats.activeStakesTotal, stats.treasuryBalance, stats.daily]);
     const pulseStats = useMemo(() => ([
-        { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
-        { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371' },
-        { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), color: '#ef4444' },
-        { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, color: '#3CB371' }
-    ]), [stats.activeCount, stats.totalVolume, stats.pendingDisputes, stats.bullBearRatio]);
+        { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e', daily: stats.daily?.activeCount },
+        { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371', daily: stats.daily?.totalVolume },
+        { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), color: '#ef4444', daily: stats.daily?.pendingDisputes, invert: true },
+        { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, color: '#3CB371', daily: stats.daily?.bullBearRatio }
+    ]), [stats.activeCount, stats.totalVolume, stats.pendingDisputes, stats.bullBearRatio, stats.daily]);
 
     const [recentActivity, setRecentActivity] = useState([]);
     // Payout-retry in-flight set: warms the spinning icon on a PAY FAIL pill
@@ -1712,12 +1713,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         platform health reads at a glance. */}
                     <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory gap-4 md:grid md:grid-cols-3 lg:grid-cols-6 md:gap-6 md:overflow-visible">
                         {[
-                            { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371' },
-                            { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, color: '#3b82f6' },
-                            { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e' },
-                            { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b' },
-                            { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true },
-                            { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#a78bfa' }
+                            { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371', daily: stats.daily?.totalVolume },
+                            { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, color: '#3b82f6', daily: stats.daily?.platformRevenue },
+                            { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e', daily: stats.daily?.activeCount },
+                            { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b', daily: stats.daily?.activeStakesTotal },
+                            { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true, daily: stats.daily?.treasuryBalance },
+                            { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#a78bfa', daily: stats.daily?.totalTrades }
                         ].map((stat, i) => (
                             <div key={i} className="border-l-2 pl-3 min-w-0 flex-none w-[128px] snap-start md:w-auto md:flex-1" style={{ borderColor: `${stat.color}55` }}>
                                 <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
@@ -1725,6 +1726,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     {stat.value}
                                     {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-[21px] h-[21px] flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
                                 </div>
+                                <div className="mt-1"><DailyChange pct={stat.daily?.pct} invert={stat.invert} /></div>
                             </div>
                         ))}
                     </div>
@@ -1841,6 +1843,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         {stat.value}
                                         {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-[21px] h-[21px] flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
                                     </div>
+                                    <div className="mt-1"><DailyChange pct={stat.daily?.pct} invert={stat.invert} /></div>
                                 </div>
                             ))}
                         </div>
@@ -1860,6 +1863,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             {stat.value}
                                             {stat.usdc && <img src="/usdc.png" alt="USDC" className="w-[15px] h-[15px] flex-none" style={{ filter: isLight ? 'brightness(0) invert(0.55)' : 'brightness(0) invert(1)' }} />}
                                         </div>
+                                        <div className="mt-0.5"><DailyChange pct={stat.daily?.pct} invert={stat.invert} size="sm" /></div>
                                     </div>
                                 ))}
                             </div>
@@ -1871,6 +1875,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div key={i} className="border-l-2 pl-3 min-w-0" style={{ borderColor: `${stat.color}55` }}>
                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
                                     <div className={`text-lg xl:text-2xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                    <div className="mt-1"><DailyChange pct={stat.daily?.pct} invert={stat.invert} /></div>
                                 </div>
                             ))}
                         </div>

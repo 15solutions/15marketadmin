@@ -87,6 +87,7 @@ const corsOptions = { origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
 const io = new Server(server, { cors: corsOptions });
 notificationService.init(io);
 const siem = require('./siem');
+const dailyChange = require('./dailyChange');
 // Every HIGH/CRITICAL SIEM alert reaches open admin dashboards live.
 siem.setBroadcaster((event) => io.emit('siem_alert', event));
 
@@ -599,6 +600,19 @@ async function emitAdminStats() {
       timestamp: Date.now()
     };
 
+    // Daily change: every KPI vs its own value at the start of today (UTC).
+    payload.daily = dailyChange.update({
+      totalWallets: payload.totalWallets,
+      totalTrades: payload.totalTrades,
+      totalVolume: payload.totalVolume,
+      platformRevenue: payload.platformRevenue,
+      activeCount: payload.activeCount,
+      activeStakesTotal: payload.activeStakesTotal,
+      treasuryBalance: payload.treasuryBalance,
+      pendingDisputes: payload.pendingDisputes,
+      bullBearRatio: payload.bullBearRatio
+    });
+
     io.emit('admin_stats_update', payload);
     // Also emit as 'dashboard_stats' for backward compatibility with existing frontend
     io.emit('dashboard_stats', payload);
@@ -765,7 +779,8 @@ io.on('connection', (socket) => {
         .filter(t => t.status === 'PENDING')
         .reduce((sum, t) => sum + t.amount, 0).toFixed(2),
       treasuryBalance,
-      totalWallets: Object.keys(profiles.profiles).length
+      totalWallets: Object.keys(profiles.profiles).length,
+      daily: dailyChange.latest()
     });
   })();
 
