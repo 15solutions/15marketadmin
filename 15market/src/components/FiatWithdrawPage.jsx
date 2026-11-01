@@ -105,6 +105,7 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
     const [accountNumber, setAccountNumber] = useState('');
     const [amount, setAmount] = useState('');
     const [submitBusy, setSubmitBusy] = useState(false);
+    const [busyLabel, setBusyLabel] = useState('');
     const [past, setPast] = useState([]);
     const [refreshTick, setRefreshTick] = useState(0);
 
@@ -160,13 +161,16 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
             // to the fiat vault on-chain while this request runs.
             // main → the user's own wallet signs the vault transfer here,
             // then the request files with the receipt attached.
+            // In-progress feedback lives IN THIS BUTTON (state label), never
+            // on the page — only the finished verdict takes the screen.
             let escrowTx = null;
             if (source === 'main') {
-                notify('Confirm the vault transfer in your wallet…', 'pending');
+                setBusyLabel('Confirm the vault transfer in your wallet…');
                 escrowTx = await sendToEscrow(methods.escrow, amt);
             } else {
-                notify('Moving funds to the fiat vault…', 'pending');
+                setBusyLabel('Moving funds to the fiat vault…');
             }
+            setBusyLabel('Filing the request…');
             const res = await fetch(`${KEEPER_URL_ARC}/fiat/withdraw/${address.toLowerCase()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -186,6 +190,7 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
             notify(msg, 'error');
         } finally {
             setSubmitBusy(false);
+            setBusyLabel('');
         }
     };
 
@@ -317,7 +322,7 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                             </div>
                             <button onClick={submit} disabled={!canSubmit || submitBusy}
                                 className="w-full mt-4 py-4 bg-[#1A6140] text-white rounded-[20px] font-black uppercase tracking-[0.2em] text-[9px] shadow-xl shadow-[#1A6140]/25 hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-40">
-                                {submitBusy ? 'Submitting…' : 'Confirm & send request'}
+                                {submitBusy ? (busyLabel || 'Processing…') : 'Confirm & send request'}
                             </button>
                         </motion.div>
                     )}

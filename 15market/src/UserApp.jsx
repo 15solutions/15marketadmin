@@ -25,8 +25,6 @@ import { DashboardPage } from "./components/DashboardPage";
 import ComingSoonPage from "./components/ComingSoonPage";
 import { CircleWalletPage } from "./components/CircleWalletPage";
 import { ReferralHub } from "./components/ReferralHub";
-import { FiatWithdrawPage } from "./components/FiatWithdrawPage";
-
 import HelpPage from "./components/HelpPage";
 
 // Lazy load conditionally rendered components
@@ -50,7 +48,6 @@ import { MascotLoader } from "./components/MascotLoader";
 import CustomChart from './components/CustomChart';
 import MobileTradeView from './components/MobileTradeView';
 import NotifyFlash from "./components/NotifyFlash";
-import SuccessOverlay from "./components/SuccessOverlay";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ModeSwitch } from "./components/ModeSwitch";
 import SideHistoryPane from "./components/SideHistoryPane";
@@ -772,7 +769,6 @@ const performStealthChecks = useCallback(async (addr) => {
 
   const [treasuryBalance, setTreasuryBalance] = useState(0);
   const [toast, setToast] = useState(null); // { message, type, onClick }
-  const [successOverlay, setSuccessOverlay] = useState(null); // { title }
 
   const notify = useCallback((message, type = 'success', onClick = null) => {
     setToast({ id: Date.now() + Math.random(), message, type, onClick });
@@ -3047,7 +3043,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
         }, 2500);
 
         // STEP 6: Show success immediately — socket balance_update handles real balance
-        setSuccessOverlay({ title: 'DEPOSIT SUCCESSFUL' });
+        notify('Deposit successful', 'success');
 
         const newTx = {
           id: `dep_${Date.now()}`,
@@ -3232,9 +3228,8 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       const data = await res.json();
       const withdrawalHash = data.txHash;
 
-      setSuccessOverlay({
-        title: isExternal ? 'TRANSFER SUCCESSFUL' : 'WITHDRAWAL SUCCESSFUL',
-      });
+      notify(isExternal ? 'Transfer successful' : 'Withdrawal successful', 'success');
+
 
       setSessionBalance(prev => Math.max(0, prev - amtNum));
       if (!isExternal) {
@@ -3745,14 +3740,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
            
 
 
-          {/* Toast notifications removed in favor of inline outcome UI */}
-          {successOverlay && (
-            <SuccessOverlay
-              show={!!successOverlay}
-              title={successOverlay.title}
-              onDone={() => setSuccessOverlay(null)}
-            />
-          )}
+          {/* Outcome confirmations all ride the single NotifyFlash takeover */}
 
           {/* Network Status Overlay */}
           <AnimatePresence>

@@ -53,7 +53,7 @@ const GLYPHS = {
 function VerdictMark({ kind, color }) {
     const paths = GLYPHS[kind === 'pending' ? 'info' : kind] || GLYPHS.success;
     return (
-        <div className="relative w-36 h-36 flex items-center justify-center">
+        <div className="relative w-[100px] h-[100px] flex items-center justify-center">
             <motion.span
                 className="absolute inset-0 rounded-full"
                 style={{ background: `radial-gradient(circle, ${color}33 0%, transparent 68%)` }}
@@ -83,6 +83,11 @@ export default function NotifyFlash({ message, kind = 'success', onClick, onClos
         const t = setTimeout(() => onClose?.(), 2600);
         return () => clearTimeout(t);
     }, [onClose]);
+
+    // Pending never takes the page: in-progress feedback lives in the action
+    // BUTTON the user pressed. Only the finished verdict (success / failed)
+    // earns the confirmation page.
+    if (kind === 'pending') return null;
 
     const isLight = typeof window !== 'undefined' && localStorage.getItem("15market_theme") === 'light';
     const cfg = KINDS[kind] || KINDS.success;
@@ -121,7 +126,7 @@ export default function NotifyFlash({ message, kind = 'success', onClick, onClos
                 <img
                     src={isLight ? '/goblogo.png' : '/gowlogo.png'}
                     alt="15market"
-                    className="absolute left-1/2 -translate-x-1/2 h-[52px] w-auto pointer-events-none select-none"
+                    className="absolute left-1/2 -translate-x-1/2 h-[104px] w-auto pointer-events-none select-none"
                     style={{ bottom: 'calc(env(safe-area-inset-bottom) + 28px)', filter: isLight ? 'brightness(0)' : 'brightness(0) invert(1)' }}
                 />
             </div>

@@ -2365,14 +2365,14 @@ export function CircleWalletPage({
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSendModal(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
                             <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className={`w-full md:max-w-md relative z-10 p-6 md:p-8 rounded-t-[40px] md:rounded-[40px] border-t md:border ${isLight ? 'bg-[#CFDCD5] border-black/5' : 'bg-[#0D0D0D] border-white/5 shadow-2xl'} max-h-[92dvh] overflow-y-auto`}>
                                 <div className="flex items-center justify-between mb-8">
-                                    <h3 className={`text-2xl font-black uppercase tracking-tighter text-white`}>Send Assets</h3>
-                                    <button onClick={() => setShowSendModal(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors"><X size={24} /></button>
+                                    <h3 className={`text-2xl font-black uppercase tracking-tighter ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Send Assets</h3>
+                                    <button onClick={() => setShowSendModal(false)} className={`p-2 rounded-full transition-colors ${isLight ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/5'}`}><X size={24} /></button>
                                 </div>
 
                                 <div className="flex flex-col gap-6">
                                     <div className={`p-4 rounded-2xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border-2 border-[#1A6140]/20`}>
                                         <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1">Source Wallet</p>
-                                        <p className={`text-sm font-black uppercase text-white`}>{currentWallet.label}</p>
+                                        <p className={`text-sm font-black uppercase ${isLight ? 'text-[#1A6140]' : 'text-white'}`}>{currentWallet.label}</p>
                                     </div>
 
                                     <div>
@@ -2401,20 +2401,20 @@ export function CircleWalletPage({
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (!isTransferring) setTransferModal(null); }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
                             <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className={`w-full md:max-w-md relative z-10 p-6 md:p-8 rounded-t-[40px] md:rounded-[40px] border-t md:border ${isLight ? 'bg-[#CFDCD5] border-black/5' : 'bg-[#0D0D0D] border-white/5 shadow-2xl'} flex flex-col max-h-[92dvh] overflow-y-auto`}>
                                 <div className="flex items-center justify-between w-full mb-8">
-                                    <h3 className="text-2xl font-black uppercase tracking-tighter text-white">{transferModal === 'deposit' ? 'Deposit' : 'Withdraw'}</h3>
-                                    <button onClick={() => { if (!isTransferring) setTransferModal(null); }} className="p-2 hover:bg-white/5 rounded-full transition-colors"><X size={24} /></button>
+                                    <h3 className={`text-2xl font-black uppercase tracking-tighter ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>{transferModal === 'deposit' ? 'Deposit' : 'Withdraw'}</h3>
+                                    <button onClick={() => { if (!isTransferring) setTransferModal(null); }} className={`p-2 rounded-full transition-colors ${isLight ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/5'}`}><X size={24} /></button>
                                 </div>
 
                                 {/* Route: source -> destination */}
                                 <div className={`flex items-center gap-3 mb-7 p-4 rounded-3xl border border-[#1A6140]/25 bg-[#1A6140]/10`}>
                                     <div className="flex-1 flex flex-col items-center gap-1.5 text-center">
-                                        <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 text-white`}>From</span>
-                                        <span className="text-[11px] font-black uppercase tracking-wider text-white">{transferModal === 'deposit' ? 'Main Wallet' : 'Trading Wallet'}</span>
+                                        <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black/60' : 'text-white'}`}>From</span>
+                                        <span className={`text-[11px] font-black uppercase tracking-wider ${isLight ? 'text-[#1A6140]' : 'text-white'}`}>{transferModal === 'deposit' ? 'Main Wallet' : 'Trading Wallet'}</span>
                                     </div>
                                     <Send size={16} className="text-[#1A6140] rotate-[-45deg] shrink-0" />
                                     <div className="flex-1 flex flex-col items-center gap-1.5 text-center">
-                                        <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 text-white`}>To</span>
-                                        <span className="text-[11px] font-black uppercase tracking-wider text-white">{transferModal === 'deposit' ? 'Trading Wallet' : 'Main Wallet'}</span>
+                                        <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black/60' : 'text-white'}`}>To</span>
+                                        <span className={`text-[11px] font-black uppercase tracking-wider ${isLight ? 'text-[#1A6140]' : 'text-white'}`}>{transferModal === 'deposit' ? 'Trading Wallet' : 'Main Wallet'}</span>
                                     </div>
                                 </div>
 
@@ -2426,7 +2426,7 @@ export function CircleWalletPage({
                                         placeholder="0.00"
                                         value={transferAmount}
                                         onChange={(e) => setTransferAmount(e.target.value)}
-                                        className="w-full py-5 px-6 rounded-2xl bg-white/5 text-white border-2 border-transparent focus:border-[#1A6140]/30 outline-none text-3xl font-black transition-all"
+                                        className={`w-full py-5 px-6 rounded-2xl border-2 border-transparent focus:border-[#1A6140]/30 outline-none text-3xl font-black transition-all ${isLight ? 'bg-black/5 text-black placeholder-black/25' : 'bg-white/5 text-white placeholder-white/25'}`}
                                     />
                                     <button
                                         onClick={() => setTransferAmount(String(transferModal === 'deposit' ? (parseFloat(evmBalance || 0) || 0) : (parseFloat(sessionBalance || 0) || 0)))}
@@ -2435,7 +2435,7 @@ export function CircleWalletPage({
                                         Max
                                     </button>
                                 </div>
-                                <p className={`text-[10px] font-black uppercase tracking-widest mb-8 opacity-40 text-white`}>
+                                <p className={`text-[10px] font-black uppercase tracking-widest mb-8 opacity-40 ${isLight ? 'text-black' : 'text-white'}`}>
                                     {transferModal === 'deposit'
                                         ? `Main Wallet balance: ${parseFloat(evmBalance || 0).toFixed(2)} USDC`
                                         : `Trading Wallet balance: ${parseFloat(sessionBalance || 0).toFixed(2)} USDC`}
@@ -2449,7 +2449,7 @@ export function CircleWalletPage({
                                     {isTransferring ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
                                     {isTransferring ? (transferModal === 'deposit' ? 'Depositing...' : 'Withdrawing...') : (transferModal === 'deposit' ? 'Confirm Deposit' : 'Confirm Withdrawal')}
                                 </button>
-                                <p className={`text-[8px] font-bold mt-4 opacity-40 text-white text-center`}>
+                                <p className={`text-[8px] font-bold mt-4 opacity-40 text-center ${isLight ? 'text-black' : 'text-white'}`}>
                                     {transferModal === 'deposit'
                                         ? 'Instant internal transfer — USDC moves from your Main Wallet into your Trading Wallet.'
                                         : 'Instant internal transfer — USDC moves from your Trading Wallet back to your Main Wallet.'}
@@ -2463,8 +2463,8 @@ export function CircleWalletPage({
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowReceiveModal(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
                             <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className={`w-full md:max-w-md relative z-10 p-6 md:p-8 rounded-t-[40px] md:rounded-[40px] border-t md:border ${isLight ? 'bg-[#CFDCD5] border-black/5' : 'bg-[#0D0D0D] border-white/5 shadow-2xl'} flex flex-col items-center max-h-[92dvh] overflow-y-auto`}>
                                 <div className="flex items-center justify-between w-full mb-8">
-                                    <h3 className={`text-2xl font-black uppercase tracking-tighter text-white`}>Receive</h3>
-                                    <button onClick={() => setShowReceiveModal(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors"><X size={24} /></button>
+                                    <h3 className={`text-2xl font-black uppercase tracking-tighter ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Receive</h3>
+                                    <button onClick={() => setShowReceiveModal(false)} className={`p-2 rounded-full transition-colors ${isLight ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/5'}`}><X size={24} /></button>
                                 </div>
 
                                 <div className="p-4 rounded-3xl bg-white mb-8 shadow-2xl relative group overflow-hidden flex items-center justify-center">
