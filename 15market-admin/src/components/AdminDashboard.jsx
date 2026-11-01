@@ -57,7 +57,7 @@ import { socketService } from "../utils/socket";
 import { COUNTRY_CENTER } from "./ui/places";
 import { RouteGlobe } from "./ui/route-globe";
 import { ThemeToggle } from "./ui/ThemeToggle";
-import { DailyChange } from "./DailyChange";
+import { DailyChange, useDailyChanges } from "./DailyChange";
 
 // Sidebar navigation: collapsible icon rail ↔ full menu. "Referral Program"
 // hosts the participants list (with earnings), the withdrawal request queue
@@ -181,6 +181,14 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     });
     const [pulse, setPulse] = useState([]); // transient globe flashes {id, lat, lng}
 
+    // Daily change per KPI: the backend's figure when it sends one, otherwise
+    // counted here from the first live reading of the day. `statsReady` flips
+    // on the first full stats pulse so the console's initial zeros never
+    // become a baseline.
+    const [statsReady, setStatsReady] = useState(false);
+    const statsReadyRef = useRef(false);
+    const dailyChanges = useDailyChanges(stats, statsReady);
+
     // RouteGlobe renders the reference design stock (Muscat hub, flight-city
     // arcs, NIGHT theme) — no props, exactly like the source component.
 
@@ -188,17 +196,17 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
     // THE metric rows, shared by the desktop side panels and the mobile strip.
     const platformStats = useMemo(() => ([
-        { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7', daily: stats.daily?.totalWallets },
-        { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6', daily: stats.daily?.totalTrades },
-        { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b', daily: stats.daily?.activeStakesTotal },
-        { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true, daily: stats.daily?.treasuryBalance }
-    ]), [stats.totalWallets, stats.totalTrades, stats.activeStakesTotal, stats.treasuryBalance, stats.daily]);
+        { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7', daily: dailyChanges.totalWallets },
+        { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6', daily: dailyChanges.totalTrades },
+        { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b', daily: dailyChanges.activeStakesTotal },
+        { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true, daily: dailyChanges.treasuryBalance }
+    ]), [stats.totalWallets, stats.totalTrades, stats.activeStakesTotal, stats.treasuryBalance, dailyChanges]);
     const pulseStats = useMemo(() => ([
-        { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e', daily: stats.daily?.activeCount },
-        { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371', daily: stats.daily?.totalVolume },
-        { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), color: '#ef4444', daily: stats.daily?.pendingDisputes, invert: true },
-        { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, color: '#3CB371', daily: stats.daily?.bullBearRatio }
-    ]), [stats.activeCount, stats.totalVolume, stats.pendingDisputes, stats.bullBearRatio, stats.daily]);
+        { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e', daily: dailyChanges.activeCount },
+        { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371', daily: dailyChanges.totalVolume },
+        { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), color: '#ef4444', daily: dailyChanges.pendingDisputes, invert: true },
+        { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, color: '#3CB371', daily: dailyChanges.bullBearRatio }
+    ]), [stats.activeCount, stats.totalVolume, stats.pendingDisputes, stats.bullBearRatio, dailyChanges]);
 
     const [recentActivity, setRecentActivity] = useState([]);
     // Payout-retry in-flight set: warms the spinning icon on a PAY FAIL pill
@@ -596,7 +604,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         //    once on connect (dashboard_stats).
         const applyStats = (data) => {
             if (!data) return;
-            setStats(prev => ({ ...prev, ...data }));
+            // The full pulse carries a timestamp; the on-connect snapshot counts
+            // wallets differently, so once live it must not move that figure.
+            const isFullPulse = !!data.timestamp;
+            const incoming = (!isFullPulse && statsReadyRef.current) ? (({ totalWallets, ...rest }) => rest)(data) : data;
+            setStats(prev => ({ ...prev, ...incoming }));
+            if (isFullPulse && !statsReadyRef.current) {
+                statsReadyRef.current = true;
+                setStatsReady(true);
+            }
             setIsConnected(true);
             // The pulse doubles as a refresh trigger for non-socket data
             // (referral lists, treasury ledger) — debounced by the bus.
@@ -1713,12 +1729,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         platform health reads at a glance. */}
                     <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory gap-4 md:grid md:grid-cols-3 lg:grid-cols-6 md:gap-6 md:overflow-visible">
                         {[
-                            { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371', daily: stats.daily?.totalVolume },
-                            { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, color: '#3b82f6', daily: stats.daily?.platformRevenue },
-                            { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e', daily: stats.daily?.activeCount },
-                            { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b', daily: stats.daily?.activeStakesTotal },
-                            { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true, daily: stats.daily?.treasuryBalance },
-                            { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#a78bfa', daily: stats.daily?.totalTrades }
+                            { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371', daily: dailyChanges.totalVolume },
+                            { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, color: '#3b82f6', daily: dailyChanges.platformRevenue },
+                            { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e', daily: dailyChanges.activeCount },
+                            { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b', daily: dailyChanges.activeStakesTotal },
+                            { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true, daily: dailyChanges.treasuryBalance },
+                            { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#a78bfa', daily: dailyChanges.totalTrades }
                         ].map((stat, i) => (
                             <div key={i} className="border-l-2 pl-3 min-w-0 flex-none w-[128px] snap-start md:w-auto md:flex-1" style={{ borderColor: `${stat.color}55` }}>
                                 <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>

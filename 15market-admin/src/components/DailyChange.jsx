@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 // Daily change indicator for a KPI: percent move versus the metric's value at
@@ -58,3 +58,70 @@ export function DailyChange({ pct, invert = false, size = 'md' }) {
 }
 
 export default DailyChange;
+
+// ─── Client-side daily baseline ───────────────────────────────────────────
+// The backend normally sends `stats.daily`. When it does not (older backend
+// build, first pulse still in flight) the console counts the day itself:
+// each metric's first live reading of the UTC day becomes its baseline, kept
+// in localStorage, so the counter starts at 0% and moves with every change.
+
+const BASELINE_KEY = '15market_admin_daily_baseline_v1';
+const METRIC_KEYS = [
+    'totalWallets', 'totalTrades', 'totalVolume', 'platformRevenue', 'activeCount',
+    'activeStakesTotal', 'treasuryBalance', 'pendingDisputes', 'bullBearRatio'
+];
+const utcDay = () => new Date().toISOString().slice(0, 10);
+
+function loadBaseline() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(BASELINE_KEY) || 'null');
+        if (raw && raw.day === utcDay() && raw.baseline && typeof raw.baseline === 'object') return raw;
+    } catch (e) { /* fall through to a fresh day */ }
+    return { day: utcDay(), baseline: {} };
+}
+
+/**
+ * @param stats  the live stats object from the console
+ * @param ready  true once a real stats pulse has been applied (so the zeros
+ *               the console starts with are never taken as a baseline)
+ * @returns      { key: { pct } } — backend figure when present, else counted here
+ */
+export function useDailyChanges(stats, ready) {
+    const [store, setStore] = useState(loadBaseline);
+
+    // Record first-of-day readings (and roll to a fresh baseline at midnight UTC).
+    useEffect(() => {
+        if (!ready) return;
+        setStore(prev => {
+            let next = prev.day === utcDay() ? prev : { day: utcDay(), baseline: {} };
+            let changed = next !== prev;
+            for (const key of METRIC_KEYS) {
+                const v = Number(stats?.[key]);
+                if (!Number.isFinite(v) || key in next.baseline) continue;
+                if (next === prev) next = { day: prev.day, baseline: { ...prev.baseline } };
+                next.baseline[key] = v;
+                changed = true;
+            }
+            if (!changed) return prev;
+            try { localStorage.setItem(BASELINE_KEY, JSON.stringify(next)); } catch (e) { /* quota */ }
+            return next;
+        });
+    }, [ready, stats]);
+
+    return useMemo(() => {
+        const out = {};
+        for (const key of METRIC_KEYS) {
+            const backend = stats?.daily?.[key];
+            if (backend && backend.pct !== undefined) { out[key] = backend; continue; }
+            if (!ready || !(key in store.baseline)) continue;
+            const base = store.baseline[key];
+            const cur = Number(stats?.[key]);
+            if (!Number.isFinite(cur)) continue;
+            let pct;
+            if (base === 0) pct = cur === 0 ? 0 : null;
+            else pct = ((cur - base) / Math.abs(base)) * 100;
+            out[key] = { pct, base };
+        }
+        return out;
+    }, [stats, ready, store]);
+}
