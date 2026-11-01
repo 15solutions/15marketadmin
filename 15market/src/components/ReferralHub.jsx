@@ -168,7 +168,7 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
     const myRate = info?.rateOverride != null && Number.isFinite(Number(info.rateOverride)) ? Number(info.rateOverride) : 10;
 
     return (
-        <div className={`ref-hub min-h-screen md:h-screen w-full flex flex-col md:overflow-hidden ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#0A0A0A]'} ${isLight ? 'text-[#0a261a]' : 'text-white'}`}
+        <div className={`ref-hub h-[100dvh] w-full flex flex-col overflow-hidden ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#0A0A0A]'} ${isLight ? 'text-[#0a261a]' : 'text-white'}`}
             style={{ fontFamily: "'Comfortaa', sans-serif" }}>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap');

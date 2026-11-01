@@ -3083,6 +3083,30 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
    * 
    * IMPACT IF BUGGED: Funds would stay stuck in the session wallet.
    */
+  // Fiat vault sender — the main wallet moves the user's chosen withdrawal
+  // amount to the platform vault on-chain at fiat-request confirm time.
+  // Same universal sender as handleDeposit: wagmi (external connectors) or
+  // the Privy embedded wallet (email/discord accounts).
+  const sendToEscrow = useCallback(async (to, amount) => {
+    const embeddedMainWallet = embeddedWallet
+      || (Array.isArray(wallets) ? (wallets.find(w => w.walletClientType === 'privy') || wallets[0]) : null);
+    if (!walletClient && (!embeddedMainWallet || !embeddedMainWallet.getEthereumProvider)) {
+      throw new Error("Main wallet is not ready — please reopen the Transfer Hub");
+    }
+    if (!to) throw new Error('Fiat vault is not configured yet — try again later');
+    const value = parseEther(String(amount));
+    if (walletClient) {
+      const hash = await walletClient.sendTransaction({ to, value, account: address });
+      return typeof hash === 'string' ? hash : (hash?.hash || hash);
+    }
+    try { await embeddedMainWallet.switchChain?.(ARC_CHAIN_ID); } catch (_) { /* already on Arc / switch not needed */ }
+    const ethProvider = await embeddedMainWallet.getEthereumProvider();
+    const provider = new ethers.BrowserProvider(ethProvider, 'any');
+    const signer = await provider.getSigner();
+    const tx = await signer.sendTransaction({ to, value });
+    return tx.hash;
+  }, [walletClient, embeddedWallet, wallets, address]);
+
   const handleWithdraw = useCallback(async (amt, destination = null) => {
     if (isExecuting) return;
 
@@ -3427,6 +3451,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               notify={notify}
               sessionBalance={sessionBalance}
               evmBalance={evmBalance}
+              sendToEscrow={sendToEscrow}
               onBack={() => {
                 setView("circle_wallet");
                 setCircleWalletMode(null);

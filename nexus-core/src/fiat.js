@@ -84,10 +84,11 @@ function newId() {
 }
 
 /**
- * Create a request. `debit` should already have happened server-side (the
- * router debits the trading ledger) — here we only record + index.
+ * Create a request. The router has already moved the funds on-chain to the
+ * fiat vault (trading source) or holds the client's escrow receipt (main
+ * source) — here we only record + index, escrow tx included.
  */
-function createRequest({ address, source, amount, country, method, bankName, bankCode, accountName, accountNumber, note }) {
+function createRequest({ address, source, amount, country, method, bankName, bankCode, accountName, accountNumber, note, escrowTx }) {
     const addr = String(address || '').toLowerCase();
     const src = String(source || '').toLowerCase();
     const amt = Number(amount);
@@ -119,9 +120,10 @@ function createRequest({ address, source, amount, country, method, bankName, ban
         accountName: String(accountName).trim(),
         accountNumber: acctNo,
         status: 'pending',           // pending | approved | denied
+        escrowTx: escrowTx || null,  // vault transfer receipt (trading) / client receipt (main)
         note: note || '',
         timeline: [
-            { at: Date.now(), event: 'requested', by: addr, detail: { source: src, amount: Math.round(amt * 100) / 100 } }
+            { at: Date.now(), event: 'requested', by: addr, detail: { source: src, amount: Math.round(amt * 100) / 100, ...(escrowTx ? { escrowTx } : {}) } }
         ],
         createdAt: Date.now()
     };

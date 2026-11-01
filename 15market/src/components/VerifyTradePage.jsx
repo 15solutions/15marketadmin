@@ -91,7 +91,7 @@ export default function VerifyTradePage() {
   }[state];
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center gap-6 px-4 py-10 bg-[#050505] text-white font-['Comfortaa',cursive]">
+    <div className="min-h-[100dvh] max-h-[100dvh] w-full flex flex-col items-center justify-center gap-6 px-4 py-10 overflow-y-auto bg-[#050505] text-white font-['Comfortaa',cursive]">
       {state === STATE.READY && trade && (
         <TradeShareCard
           isOpen

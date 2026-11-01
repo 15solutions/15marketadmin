@@ -190,6 +190,31 @@ body {
   /* IE and Edge */
 }
 
+/* ── Mobile: pages are static canvases ────────────────────────────────────
+   On phones the PAGE itself never scrolls — not sideways (no horizontal
+   drift) and not vertically (no whole-page glide, no address-bar chase).
+   Every page is a fixed viewport with its own inner content scroller, so
+   locking the document is safe and the in-page lists keep scrolling. */
+@media (max-width: 767px) {
+  html,
+  body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+  }
+
+  #root {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+}
+
 ::-webkit-scrollbar {
   display: none;
 }

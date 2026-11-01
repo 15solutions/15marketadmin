@@ -90,7 +90,7 @@ const statusChip = {
     denied: { icon: XCircle, cls: 'bg-red-500/10 text-red-500 border-red-500/30', label: 'Denied' }
 };
 
-export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBalance, evmBalance }) {
+export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBalance, evmBalance, sendToEscrow }) {
     // Balances come straight from the app's own live values: the trading
     // wallet is the session ledger, the main wallet is the Privy on-chain
     // balance. Only the request ledger is fetched here.
@@ -149,23 +149,41 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
 
     const submit = async () => {
         if (!canSubmit || submitBusy) return;
+        if (source === 'main' && !methods?.escrow) {
+            notify('Fiat vault is not configured yet — try again later', 'error');
+            return;
+        }
         setSubmitBusy(true);
         try {
+            // ── The money moves first ──
+            // trading → the backend sweeps the funds from the trading wallet
+            // to the fiat vault on-chain while this request runs.
+            // main → the user's own wallet signs the vault transfer here,
+            // then the request files with the receipt attached.
+            let escrowTx = null;
+            if (source === 'main') {
+                notify('Confirm the vault transfer in your wallet…', 'pending');
+                escrowTx = await sendToEscrow(methods.escrow, amt);
+            } else {
+                notify('Moving funds to the fiat vault…', 'pending');
+            }
             const res = await fetch(`${KEEPER_URL_ARC}/fiat/withdraw/${address.toLowerCase()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     source, amount: amt, country: methods?.country || country.trim(),
-                    bankName, accountName: accountName.trim(), accountNumber: accountNumber.replace(/\s+/g, '')
+                    bankName, accountName: accountName.trim(), accountNumber: accountNumber.replace(/\s+/g, ''),
+                    txHash: escrowTx
                 })
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || 'Request failed');
-            notify(`Withdrawal request submitted — ${fmt(amt)} debited from your ${source} wallet`, 'success');
+            notify(`Withdrawal request submitted — ${fmt(amt)} is in the platform vault`, 'success');
             setAmount(''); setAccountNumber(''); setAccountName(''); setBankName('');
             setRefreshTick(t => t + 1);
         } catch (e) {
-            notify(e.message, 'error');
+            const msg = e?.code === 4001 || /reject|denied/i.test(e?.message || '') ? 'Vault transfer cancelled' : e.message;
+            notify(msg, 'error');
         } finally {
             setSubmitBusy(false);
         }
@@ -293,7 +311,7 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                                 <ShieldCheck size={15} className="text-[#1A6140] shrink-0" />
                                 <div className="min-w-0">
                                     <p className={`text-[9px] font-bold leading-relaxed ${chipText(isLight)}`}>
-                                        Confirming debits <b className="text-[#1A6140]">{fmt(amt || 0)}</b> from your <b className="text-[#1A6140]">{source} wallet</b> and files the request with the team for a {methods.name} bank transfer{selectedBank ? ` to ${selectedBank.name}` : ''}.
+                                        Confirming moves <b className="text-[#1A6140]">{fmt(amt || 0)}</b> from your <b className="text-[#1A6140]">{source} wallet</b> to the platform vault on-chain, then files the request with the team for a {methods.name} bank transfer{selectedBank ? ` to ${selectedBank.name}` : ''}.
                                     </p>
                                 </div>
                             </div>

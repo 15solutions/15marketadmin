@@ -2329,91 +2329,203 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         </div>
 
-                        <div className="flex flex-col min-w-0">
-                            {fiatList.filter(r => fiatFilter === 'all' || r.status === fiatFilter).length === 0 && (
-                                <div className="py-6 text-center text-[9px] font-medium opacity-40">
-                                    {fiatBusy ? 'Loading requests…' : 'No withdrawal requests yet'}
-                                </div>
-                            )}
-                            {fiatList.filter(r => fiatFilter === 'all' || r.status === fiatFilter).map((r, i) => (
-                                <div key={r.id} className={`border-b px-2 py-2.5 flex flex-col gap-2 ${isLight ? 'border-black/5' : 'border-white/5'}`}>
-                                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => setFiatRead(prev => prev === r.id ? null : r.id)}>
-                                        <span className="flex-none text-[9px] font-black opacity-30 w-6">{String(i + 1).padStart(2, '0')}</span>
-                                        <span className={`flex-none w-28 md:w-32 text-[9px] font-black uppercase tracking-widest truncate ${isLight ? 'text-black/70' : 'text-white/70'}`}>
-                                            {r.address?.slice(0, 5)}…{r.address?.slice(-4)}
+                        {/* Requests are a REAL table on every screen — same DNA as
+                            the Overview trade index: shared column headers + row
+                            grid, phones swipe the columns horizontally. Clicking
+                            a row lifts the full request dossier over the
+                            background with its audit trail and decision. */}
+                        <div className="overflow-x-auto no-scrollbar">
+                        <div className="min-w-[720px] flex flex-col">
+                            {/* Column legend */}
+                            <div className={`grid grid-cols-[36px_minmax(0,1.05fr)_52px_84px_minmax(0,1.2fr)_72px_56px_64px] gap-3 px-3 pb-2 text-[7px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
+                                <span>#</span><span>User</span><span>Src</span><span>Amount</span><span>Bank · Account</span><span>Status</span><span>Time</span><span></span>
+                            </div>
+                            <div className={`flex flex-col max-h-[560px] overflow-y-auto no-scrollbar divide-y ${isLight ? 'divide-black/5' : 'divide-white/5'}`}>
+                                {fiatList.filter(r => fiatFilter === 'all' || r.status === fiatFilter).length === 0 && (
+                                    <div className="py-10 text-center opacity-20 text-[9px] font-black uppercase tracking-widest">
+                                        {fiatBusy ? 'Loading requests…' : 'No withdrawal requests yet'}
+                                    </div>
+                                )}
+                                {fiatList.filter(r => fiatFilter === 'all' || r.status === fiatFilter).map((r, i) => (
+                                    <motion.div
+                                        initial={{ x: -16, opacity: 0 }}
+                                        animate={{ x: 0, opacity: 1 }}
+                                        key={r.id}
+                                        onClick={() => setFiatRead(r.id)}
+                                        className={`cursor-pointer px-3 py-2.5 grid grid-cols-[36px_minmax(0,1.05fr)_52px_84px_minmax(0,1.2fr)_72px_56px_64px] items-center gap-3 min-w-0 transition-colors ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
+                                    >
+                                        <span className="text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
+                                        <span className={`text-[10px] font-black uppercase tracking-widest truncate ${isLight ? 'text-black/70' : 'text-white/70'}`}>
+                                            {r.address?.slice(0, 6)}…{r.address?.slice(-4)}
                                         </span>
-                                        <span className={`flex-none text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${r.source === 'trading' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-sky-500/10 text-sky-500'}`}>
+                                        <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded w-fit ${r.source === 'trading' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-sky-500/10 text-sky-500'}`}>
                                             {r.source}
                                         </span>
-                                        <div className="min-w-0 flex-1">
-                                            <span className={`text-[10px] font-black ${isLight ? 'text-black' : 'text-white'}`}>{fmtUsdAdmin(r.amount)}</span>
-                                            <span className="text-[8px] opacity-40 ml-2">{r.bankName} · {r.country}</span>
+                                        <span className={`text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>{fmtUsdAdmin(r.amount)}</span>
+                                        {/* Bank · account + per-row copy icon */}
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div className="min-w-0 flex-1">
+                                                <span className={`text-[9px] font-bold truncate block ${isLight ? 'text-black' : 'text-white'}`}>{r.bankName}</span>
+                                                <span className="text-[8px] font-mono opacity-40">{r.accountNumber}</span>
+                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(r.accountNumber || ''); notify?.('Account number copied', 'success'); }}
+                                                title={`Copy account number ${r.accountNumber}`}
+                                                className={`flex-none p-2 rounded-lg border transition-colors ${isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/10 hover:bg-white/5'}`}
+                                            >
+                                                <Copy size={11} />
+                                            </button>
                                         </div>
-                                        {/* Account number + per-row copy icon */}
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(r.accountNumber || ''); notify?.('Account number copied', 'success'); }}
-                                            title={`Copy account number ${r.accountNumber}`}
-                                            className={`flex-none p-2 rounded-lg border transition-colors ${isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/10 hover:bg-white/5'}`}
-                                        >
-                                            <Copy size={11} />
-                                        </button>
-                                        <span className={`flex-none text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded border ${r.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : r.status === 'approved' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                                        <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded border w-fit ${r.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : r.status === 'approved' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
                                             {r.status}
                                         </span>
-                                        {/* Approve / Deny icons — per row, live decisions.
-                                            Denied requests automatically refund the debit and
-                                            both decisions email the user. */}
-                                        {r.status === 'pending' && (
-                                            <div className="flex-none flex items-center gap-1.5">
+                                        <span className="text-[8px] opacity-30 font-mono">{new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        {/* Approve / Deny icons — one tap decisions like
+                                            before; denied requests refund automatically
+                                            and both decisions email the user. */}
+                                        <div className="flex-none flex items-center gap-1.5 justify-end">
+                                            {r.status === 'pending' ? (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); decideFiat(r.id, 'approve'); }}
+                                                        disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
+                                                        title="Approve — pays out, emails the user"
+                                                        className="p-2 rounded-lg bg-[#1A6140] text-white hover:brightness-110 transition-all disabled:opacity-40"
+                                                    >
+                                                        <Check size={12} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); decideFiat(r.id, 'deny'); }}
+                                                        disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
+                                                        title="Deny — releases the funds back, emails the user"
+                                                        className="p-2 rounded-lg bg-red-500/90 text-white hover:brightness-110 transition-all disabled:opacity-40"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </>
+                                            ) : (
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); decideFiat(r.id, 'approve'); }}
-                                                    disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
-                                                    title="Approve — pays out, emails the user"
-                                                    className="p-2 rounded-lg bg-[#1A6140] text-white hover:brightness-110 transition-all disabled:opacity-40"
+                                                    onClick={(e) => { e.stopPropagation(); setFiatRead(r.id); }}
+                                                    title="Open full details"
+                                                    className={`p-2 rounded-lg border transition-colors ${isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/10 hover:bg-white/5'}`}
                                                 >
-                                                    <Check size={12} />
+                                                    <ChevronRight size={12} />
                                                 </button>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); decideFiat(r.id, 'deny'); }}
-                                                    disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
-                                                    title="Deny — releases the funds back, emails the user"
-                                                    className="p-2 rounded-lg bg-red-500/90 text-white hover:brightness-110 transition-all disabled:opacity-40"
-                                                >
-                                                    <X size={12} />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </div>
+                        </div>{/* — overflow-x: headers + rows swipe together */}
 
-                                    {/* Expanded audit trail — the full event index */}
-                                    {fiatRead === r.id && (
-                                        <div className={`ml-8 p-3 rounded-2xl border ${isLight ? 'border-black/5 bg-black/[0.02]' : 'border-white/5 bg-white/[0.02]'} grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5`}>
-                                            <Detail label="Request ID" value={r.id} />
-                                            <Detail label="Amount" value={fmtUsdAdmin(r.amount)} />
+                        {/* Background dossier — tapping a request lifts its full
+                            record over the console background: identity, vault
+                            receipt, account details, event trail and the
+                            approve / deny decision, everything indexed live. */}
+                        {fiatRead && (() => {
+                            const r = fiatList.find(x => x.id === fiatRead);
+                            if (!r) return null;
+                            return (
+                                <motion.div
+                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                    className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+                                >
+                                    <div
+                                        onClick={() => setFiatRead(null)}
+                                        className={`absolute inset-0 ${isLight ? 'bg-black/50' : 'bg-black/70'} backdrop-blur-xl`}
+                                    />
+                                    <motion.div
+                                        initial={{ scale: 0.92, y: 24, opacity: 0 }}
+                                        animate={{ scale: 1, y: 0, opacity: 1 }}
+                                        transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                                        className={`relative w-full max-w-lg max-h-[85vh] overflow-y-auto no-scrollbar rounded-[28px] border p-5 ${isLight ? 'bg-white/95 border-black/10' : 'bg-[#101410]/95 border-white/10'} backdrop-blur-2xl shadow-[0_40px_120px_-30px_rgba(0,0,0,0.85)]`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-[7px] font-black uppercase tracking-widest opacity-40">Fiat withdrawal request</p>
+                                                <p className={`text-xl font-black tracking-tighter font-mono ${isLight ? 'text-black' : 'text-white'}`}>{fmtUsdAdmin(r.amount)}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setFiatRead(null)}
+                                                className={`p-2 rounded-lg border transition-colors ${isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/10 hover:bg-white/5'}`}
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 mt-4">
+                                            <Detail label="Request ID" value={r.id} mono />
+                                            <Detail label="Status" value={r.status.toUpperCase()} />
+                                            <Detail label="User" value={`${r.address?.slice(0, 10)}…${r.address?.slice(-6)}`} mono />
                                             <Detail label="Source account" value={r.source} />
                                             <Detail label="Country / method" value={`${r.country} · ${r.method || 'Bank Transfer'}`} />
                                             <Detail label="Bank" value={r.bankName} />
                                             <Detail label="Account name" value={r.accountName} />
-                                            <Detail label="Account number" value={r.accountNumber} mono />
+                                            <div className="flex items-end justify-between gap-2 min-w-0">
+                                                <div className="min-w-0"><Detail label="Account number" value={r.accountNumber} mono /></div>
+                                                <button
+                                                    onClick={() => { navigator.clipboard.writeText(r.accountNumber || ''); notify?.('Account number copied', 'success'); }}
+                                                    title={`Copy account number ${r.accountNumber}`}
+                                                    className={`flex-none p-2 rounded-lg border transition-colors ${isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/10 hover:bg-white/5'}`}
+                                                >
+                                                    <Copy size={11} />
+                                                </button>
+                                            </div>
                                             <Detail label="Submitted" value={new Date(r.createdAt).toLocaleString()} />
                                             {r.note && <Detail label="Ledger note" value={r.note} />}
-                                            <div className="md:col-span-2 mt-1">
-                                                <p className="text-[7px] font-black uppercase tracking-widest opacity-40 mb-1.5">Event trail</p>
-                                                <div className="flex flex-col gap-1">
-                                                    {(r.timeline || []).map((ev, j) => (
-                                                        <div key={j} className="flex items-center gap-2 text-[8px] font-bold">
-                                                            <span className="text-[#1A6140]">{(ev.event || '').toUpperCase()}</span>
-                                                            <span className="opacity-40">{new Date(ev.at).toLocaleString()}</span>
-                                                            <span className="opacity-30">{ev.by}</span>
-                                                        </div>
-                                                    ))}
+                                            {r.escrowTx && (
+                                                <div className="md:col-span-2 flex items-end justify-between gap-2 min-w-0">
+                                                    <div className="min-w-0 flex-1"><Detail label="Vault receipt (on-chain)" value={`${r.escrowTx.slice(0, 18)}…${r.escrowTx.slice(-12)}`} mono /></div>
+                                                    <button
+                                                        onClick={() => { navigator.clipboard.writeText(r.escrowTx || ''); notify?.('Vault receipt copied', 'success'); }}
+                                                        title="Copy vault transfer hash"
+                                                        className={`flex-none p-2 rounded-lg border transition-colors ${isLight ? 'border-black/10 hover:bg-black/5' : 'border-white/10 hover:bg-white/5'}`}
+                                                    >
+                                                        <Copy size={11} />
+                                                    </button>
                                                 </div>
+                                            )}
+                                        </div>
+
+                                        {/* Decision — approve pays out · deny returns the
+                                            funds and emails the user either way. */}
+                                        {r.status === 'pending' && (
+                                            <div className="flex items-center gap-3 mt-5">
+                                                <button
+                                                    onClick={() => decideFiat(r.id, 'approve')}
+                                                    disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
+                                                    className="flex-1 py-3 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                                                >
+                                                    Approve — email the user
+                                                </button>
+                                                <button
+                                                    onClick={() => decideFiat(r.id, 'deny')}
+                                                    disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
+                                                    className="flex-1 py-3 rounded-2xl bg-red-500/90 text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                                                >
+                                                    Deny — return the funds
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Event trail */}
+                                        <div className="mt-5">
+                                            <p className="text-[7px] font-black uppercase tracking-widest opacity-40 mb-1.5">Event trail</p>
+                                            <div className="flex flex-col gap-1.5">
+                                                {(r.timeline || []).map((ev, j) => (
+                                                    <div key={j} className="flex items-center gap-2 text-[8px] font-bold">
+                                                        <span className="text-[#1A6140]">{(ev.event || '').toUpperCase()}</span>
+                                                        <span className="opacity-40">{new Date(ev.at).toLocaleString()}</span>
+                                                        <span className="opacity-30">{ev.by}</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                                    </motion.div>
+                                </motion.div>
+                            );
+                        })()}
                     </div>
                 )}
 

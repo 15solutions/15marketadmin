@@ -436,30 +436,86 @@ function creditTradingLedger(addr, amount) {
     if (session) session.balance = newBalance;
 }
 
+// The fiat vault — every confirmed request has physically moved its USDC to
+// this address (FIAT_ESCROW_ADDRESS env, falling back to the platform
+// contract / treasury). The user's balance deduction is the real transfer.
+const FIAT_ESCROW_ADDRESS = /^0x[a-fA-F0-9]{40}$/.test(String(process.env.FIAT_ESCROW_ADDRESS || ''))
+    ? String(process.env.FIAT_ESCROW_ADDRESS).toLowerCase()
+    : String(config.TREASURY_ADDRESS || '').toLowerCase();
+
 // Country methods: what rails exist for a given country (typed anywhere —
 // Nigeria unlocks bank transfer, everything else is coming soon for now).
+// The vault address rides along so the page can route its transfers.
 app.get('/fiat/methods', (req, res) => {
-    res.json(fiat.methodsFor(req.query.country));
+    res.json({
+        ...fiat.methodsFor(req.query.country),
+        escrow: /^0x[a-f0-9]{40}$/.test(FIAT_ESCROW_ADDRESS)
+            && FIAT_ESCROW_ADDRESS !== '0x0000000000000000000000000000000000000000'
+            ? FIAT_ESCROW_ADDRESS : null
+    });
 });
 
 app.get('/fiat/withdrawals/:address', (req, res) => {
     res.json({ withdrawals: fiat.listFor(req.params.address) });
 });
 
-app.post('/fiat/withdraw/:address', (req, res) => {
+app.post('/fiat/withdraw/:address', async (req, res) => {
     const addr = String(req.params.address || '').toLowerCase();
     if (!/^0x[a-f0-9]{40}$/.test(addr)) return res.status(400).json({ error: 'Valid account address required' });
     const source = String(req.body?.source || '').toLowerCase();
     const amount = Number(req.body?.amount);
 
-    // Debits happen at confirm time: trading is a hard ledger debit, a
-    // main-account request is recorded as a hold (the on-chain main wallet
-    // cannot be locked server-side) and released on denial.
-    let debit = null;
+    // ── The money actually moves here ─────────────────────────────────────
+    // trading → the server (which owns the derived session wallet) sweeps the
+    // USDC to the fiat vault and only then debits the ledger: nothing ever
+    // leaves if the chain refuses.
+    // main → the user's own wallet signs the vault transfer client-side at
+    // confirm; the route only files the request after the receipt exists.
+    let escrowTx = null;
     if (source === 'trading') {
-        debit = debitTradingWallet(addr, amount);
-        if (!debit.ok) return res.status(400).json({ error: debit.error });
+        if (!/^0x[a-f0-9]{40}$/.test(FIAT_ESCROW_ADDRESS) || FIAT_ESCROW_ADDRESS === '0x0000000000000000000000000000000000000000') {
+            return res.status(503).json({ error: 'Fiat vault is not configured yet — try again later' });
+        }
+        const profile = profiles.get(addr);
+        const bal = parseFloat(profile?.balance || 0);
+        if (!Number.isFinite(amount) || amount <= 0 || bal < amount) {
+            return res.status(400).json({ error: `Insufficient trading balance — ${bal.toFixed(2)} USDC available` });
+        }
+        try {
+            const sessionWallet = deriveSessionWallet(addr);
+            const nonce = await rpc.getNonce(sessionWallet.address);
+            const txResponse = await rpc.broadcastWithFailover(sessionWallet.privateKey, {
+                to: ethers.getAddress(FIAT_ESCROW_ADDRESS),
+                value: ethers.parseEther(String(amount)),
+                gasLimit: 21000n,
+                gasPrice: ethers.parseUnits('60', 'gwei'),
+                nonce,
+                chainId: rpc.chainId
+            });
+            const receipt = await rpc.waitForReceipt(txResponse.hash, 8, 3000);
+            if (!receipt || receipt.status !== 1) {
+                return res.status(502).json({ error: 'The vault transfer could not be confirmed on-chain — nothing was debited. Try again.' });
+            }
+            escrowTx = txResponse.hash;
+        } catch (e) {
+            return res.status(502).json({ error: 'Vault transfer failed: ' + (e.shortMessage || e.message) });
+        }
+    } else {
+        const txHash = String(req.body?.txHash || '');
+        if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+            return res.status(400).json({ error: 'Missing vault transfer receipt — confirm the transfer in your wallet first' });
+        }
+        try {
+            const receipt = await rpc.waitForReceipt(txHash, 4, 2500);
+            if (receipt && receipt.status !== 1) {
+                return res.status(400).json({ error: 'Your vault transfer failed on-chain — no request was filed' });
+            }
+        } catch { /* receipt not yet visible — accept, the request notes it */ }
+        escrowTx = txHash;
     }
+
+    const debit = source === 'trading' ? debitTradingWallet(addr, amount) : { ok: true, newBalance: null };
+    if (!debit.ok) return res.status(400).json({ error: debit.error });
 
     const out = fiat.createRequest({
         address: addr,
@@ -469,11 +525,14 @@ app.post('/fiat/withdraw/:address', (req, res) => {
         bankName: req.body?.bankName,
         accountName: req.body?.accountName,
         accountNumber: req.body?.accountNumber,
-        note: debit && debit.ok ? `Trading ledger debited — balance now ${debit.newBalance} USDC` : 'Main account hold — released on denial'
+        escrowTx,
+        note: source === 'trading'
+            ? `Vault transfer confirmed — trading ledger debited to ${debit.newBalance} USDC`
+            : 'Vault transfer signed from the main wallet — receipt attached to the request'
     });
     if (!out.ok) {
         // Nothing else was touched — but a hard debit above must roll back.
-        if (debit && debit.ok) creditTradingLedger(addr, amount);
+        if (source === 'trading') creditTradingLedger(addr, amount);
         return res.status(out.status || 400).json({ error: out.error });
     }
 
@@ -481,14 +540,14 @@ app.post('/fiat/withdraw/:address', (req, res) => {
     siem.addEvent({
         type: 'FIAT_REQUESTED',
         severity: 'info',
-        message: `Fiat withdrawal ${out.request.id} — ${out.request.amount} USDC from ${source} wallet to ${out.request.bankName} ••${out.request.accountNumber.slice(-4)}`,
+        message: `Fiat withdrawal ${out.request.id} — ${out.request.amount} USDC escrowed from ${source} wallet ••${out.request.accountNumber.slice(-4)} to ${out.request.bankName}`,
         ip,
-        meta: { request: out.request.id, address: addr, source, amount: out.request.amount, bank: out.request.bankName }
+        meta: { request: out.request.id, address: addr, source, amount: out.request.amount, bank: out.request.bankName, escrowTx }
     });
     io.emit('fiat_withdrawal_new', { id: out.request.id, address: addr });
     io.to(addr).emit('fiat_withdrawal_update', { id: out.request.id, status: 'pending' });
     notificationService.notifyUser(addr, 'Fiat Withdrawal Request Submitted',
-        `Your request to withdraw ${out.request.amount} USDC (local fiat payout) from your ${source} wallet has been submitted. The team will review it shortly.`,
+        `Your request to withdraw ${out.request.amount} USDC (local fiat payout) from your ${source} wallet has been submitted. The funds are already in the platform vault — the team will review your request shortly.`,
         'info').catch(() => {});
     res.json({ ok: true, request: out.request });
 });

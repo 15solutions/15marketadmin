@@ -98,7 +98,7 @@ export function LandingPage({ theme, onToggle, onHelp, isSmallScreen }) {
         : "bg-white/[0.03] border-white/[0.05] backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.3)]";
 
     return (
-        <div className={`min-h-screen w-screen ${isLight ? 'text-[#0a261a]' : 'text-white'} overflow-y-auto no-scrollbar font-sans relative flex flex-col items-center selection:bg-[#1A6140]/30 pb-16`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+        <div className={`h-[100dvh] w-screen max-w-full ${isLight ? 'text-[#0a261a]' : 'text-white'} overflow-y-auto no-scrollbar font-sans relative flex flex-col items-center selection:bg-[#1A6140]/30 pb-16`} style={{ fontFamily: '"Comfortaa", cursive' }}>
             <LandingBackground theme={theme} />
 
             {/* TOP NAVIGATION BAR */}

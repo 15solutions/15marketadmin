@@ -10,7 +10,7 @@ export const EsportPage = ({ onBack, theme }) => {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className={`min-h-screen w-full flex flex-col items-center justify-center p-6 ${isLight ? 'bg-[#f0f9f4]' : 'bg-[#050505]'} relative overflow-hidden transition-colors duration-500`}
+            className={`min-h-[100dvh] max-h-[100dvh] w-full flex flex-col items-center justify-center overflow-y-auto p-6 ${isLight ? 'bg-[#f0f9f4]' : 'bg-[#050505]'} relative transition-colors duration-500`}
         >
             {/* Background Elements */}
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[#1A6140] ${isLight ? 'opacity-10' : 'opacity-5'} blur-[150px] rounded-full pointer-events-none`} />
