@@ -456,7 +456,7 @@ function TradeOutcome({ won, isLight, isPending, settled, phase, fit, amount, pa
   );
 }
 
-export { FlipClock, ProgressBeam, ResolvingOutcome, TradeOutcome };
+export { FlipClock, ProgressBeam, ResolvingOutcome, TradeOutcome, PriceMeterTicker };
 
 export default function TradingWidget({
   price,

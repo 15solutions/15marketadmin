@@ -1875,18 +1875,6 @@ export function CircleWalletPage({
                                     <div className="flex flex-col gap-4 h-full min-h-[400px]">
                                         {currentWallet.key === 'main' ? (
                                             <div className="flex flex-col items-center justify-center flex-1 pt-6 pb-16 md:py-10 gap-6 relative z-10 w-full h-full md:min-h-[300px] md:pb-0">
-                                                <div className={`w-20 h-20 md:w-24 md:h-24 rounded-[28px] md:rounded-[36px] flex items-center justify-center ${isLight ? 'bg-black/5' : 'bg-white/5'} border ${isLight ? 'border-black/5' : 'border-white/10'} transition-all hover:scale-105 group`}>
-                                                    <Landmark size={40} className="text-[#1A6140] opacity-80 group-hover:opacity-100 transition-opacity" strokeWidth={1.5} />
-                                                </div>
-                                                <div className="text-center">
-                                                    <h3 className={`text-[16px] md:text-xl font-black uppercase tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>
-                                                        Fiat <span className="text-[#1A6140]">Withdrawal</span>
-                                                    </h3>
-                                                    <p className={`text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] mt-3 ${isLight ? 'text-black/40' : 'text-white/40'}`}>
-                                                        Bank-transfer payouts — available in your country
-                                                    </p>
-                                                </div>
-
                                                 <button
                                                     onClick={() => onFiatWithdraw?.()}
                                                     className="w-full max-w-[280px] py-4 md:py-5 rounded-[20px] bg-[#1A6140] text-white font-black uppercase text-[9px] tracking-[0.2em] shadow-xl shadow-[#1A6140]/20 hover:brightness-110 active:scale-[0.97] transition-all"

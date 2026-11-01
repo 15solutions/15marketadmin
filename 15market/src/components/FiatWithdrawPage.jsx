@@ -2,13 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
     ArrowLeft, RefreshCw, Landmark, Building2, Wallet,
-    ShieldCheck, CheckCircle2, XCircle, Clock
+    ShieldCheck, CheckCircle2, XCircle, Clock, ChevronDown, Check, Globe
 } from 'lucide-react';
-import { KEEPER_URL_ARC } from '../constants';
+import { KEEPER_URL_ARC, COUNTRY_LIST } from '../constants';
 
 // ─── Fiat Withdrawal page ─────────────────────────────────────────────────
-// Select the funding account (Trading / Main) → type the country → unique
-// methods reveal. Nigeria unlocks bank transfer (bank · account name ·
+// Select the funding account (Trading / Main) → pick the country from the
+// list → unique methods reveal. Nigeria unlocks bank transfer (bank · account name ·
 // account number · amount); any other country is coming soon for now.
 // Confirming debits the chosen account server-side and pushes the request
 // to the admin console. Approve / deny decisions arrive by email.
@@ -19,6 +19,68 @@ const card = (isLight) => `p-4 md:p-5 rounded-[24px] border ${isLight
 const chipText = (isLight) => isLight ? 'text-black/40' : 'text-white/40';
 const field = (isLight) => `w-full px-4 py-3.5 rounded-2xl border outline-none transition-all ${isLight
     ? 'bg-black/5 border-black/10 focus:border-[#1A6140]' : 'bg-white/5 border-white/10 focus:border-[#1A6140]'}`;
+
+const flagUrl = (code) => `https://flagcdn.com/w40/${String(code || '').toLowerCase()}.png`;
+
+// Branded dropdown list (native <select> renders OS chrome). Options are
+// { value, label, flag? }; the open list scrolls and closes on outside tap.
+function PickList({ isLight, value, onChange, options, placeholder, icon: Icon, disabled }) {
+    const [open, setOpen] = useState(false);
+    const selected = options.find(o => o.value === value) || null;
+    return (
+        <div className="relative w-full">
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setOpen(v => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                className={field(isLight) + ' text-[11px] font-bold flex items-center gap-3 text-left cursor-pointer disabled:opacity-40'}
+            >
+                {selected?.flag ? (
+                    <img src={flagUrl(selected.flag)} alt="" className="w-6 h-4 object-cover rounded-[3px] shrink-0" loading="lazy" />
+                ) : Icon ? (
+                    <Icon size={15} className={`shrink-0 ${chipText(isLight)}`} />
+                ) : null}
+                <span className={`flex-1 truncate ${selected ? (isLight ? 'text-black' : 'text-white') : chipText(isLight)}`}>
+                    {selected ? selected.label : placeholder}
+                </span>
+                <ChevronDown size={14} className={`shrink-0 transition-transform ${chipText(isLight)} ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden="true" />
+                    <div
+                        role="listbox"
+                        className={`absolute left-0 right-0 top-full mt-2 z-20 max-h-56 overflow-y-auto rounded-2xl border shadow-2xl ${
+                            isLight ? 'bg-white border-gray-200' : 'bg-[#0d0d0d] border-white/10'
+                        }`}
+                    >
+                        {options.map(o => {
+                            const active = o.value === value;
+                            return (
+                                <button
+                                    key={o.value}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={active}
+                                    onClick={() => { onChange(o.value); setOpen(false); }}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                                        active ? 'bg-[#1A6140]/15' : (isLight ? 'hover:bg-black/5' : 'hover:bg-white/5')
+                                    }`}
+                                >
+                                    {o.flag && <img src={flagUrl(o.flag)} alt="" className="w-6 h-4 object-cover rounded-[3px] shrink-0" loading="lazy" />}
+                                    <span className={`flex-1 text-[11px] font-bold ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>{o.label}</span>
+                                    {active && <Check size={14} className="text-[#1A6140] shrink-0" strokeWidth={3} />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
 
 const fmt = (n) => `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
@@ -58,8 +120,8 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
 
     useEffect(() => { refresh(); }, [refresh, refreshTick]);
 
-    // Country lookup — debounced; each keystroke asks the backend which
-    // fiat methods (if any) that country carries.
+    // Country lookup — picking a country asks the backend which fiat methods
+    // (if any) that country carries.
     useEffect(() => {
         setBankName(''); setAccountName(''); setAccountNumber(''); setMethods(null);
         if (!country.trim()) return;
@@ -74,7 +136,7 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
             } finally {
                 setMethodsBusy(false);
             }
-        }, 450);
+        }, 150);
         return () => clearTimeout(t);
     }, [country]);
 
@@ -160,12 +222,13 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                     {/* STEP 2 — country */}
                     <div className={card(isLight)}>
                         <p className="text-[10px] font-black uppercase tracking-widest mb-3">2 · Where are you cashing out?</p>
-                        <input
+                        <PickList
+                            isLight={isLight}
                             value={country}
-                            onChange={(e) => setCountry(e.target.value)}
-                            placeholder="Type your country — e.g. Nigeria"
-                            className={field(isLight) + ' text-[11px] font-bold'}
-                            spellCheck={false}
+                            onChange={setCountry}
+                            options={COUNTRY_LIST.map(c => ({ value: c.name, label: c.name, flag: c.code }))}
+                            placeholder="Select your country"
+                            icon={Globe}
                         />
                         {methodsBusy && <p className={`text-[9px] font-black uppercase tracking-widest mt-3 ${chipText(isLight)}`}>Checking methods…</p>}
                         {methods && !methodsBusy && methods.available && (
@@ -191,17 +254,14 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={card(isLight)}>
                             <p className="text-[10px] font-black uppercase tracking-widest mb-3">3 · Bank transfer details</p>
                             <div className="flex flex-col gap-3">
-                                <div className="relative">
-                                    <select
-                                        value={bankName}
-                                        onChange={(e) => setBankName(e.target.value)}
-                                        className={field(isLight) + ` text-[11px] font-bold appearance-none pr-10 ${!bankName ? (isLight ? 'text-black/30' : 'text-white/30') : ''}`}
-                                    >
-                                        <option value="">Select your bank</option>
-                                        {(methods.banks || []).map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
-                                    </select>
-                                    <ChevronDown size={14} className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${chipText(isLight)}`} />
-                                </div>
+                                <PickList
+                                    isLight={isLight}
+                                    value={bankName}
+                                    onChange={setBankName}
+                                    options={(methods.banks || []).map(b => ({ value: b.name, label: b.name }))}
+                                    placeholder="Select your bank"
+                                    icon={Building2}
+                                />
                                 <input value={accountName} onChange={(e) => setAccountName(e.target.value)}
                                     placeholder="Account name (as registered at the bank)"
                                     className={field(isLight) + ' text-[11px] font-bold'} />

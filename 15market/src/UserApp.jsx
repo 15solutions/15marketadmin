@@ -52,6 +52,7 @@ import MobileTradeView from './components/MobileTradeView';
 import NotifyFlash from "./components/NotifyFlash";
 import SuccessOverlay from "./components/SuccessOverlay";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { ModeSwitch } from "./components/ModeSwitch";
 import SideHistoryPane from "./components/SideHistoryPane";
 import WalletConnectionLoading from "./components/WalletConnectionLoading";
 import GlobalLoader from "./components/GlobalLoader";
@@ -3505,13 +3506,12 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                     <>
                       {/* Branded Game Mode Switcher - Mobile: CLASSIC = trading,
                           LADDERS = coming-soon page (rounds model removed) */}
-                      <div className={`flex items-center p-0.5 rounded-full border backdrop-blur-3xl transition-all duration-500 ${theme === 'light' ? 'bg-white/40 border-[#1A6140]/20' : 'bg-black/40 border-white/5'}`}>
-                        {[{ key: 'classic', Icon: Zap, action: () => setView('trading') }, { key: 'ladders', Icon: Layers, action: () => setView('ladders') }].map(({ key, Icon, action }) => (
-                          <button key={key} onClick={action}
-                            className={`relative z-10 flex items-center justify-center h-[28px] w-[54px] transition-all duration-300 ${key === 'classic' ? 'text-[#1A6140]' : (theme === 'light' ? 'text-black/30' : 'text-white/20')}`}>
-                            <Icon size={11} />
-                          </button>
-                        ))}
+                      <div className="scale-[0.8] origin-center -mx-1.5 flex items-center gap-1">
+                        <ModeSwitch
+                          theme={theme}
+                          mode={view === 'ladders' ? 'ladders' : 'classic'}
+                          onChange={(m) => setView(m === 'ladders' ? 'ladders' : 'trading')}
+                        />
                       </div>
                       <div className="scale-[0.8] origin-center -mx-1.5 flex items-center gap-1">
                         <ThemeToggle theme={theme} onToggle={toggleTheme} />

@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp, Check, Search, History, ArrowUp, ArrowDown, X }
 import { priceSocketService } from '../utils/priceSocket';
 import { KEEPER_URL_ARC } from '../constants';
 import { GlobalTradeScroller } from './GlobalTradeScroller';
-import { FlipClock, ProgressBeam, ResolvingOutcome, TradeOutcome } from './TradingWidget';
+import { FlipClock, ProgressBeam, ResolvingOutcome, TradeOutcome, PriceMeterTicker } from './TradingWidget';
 import { isTradeSettled, isTradeInFlight, isTradeOverdue, isWinningTrade, tradeShares } from '../utils/tradeStatus';
 
 const LOGO_MAP = {
@@ -1662,11 +1662,14 @@ export default function MobileTradeView({
                 {isExecuting ? (
                   <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 ) : (
-                  <span className="flex items-center gap-2">
-                    <span>YES</span>
-                    <span className="text-[16px] font-black opacity-95">{yesCents}¢</span>
-                    <span className="text-[9px] font-bold tabular-nums opacity-80">≈ {currentStake > 0 ? (currentStake / Math.max(0.01, yesShare)).toFixed(2) : '0.00'} sh</span>
-                  </span>
+                  <>
+                    <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
+                      YES <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={yesCents} />¢</span>
+                    </span>
+                    <span className="text-[9px] font-bold tabular-nums opacity-80 tracking-wide">
+                      ≈ {currentStake > 0 ? (currentStake / Math.max(0.01, yesShare)).toFixed(2) : '0.00'} shares
+                    </span>
+                  </>
                 )}
               </button>
 
@@ -1680,11 +1683,14 @@ export default function MobileTradeView({
                 {isExecuting ? (
                   <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 ) : (
-                  <span className="flex items-center gap-2">
-                    <span>NO</span>
-                    <span className="text-[16px] font-black opacity-95">{noCents}¢</span>
-                    <span className="text-[9px] font-bold tabular-nums opacity-80">≈ {currentStake > 0 ? (currentStake / Math.max(0.01, noShare)).toFixed(2) : '0.00'} sh</span>
-                  </span>
+                  <>
+                    <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
+                      NO <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={noCents} />¢</span>
+                    </span>
+                    <span className="text-[9px] font-bold tabular-nums opacity-80 tracking-wide">
+                      ≈ {currentStake > 0 ? (currentStake / Math.max(0.01, noShare)).toFixed(2) : '0.00'} shares
+                    </span>
+                  </>
                 )}
               </button>
             </div>
