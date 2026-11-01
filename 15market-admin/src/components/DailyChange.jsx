@@ -21,7 +21,20 @@ export function formatDailyPct(pct) {
  * @param invert  boolean         true when "up" is bad (e.g. open disputes)
  */
 export function DailyChange({ pct, invert = false, size = 'md' }) {
-    if (pct === undefined) return null; // backend has not reported it yet
+    // Backend has not reported a daily figure yet (older backend build, or the
+    // first stats pulse has not landed): keep the slot visible, not hidden.
+    if (pct === undefined) {
+        return (
+            <div
+                className={`flex items-center gap-1 font-black tabular-nums leading-none whitespace-nowrap opacity-30 ${size === 'sm' ? 'text-[8px]' : 'text-[9px]'}`}
+                title="Waiting for daily change data from the backend"
+            >
+                <Minus size={size === 'sm' ? 9 : 10} strokeWidth={3} className="flex-none" />
+                <span>--%</span>
+                <span className="opacity-60 font-bold uppercase tracking-widest">today</span>
+            </div>
+        );
+    }
 
     const flat = pct === 0;
     const up = pct === null || pct > 0;
