@@ -2,30 +2,30 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Rocket } from 'lucide-react';
 
-export default function ComingSoonPage({ onBack, theme, title }) {
+export default function ComingSoonPage({ onBack, theme, title, embedded = false }) {
   const isLight = theme === 'light';
   return (
-    <div className={`w-full h-screen overflow-hidden relative ${isLight ? 'text-black bg-[#CFDCD5]' : 'text-white bg-black'} flex flex-col`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+    <div className={`w-full ${embedded ? 'flex-1 min-h-0' : 'h-screen'} overflow-hidden relative ${embedded ? (isLight ? 'text-black' : 'text-white') : (isLight ? 'text-black bg-[#CFDCD5]' : 'text-white bg-black')} flex flex-col`} style={{ fontFamily: '"Comfortaa", cursive' }}>
       {/* Subtle texture overlay for light mode */}
       <div className={`absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] ${isLight ? '' : 'hidden'}`} />
       
       {/* Background Decor */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+      <div className={`${embedded ? 'absolute' : 'fixed'} inset-0 pointer-events-none overflow-hidden z-0`}>
           <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-[#1A6140]/10 rounded-full blur-[120px] mix-blend-screen opacity-30" />
           <div className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-[#1A6140]/5 rounded-full blur-[100px] mix-blend-screen opacity-30" />
       </div>
 
       {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center p-4 relative z-10 w-full h-full">
-        {/* Back button */}
-        <button
+        {/* Back button (full-page mode only; embedded mode keeps the app navbar) */}
+        {!embedded && <button
           onClick={onBack}
           className={`absolute left-4 p-2 rounded-full ${isLight ? 'bg-white/40 hover:bg-white/80 border border-[#1A6140]/20 shadow-sm' : 'bg-white/5 hover:bg-white/10 border border-white/5 shadow-md'} transition-all`}
           style={{ top: typeof window !== 'undefined' && window.innerWidth < 1024 ? 'calc(env(safe-area-inset-top) + 16px)' : '16px' }}
           title="Back"
         >
           <ArrowLeft size={24} className={isLight ? 'text-black' : 'text-white'} />
-        </button>
+        </button>}
 
       {/* Icon */}
       <motion.div

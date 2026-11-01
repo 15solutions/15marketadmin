@@ -3394,8 +3394,8 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               onReferral={() => setView("referral")}
               onSelect={(type) => setView("comingsoon")}
             />
-          ) : view === "comingsoon" || view === "ladders" ? (
-            <ComingSoonPage onBack={() => setView("dashboard")} theme={theme} title={view === "ladders" ? "Ladders" : undefined} />
+          ) : view === "comingsoon" ? (
+            <ComingSoonPage onBack={() => setView("dashboard")} theme={theme} />
           ) : view === "circle_wallet" ? (
             <CircleWalletPage
               address={address}
@@ -3466,7 +3466,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                           <button key={key} onClick={action}
                             style={{ fontFamily: '"Comfortaa", cursive' }}
                             className={`h-[26px] px-3 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center ${
-                              key === 'classic'
+                              key === (view === 'ladders' ? 'ladders' : 'classic')
                                 ? 'bg-[#1A6140] text-white shadow-sm'
                                 : (theme === 'light' ? 'text-gray-400 hover:text-gray-600' : 'text-white/40 hover:text-white/60')
                             }`}>
@@ -3537,8 +3537,12 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
               {/* MAIN CONTENT CONTAINER */}
               <div className={`w-full ${uiVersion === 'v2' ? 'max-w-[1600px] px-2 md:px-6 lg:px-8 focus-visible:outline-none' : 'max-w-4xl lg:max-w-7xl px-4 sm:px-6 lg:px-8'} ${isSmallScreen ? '!px-0' : ''} flex flex-col items-center flex-1 min-h-0 h-full relative z-10`}>
-              {/* MOBILE: vertical layout matching reference screenshot */}
-              {isSmallScreen ? (
+              {/* LADDERS: coming-soon panel inside the normal layout, so the
+                  navbar (and the Classic/Ladders switch) stays on screen */}
+              {view === 'ladders' ? (
+                <ComingSoonPage embedded theme={theme} title="Ladders" />
+              ) : /* MOBILE: vertical layout matching reference screenshot */
+              isSmallScreen ? (
                 <div className="flex-1 w-full min-h-0 overflow-hidden flex flex-col">
                   <MobileTradeView
                     theme={theme}
