@@ -1543,10 +1543,13 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <div className="absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
                             )}
                             
-                            {/* Close — pulled lower so it clears the phone status bar */}
-                            <button onClick={() => setIsMobileMenuOpen(false)} className={`absolute right-6 z-10 p-2 rounded-xl border ${isLight ? 'bg-white/50 border-[#1A6140]/20 text-[#0a261a] shadow-sm hover:bg-white' : 'bg-white/5 border-white/10 text-white'}`}
-                                style={{ top: 'calc(env(safe-area-inset-top) + 3.5rem)' }}>
-                                <X size={16} />
+                            {/* Close — bare X icon, bottom-right of the menu footer (no box) */}
+                            <button
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                aria-label="Close menu"
+                                className={`absolute right-5 z-10 p-2 bg-transparent border-0 outline-none transition-opacity hover:opacity-70 active:scale-90 ${isLight ? 'text-[#0a261a]' : 'text-white'}`}
+                                style={{ bottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}>
+                                <X size={20} />
                             </button>
 
                             <button onClick={() => { setIsMobileMenuOpen(false); onHelp(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
