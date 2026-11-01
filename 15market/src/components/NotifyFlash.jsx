@@ -104,25 +104,25 @@ export default function NotifyFlash({ message, kind = 'success', onClick, onClos
             role="status"
             aria-live="polite"
         >
-            {/* MOBILE — wordless: one animated verdict icon + footer logo */}
+            {/* MOBILE — wordless: one animated verdict icon + footer logo.
+                The page itself is the GlobalLoader canvas: dark → black with
+                the carbon-fibre weave, light → brand green with the weave.
+                No text above or below the icon — the mark speaks alone. */}
             <div
                 onClick={dismiss}
                 className="md:hidden absolute inset-0 flex items-center justify-center"
                 style={{ backgroundColor: isLight ? '#1A6140' : '#050505' }}
             >
-                {isLight && (
-                    <>
-                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 38%, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 60%)' }} />
-                        <div className="absolute inset-0 opacity-[0.18] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-                    </>
-                )}
+                {/* Branded background texture — the same carbon-fibre weave
+                    the loading modal wears, same opacity, both modes. */}
+                <div className="absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
                 <VerdictMark kind={kind} color={isLight ? '#FFFFFF' : cfg.ink} />
                 <span className="sr-only">{message}</span>
                 <img
-                    src="/gowlogo.png"
+                    src={isLight ? '/goblogo.png' : '/gowlogo.png'}
                     alt="15market"
                     className="absolute left-1/2 -translate-x-1/2 h-[52px] w-auto pointer-events-none select-none"
-                    style={{ bottom: 'calc(env(safe-area-inset-bottom) + 28px)', filter: 'brightness(0) invert(1)' }}
+                    style={{ bottom: 'calc(env(safe-area-inset-bottom) + 28px)', filter: isLight ? 'brightness(0)' : 'brightness(0) invert(1)' }}
                 />
             </div>
 
