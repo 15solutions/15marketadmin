@@ -24,6 +24,7 @@ import { LandingPage } from "./components/LandingPage";
 import { DashboardPage } from "./components/DashboardPage";
 import ComingSoonPage from "./components/ComingSoonPage";
 import { CircleWalletPage } from "./components/CircleWalletPage";
+import { FiatWithdrawPage } from "./components/FiatWithdrawPage";
 import { ReferralHub } from "./components/ReferralHub";
 import HelpPage from "./components/HelpPage";
 
