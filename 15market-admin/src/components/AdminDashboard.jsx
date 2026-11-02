@@ -187,6 +187,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     // become a baseline.
     const [statsReady, setStatsReady] = useState(false);
     const statsReadyRef = useRef(false);
+    const sawFullPulseRef = useRef(false);
     const dailyChanges = useDailyChanges(stats, statsReady);
 
     // RouteGlobe renders the reference design stock (Muscat hub, flight-city
@@ -605,11 +606,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         const applyStats = (data) => {
             if (!data) return;
             // The full pulse carries a timestamp; the on-connect snapshot counts
-            // wallets differently, so once live it must not move that figure.
+            // wallets differently, so once a full pulse has been seen the
+            // snapshot must not move that figure.
             const isFullPulse = !!data.timestamp;
-            const incoming = (!isFullPulse && statsReadyRef.current) ? (({ totalWallets, ...rest }) => rest)(data) : data;
+            if (isFullPulse) sawFullPulseRef.current = true;
+            const incoming = (!isFullPulse && sawFullPulseRef.current) ? (({ totalWallets, ...rest }) => rest)(data) : data;
             setStats(prev => ({ ...prev, ...incoming }));
-            if (isFullPulse && !statsReadyRef.current) {
+            // Daily counting starts from the first real payload of any kind, so
+            // it never depends on a backend field that an older build lacks.
+            if (!statsReadyRef.current) {
                 statsReadyRef.current = true;
                 setStatsReady(true);
             }

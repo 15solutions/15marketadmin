@@ -113,7 +113,10 @@ export function useDailyChanges(stats, ready) {
         for (const key of METRIC_KEYS) {
             const backend = stats?.daily?.[key];
             if (backend && backend.pct !== undefined) { out[key] = backend; continue; }
-            if (!ready || !(key in store.baseline)) continue;
+            if (!ready) continue;
+            // No reading yet for this metric (e.g. the payload has not carried
+            // it): it sits at 0% until its first value becomes the baseline.
+            if (!(key in store.baseline)) { out[key] = { pct: 0, base: null }; continue; }
             const base = store.baseline[key];
             const cur = Number(stats?.[key]);
             if (!Number.isFinite(cur)) continue;
