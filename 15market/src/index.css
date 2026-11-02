@@ -723,3 +723,45 @@ iframe[id*="privy"] {
   z-index: 2147483647 !important;
 }
 */
+/* ── Swap card (components/ui/swap-card) theme ─────────────────────────────
+   The shadcn-style ui components read these variables. They are scoped to the
+   swap card (and its dropdown, which portals to <body>) so the rest of the app
+   is untouched. Dark by default; `.light` (set on <html>/<body>) flips them. */
+.swap-card-theme {
+  --background: 0 0% 2%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 2%;
+  --card-foreground: 0 0% 100%;
+  --popover: 150 14% 8%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 147 57% 24%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 150 12% 15%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 150 14% 9%;
+  --muted-foreground: 150 6% 62%;
+  --accent: 150 12% 16%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 150 10% 16%;
+  --input: 150 10% 16%;
+  --ring: 147 57% 34%;
+}
+
+.light .swap-card-theme {
+  --background: 0 0% 100%;
+  --foreground: 150 40% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 150 40% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 150 40% 10%;
+  --secondary: 150 12% 91%;
+  --secondary-foreground: 150 40% 10%;
+  --muted: 150 12% 95%;
+  --muted-foreground: 150 8% 38%;
+  --accent: 150 14% 90%;
+  --accent-foreground: 150 40% 10%;
+  --border: 150 12% 86%;
+  --input: 150 12% 86%;
+}

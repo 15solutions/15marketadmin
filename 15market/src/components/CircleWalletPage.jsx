@@ -10,6 +10,22 @@ import WalletConnectionLoading from './WalletConnectionLoading';
 import * as ethers from 'ethers';
 import { useWallets, usePrivy, useCreateWallet, useLinkAccount } from '@privy-io/react-auth';
 import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
+import { SwapCard } from '@/components/ui/swap-card';
+
+// ─── Swap tab: tokens + indicative rates (swaps open soon) ────────────────
+const swapGlyph = (glyph) => function SwapTokenIcon({ className }) {
+    return (
+        <span className={`inline-flex items-center justify-center rounded-full bg-primary/20 text-primary font-black leading-none ${className || ''}`} aria-hidden="true">
+            {glyph}
+        </span>
+    );
+};
+const SWAP_TOKEN_LIST = [
+    { symbol: 'USDC', name: 'USD Coin', icon: swapGlyph('$'), decimals: 4 },
+    { symbol: 'EURC', name: 'Euro Coin', icon: swapGlyph('€'), decimals: 4 },
+    { symbol: 'cirBTC', name: 'Circle Bitcoin', icon: swapGlyph('₿'), decimals: 8 },
+];
+const SWAP_RATES = { 'USDC-EURC': 0.921, 'EURC-USDC': 1.086, 'USDC-cirBTC': 0.0000142, 'cirBTC-USDC': 70422, 'EURC-cirBTC': 0.0000131, 'cirBTC-EURC': 76543 };
 
 const CHAIN_CONFIG = {
     'mon': { rpc: 'https://testnet-rpc.monad.xyz/', isEVM: true, usdc: '0x534b2f3A21130d7a60830c2Df862319e593943A3', paymasterSupported: false, permitName: 'USDC' },
@@ -235,27 +251,6 @@ export function CircleWalletPage({
     const [isSending, setIsSending] = useState(false);
     const [qrCodeData, setQrCodeData] = useState("");
     const [activeTab, setActiveTab] = useState('assets');
-    // Swap tab state
-    const [swapFrom, setSwapFrom] = useState('USDC');
-    const [swapTo, setSwapTo] = useState('EURC');
-    const [swapAmount, setSwapAmount] = useState('');
-    const [swapQuote, setSwapQuote] = useState(null);
-    const [isGettingQuote, setIsGettingQuote] = useState(false);
-    const SWAP_TOKENS = ['USDC', 'EURC', 'cirBTC'];
-    const SWAP_RATES = { 'USDC-EURC': 0.921, 'EURC-USDC': 1.086, 'USDC-cirBTC': 0.0000142, 'cirBTC-USDC': 70422, 'EURC-cirBTC': 0.0000131, 'cirBTC-EURC': 76543 };
-    const getSwapQuote = () => {
-        if (!swapAmount || isNaN(swapAmount) || parseFloat(swapAmount) <= 0) return;
-        setIsGettingQuote(true);
-        setSwapQuote(null);
-        setTimeout(() => {
-            const key = `${swapFrom}-${swapTo}`;
-            const rate = SWAP_RATES[key] || 1;
-            const output = (parseFloat(swapAmount) * rate).toFixed(swapTo === 'cirBTC' ? 8 : 4);
-            const fee = (parseFloat(swapAmount) * 0.003).toFixed(4);
-            setSwapQuote({ output, rate, fee, from: swapFrom, to: swapTo, input: swapAmount });
-            setIsGettingQuote(false);
-        }, 900);
-    };
     const [isDownloading, setIsDownloading] = useState(false);
     const [copied, setCopied] = useState(false);
     const [showDesktopFunding, setShowDesktopFunding] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
@@ -1767,7 +1762,7 @@ export function CircleWalletPage({
                                 Assets & Funding
                                 {activeTab === 'assets' && <motion.div layoutId="tab-underline" className={`absolute bottom-0 left-0 right-0 h-[2.5px] ${isLight ? 'bg-black' : 'bg-white'}`} />}
                             </button>
-                            <button onClick={() => { setActiveTab('swap'); setSwapQuote(null); }} className={`pb-4 text-xs font-black uppercase tracking-[0.2em] transition-all relative ${activeTab === 'swap' ? (isLight ? 'text-black' : 'text-white') : (isLight ? 'text-black/20' : 'text-white/20')}`}>
+                            <button onClick={() => setActiveTab('swap')} className={`pb-4 text-xs font-black uppercase tracking-[0.2em] transition-all relative ${activeTab === 'swap' ? (isLight ? 'text-black' : 'text-white') : (isLight ? 'text-black/20' : 'text-white/20')}`}>
                                 Swap
                                 {activeTab === 'swap' && <motion.div layoutId="tab-underline" className={`absolute bottom-0 left-0 right-0 h-[2.5px] ${isLight ? 'bg-black' : 'bg-white'}`} />}
                             </button>
@@ -1779,96 +1774,17 @@ export function CircleWalletPage({
 
                         <div className={`flex-1 overflow-visible md:overflow-hidden custom-scrollbar pr-2 pb-20`}>
                             {activeTab === 'swap' ? (
-                                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-6 py-2">
-                                    {/* Coming Soon Banner */}
-                                    <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-[#1A6140]/30 bg-[#1A6140]/10">
-                                        <span className="text-[#1A6140] text-lg">⚡</span>
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-[#1A6140]">Coming Soon</p>
-                                            <p className={`text-[10px] font-semibold mt-0.5 ${isLight ? 'text-black/50' : 'text-white/40'}`}>Native Arc asset swaps — USDC, EURC, cirBTC. Get a quote now.</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Token Selectors */}
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex-1 flex flex-col gap-1.5">
-                                            <p className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/30'}`}>From</p>
-                                            <div className="flex gap-2 flex-wrap">
-                                                {SWAP_TOKENS.map(t => (
-                                                    <button key={t} onClick={() => { setSwapFrom(t); if (t === swapTo) setSwapTo(SWAP_TOKENS.find(x => x !== t)); setSwapQuote(null); }}
-                                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
-                                                            swapFrom === t ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-black/5 border-black/10 text-black/60 hover:bg-black/10' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
-                                                        }`}>{t}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-4 ${isLight ? 'bg-black/5' : 'bg-white/5'} cursor-pointer hover:bg-[#1A6140]/20 transition-all`}
-                                            onClick={() => { const tmp = swapFrom; setSwapFrom(swapTo); setSwapTo(tmp); setSwapQuote(null); }}>
-                                            <span className="text-[#1A6140] text-sm">⇄</span>
-                                        </div>
-                                        <div className="flex-1 flex flex-col gap-1.5">
-                                            <p className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/30'}`}>To</p>
-                                            <div className="flex gap-2 flex-wrap">
-                                                {SWAP_TOKENS.filter(t => t !== swapFrom).map(t => (
-                                                    <button key={t} onClick={() => { setSwapTo(t); setSwapQuote(null); }}
-                                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
-                                                            swapTo === t ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-black/5 border-black/10 text-black/60 hover:bg-black/10' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
-                                                        }`}>{t}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Amount Input */}
-                                    <div className="flex flex-col gap-2">
-                                        <p className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/30'}`}>Amount ({swapFrom})</p>
-                                        <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl border-2 transition-all ${isLight ? 'bg-black/5 border-black/10 focus-within:border-[#1A6140]/40' : 'bg-white/5 border-white/5 focus-within:border-[#1A6140]/40'}`}>
-                                            <input
-                                                type="number"
-                                                placeholder="0.00"
-                                                value={swapAmount}
-                                                onChange={e => { setSwapAmount(e.target.value); setSwapQuote(null); }}
-                                                className={`flex-1 bg-transparent outline-none text-2xl font-black ${isLight ? 'text-black' : 'text-white'} placeholder-white/20`}
-                                            />
-                                            <span className="text-[10px] font-black text-[#1A6140] uppercase">{swapFrom}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Get Quote Button */}
-                                    <button
-                                        onClick={getSwapQuote}
-                                        disabled={!swapAmount || isGettingQuote}
-                                        className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all ${
-                                            !swapAmount ? 'bg-white/5 text-white/20 cursor-not-allowed' :
-                                            isGettingQuote ? 'bg-[#1A6140]/50 text-white animate-pulse' :
-                                            'bg-[#1A6140] text-white hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#1A6140]/20'
-                                        }`}
-                                    >
-                                        {isGettingQuote ? 'Fetching Quote...' : 'Get Quote'}
-                                    </button>
-
-                                    {/* Quote Result */}
-                                    {swapQuote && (
-                                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                                            className={`p-5 rounded-2xl border flex flex-col gap-3 ${isLight ? 'bg-black/5 border-black/10' : 'bg-white/5 border-white/10'}`}>
-                                            <div className="flex items-center justify-between">
-                                                <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/30'}`}>You Receive</span>
-                                                <span className="text-[#1A6140] text-lg font-black">{swapQuote.output} {swapQuote.to}</span>
-                                            </div>
-                                            <div className={`w-full h-[1px] ${isLight ? 'bg-black/10' : 'bg-white/5'}`} />
-                                            <div className="flex items-center justify-between">
-                                                <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/30'}`}>Rate</span>
-                                                <span className={`text-[10px] font-black ${isLight ? 'text-black/60' : 'text-white/60'}`}>1 {swapQuote.from} ≈ {swapQuote.rate} {swapQuote.to}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/30'}`}>Est. Fee (0.3%)</span>
-                                                <span className={`text-[10px] font-black ${isLight ? 'text-black/60' : 'text-white/60'}`}>{swapQuote.fee} {swapQuote.from}</span>
-                                            </div>
-                                            <button disabled className="w-full py-3 rounded-xl bg-[#1A6140]/20 text-[#1A6140] font-black uppercase text-[9px] tracking-widest cursor-not-allowed mt-1">
-                                                Execute Swap — Coming Soon
-                                            </button>
-                                        </motion.div>
-                                    )}
+                                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="py-2">
+                                    <SwapCard
+                                        tokens={SWAP_TOKEN_LIST}
+                                        initialSellToken={SWAP_TOKEN_LIST[0]}
+                                        initialBuyToken={SWAP_TOKEN_LIST[1]}
+                                        rates={SWAP_RATES}
+                                        balances={currentWallet && currentWallet.key !== 'solana' ? { USDC: Number(currentWallet.bal) || 0 } : {}}
+                                        ctaLabel="Swap — Coming Soon"
+                                        ctaDisabled
+                                        note="Native Arc asset swaps (USDC, EURC, cirBTC) are opening soon. Rates shown are indicative."
+                                    />
                                 </motion.div>
                             ) : activeTab === 'assets' ? (
                                 <div className="flex flex-col gap-6">
