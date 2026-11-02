@@ -3276,7 +3276,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
 
   return (
-    <div className={`min-h-screen ${!isSmallScreen ? 'h-screen' : 'h-screen h-[100dvh]'} w-full text-current selection:bg-[#1A6140]/30 selection:text-white transition-colors duration-500 overflow-hidden font-sans relative ${isLight ? 'bg-white' : 'bg-black'}`}>
+    <div className={`${!isSmallScreen ? 'min-h-screen h-screen' : 'min-h-0 h-full'} w-full text-current selection:bg-[#1A6140]/30 selection:text-white transition-colors duration-500 overflow-hidden font-sans relative ${isLight ? 'bg-white' : 'bg-black'}`}>
       <div className={`fixed inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] ${isLight ? 'hidden' : ''}`} />
 
       {/* Landscape Blocker — branded fullscreen gate for mobile devices in landscape */}
@@ -3351,7 +3351,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
       <ErrorBoundary>
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className={`${isLandscapeBlocked ? 'hidden' : 'min-h-screen'} ${!isSmallScreen ? 'h-screen' : 'h-screen h-[100dvh]'} w-full overflow-hidden font-sans flex flex-col items-center ${themeClass}`}
+          className={`${isLandscapeBlocked ? 'hidden' : (!isSmallScreen ? 'min-h-screen' : 'min-h-0')} ${!isSmallScreen ? 'h-screen' : 'h-full'} w-full overflow-hidden font-sans flex flex-col items-center ${themeClass}`}
           style={{
             color: theme === 'light' ? '#1f2937' : '#ffffff',
             transition: "color 0.3s ease"
