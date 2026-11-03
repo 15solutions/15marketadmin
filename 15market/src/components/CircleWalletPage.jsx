@@ -1735,8 +1735,6 @@ export function CircleWalletPage({
                             Fixed 448 × 260 canvas, uniformly scaled to fit the screen. */}
                         <style>{`
                             @import url('https://fonts.cdnfonts.com/css/sankyu');
-                            @keyframes aurora-slide { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
-                            .aurora-dash { animation: aurora-slide 5.5s linear infinite; }
                         `}</style>
                         <div ref={hubDeckRef} className="relative w-full max-w-[448px] mt-4 md:mt-0" style={{ aspectRatio: '448 / 260' }}>
                             {/* Fixed-design canvas (448 × 260), uniformly scaled to fit
@@ -1798,22 +1796,28 @@ export function CircleWalletPage({
                                                 {/* NFC icon, top right — level with the brand logo */}
                                                 <Nfc size={24} className="absolute top-4 right-6 text-white/65 pointer-events-none" />
 
-                                                {/* Aurora beam — thin, glowing, hugging the card outline */}
-                                                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 448 260" fill="none" style={{ overflow: 'visible' }}>
-                                                    <defs>
-                                                        <linearGradient id="aurora-stroke-hub" x1="0" y1="0" x2="1" y2="0">
-                                                            <stop offset="0%" stopColor="rgba(126,255,199,0)" />
-                                                            <stop offset="50%" stopColor="rgba(126,255,199,0.9)" />
-                                                            <stop offset="100%" stopColor="rgba(255,255,255,0.95)" />
-                                                        </linearGradient>
-                                                    </defs>
-                                                    <rect x="2" y="2" width="444" height="256" rx="39" pathLength="100"
-                                                        stroke="url(#aurora-stroke-hub)" strokeWidth="4.5" strokeDasharray="12 88" className="aurora-dash"
-                                                        style={{ filter: 'blur(3.5px)', opacity: 0.55, strokeLinecap: 'round' }} />
-                                                    <rect x="2" y="2" width="444" height="256" rx="39" pathLength="100"
-                                                        stroke="url(#aurora-stroke-hub)" strokeWidth="1.5" strokeDasharray="12 88" className="aurora-dash"
-                                                        style={{ strokeLinecap: 'round' }} />
-                                                </svg>
+                                                {/* Border beam — the light rides exactly ON the card's outline. A
+                                                    static clip keeps only a thin band over the border ring while
+                                                    the conic gradient behind it rotates: the glow travels along
+                                                    the card's real edge, not as a separate floating beam. */}
+                                                <div className="pointer-events-none absolute inset-0 rounded-[40px]"
+                                                    style={{
+                                                        padding: '3px',
+                                                        maskImage: 'linear-gradient(#000 0 0)',
+                                                        WebkitMaskImage: 'linear-gradient(#000 0 0)',
+                                                        maskClip: 'padding-box, border-box',
+                                                        WebkitMaskClip: 'padding-box, border-box',
+                                                        maskComposite: 'exclude',
+                                                        WebkitMaskComposite: 'xor'
+                                                    }}>
+                                                    <motion.div
+                                                        className="absolute inset-0"
+                                                        style={{
+                                                            background: 'conic-gradient(from 0deg, rgba(126,255,199,0) 0deg, rgba(126,255,199,0) 62%, rgba(126,255,199,0.38) 86%, rgba(255,255,255,0.98) 97%, rgba(126,255,199,0) 100%)'
+                                                        }}
+                                                        animate={{ rotate: 360 }}
+                                                        transition={{ duration: 5.5, repeat: Infinity, ease: 'linear' }} />
+                                                </div>
 
                                                 {/* Card Face: all-white brand logo (top-left) · username (+ wallet
                                                     label beneath) centered on the left half · bottom line =
