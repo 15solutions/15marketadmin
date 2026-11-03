@@ -1343,26 +1343,11 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
         }
       }
 
+      // Win payouts credit the ledger and raise the payoutSettled flags, but
+      // NEVER pop a success/confirmation page — the trade outcome animation
+      // already shows the user they won.
       if (data.reason === 'WIN' || data.reason === 'WIN_PAYOUT' || data.reason === 'WIN_PAYOUT_SETTLED') {
         const payoutAmt = parseFloat(data.payout || 0);
-        const reasonLabel = data.reason === 'WIN_PAYOUT_SETTLED' ? 'Confirmed' : 'Received';
-
-        notify(`$${payoutAmt.toFixed(2)} has been added to your balance`, "success", () => {
-          // Find the trade in history or active to show receipt
-          const tid = String(data.betId || "");
-          const tx = String(data.txHash || "");
-          const trade = [...activeTrades, ...tradeHistory].find(t =>
-            (tid && String(t.id || t.nonce) === tid) ||
-            (tx && String(t.tx || t.txHash) === tx)
-          );
-          if (trade) {
-            setShareTrade({
-              ...trade,
-              tx: data.txHash || trade.tx
-            });
-            setIsShareCardOpen(true);
-          }
-        });
 
         if (data.reason === 'WIN_PAYOUT_SETTLED') {
           const tid = String(data.betId || "");
@@ -1431,9 +1416,8 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
       setActiveTrades(prev => prev.map(updateFn));
       setTradeHistory(prev => prev.map(updateFn));
-      if (payoutAmt > 0) {
-        notify(`Payout Confirmed: +$${payoutAmt.toFixed(2)}`, "success");
-      }
+      // The outcome animation already tells the user the trade result — no
+      // confirmation page on top of the payout.
       triggerGlobalRefresh(true);
     });
 
@@ -2391,9 +2375,9 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
         return [settledRecord, ...prev];
       });
 
-      if (data.won) {
-        notify(`🏆 Trade WON! +$${payout}`, 'success');
-      } else {
+      // The win/loss animation in the trade widget is the outcome surface —
+      // never a success page on top of it.
+      if (!data.won) {
         notify('Trade LOST.', 'error');
       }
 
