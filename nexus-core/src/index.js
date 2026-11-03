@@ -409,6 +409,8 @@ app.post('/admin/users/suspend', requirePerm('users.manage'), async (req, res) =
  * Approve / deny emails the user automatically.
  */
 const fiat = require('./fiat');
+// Tower Exchange proxy — the DEX aggregator behind the Transfer Hub swap.
+const tower = require('./tower');
 
 // Mirror of fundingService.creditTradingWallet for debits: session cache
 // first (live display), then the persisted profile balance (source of truth).
@@ -550,6 +552,52 @@ app.post('/fiat/withdraw/:address', async (req, res) => {
         `Your request to withdraw ${out.request.amount} USDC (local fiat payout) from your ${source} wallet has been submitted. The funds are already in the platform vault — the team will review your request shortly.`,
         'info').catch(() => {});
     res.json({ ok: true, request: out.request });
+});
+
+/**
+ * Tower Exchange — DEX aggregator swaps for the Transfer Hub.
+ * The developer key lives server-side only; the client gets display amounts,
+ * the resolved quote, and the unsigned approval/swap calldata it signs.
+ * The build route requires the signer's address, so the global suspension
+ * gate applies automatically (body carries `address`).
+ */
+app.post('/swap/quote', async (req, res) => {
+    try {
+        const data = await tower.quote({
+            inputToken: req.body?.inputToken,
+            outputToken: req.body?.outputToken,
+            amount: req.body?.amount,
+            slippageTolerance: req.body?.slippageTolerance
+        });
+        res.json({ success: true, ...data });
+    } catch (e) {
+        res.status(e.status || 400).json({ success: false, error: e.message });
+    }
+});
+
+app.post('/swap/build-tx', async (req, res) => {
+    try {
+        const data = await tower.build({
+            inputToken: req.body?.inputToken,
+            outputToken: req.body?.outputToken,
+            amount: req.body?.amount,
+            slippageTolerance: req.body?.slippageTolerance,
+            address: req.body?.address
+        });
+        res.json({ success: true, ...data });
+    } catch (e) {
+        res.status(e.status || 400).json({ success: false, error: e.message });
+    }
+});
+
+// Sellable balances for the swap card (Tower's wallet indexer, token mode).
+app.get('/swap/balance/:address', async (req, res) => {
+    try {
+        const data = await tower.balanceOf(req.params.address);
+        res.json({ success: true, ...data });
+    } catch (e) {
+        res.status(e.status || 400).json({ success: false, error: e.message });
+    }
 });
 
 app.get('/admin/fiat', requirePerm('users.manage'), async (req, res) => {

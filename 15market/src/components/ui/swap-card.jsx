@@ -133,6 +133,7 @@ const SwapCard = React.forwardRef(
       balances = {},
       feeRate = 0.003,
       onSwap,
+      onSelectionChange,
       ctaLabel = "Swap",
       ctaDisabled = false,
       note,
@@ -144,6 +145,12 @@ const SwapCard = React.forwardRef(
     const [buyToken, setBuyToken] = React.useState(initialBuyToken);
     const [sellAmount, setSellAmount] = React.useState("");
     const [flipped, setFlipped] = React.useState(0);
+
+    // Report selections up so the host can quote live rates through its own
+    // price source (Tower quotes need the picked pair + amount).
+    React.useEffect(() => {
+      onSelectionChange?.({ sellAmount, sellToken, buyToken });
+    }, [onSelectionChange, sellAmount, sellToken, buyToken]);
 
     const rateOf = (from, to) => (from.symbol === to.symbol ? 1 : rates[`${from.symbol}-${to.symbol}`]);
     const rate = rateOf(sellToken, buyToken);

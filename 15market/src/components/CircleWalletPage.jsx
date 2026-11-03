@@ -237,6 +237,170 @@ export function CircleWalletPage({
     const [fundingAmount, setFundingAmount] = useState('');
     const [isFundingSuccess, setIsFundingSuccess] = useState(false);
 
+    // ─── Tower Exchange live swapping ( Swap tab ) ───────────────────────────
+    // Live rates replace the indicative table: every pick/amount debounces a
+    // server-side Tower quote (our API key never reaches the browser). Stage
+    // text rides in the BUTTON — pending never takes the page.
+    const [swapRates, setSwapRates] = useState(SWAP_RATES);
+    const [swapFeeRate, setSwapFeeRate] = useState(0.003);
+    const [swapSel, setSwapSel] = useState(null); // { sellAmount, sellToken, buyToken }
+    const [swapBusy, setSwapBusy] = useState(false);
+    const [swapStage, setSwapStage] = useState('');
+    const swapReadProviderRef = useRef(null);
+
+    const handleSwapSelection = useCallback((sel) => {
+        setSwapSel(prev => (prev
+            && prev.sellAmount === sel?.sellAmount
+            && prev.sellToken === sel?.sellToken
+            && prev.buyToken === sel?.buyToken) ? prev : sel);
+    }, []);
+
+    // Sellable balances — Tower's on-chain token bucket (the ERC-20 USDC the
+    // swap actually executes against, not the native gas bucket).
+    const [swapBalances, setSwapBalances] = useState({});
+    useEffect(() => {
+        if (!address) return;
+        let dead = false;
+        (async () => {
+            try {
+                const res = await fetch(`${KEEPER_URL_ARC}/swap/balance/${String(address).toLowerCase()}`);
+                const data = await res.json();
+                if (!dead && data?.success) {
+                    const b = {};
+                    for (const [k, v] of Object.entries(data.balances || {})) b[k] = Number(v) || 0;
+                    setSwapBalances(b);
+                }
+            } catch { /* balances stay empty */ }
+        })();
+        return () => { dead = true; };
+    }, [address]);
+
+    useEffect(() => {
+        if (!swapSel?.sellToken || !swapSel?.buyToken) return;
+        const sell = swapSel.sellToken, buy = swapSel.buyToken;
+        if (sell.symbol === buy.symbol) return;
+        const amt = parseFloat(swapSel.sellAmount);
+        const askAmt = (Number.isFinite(amt) && amt > 0) ? amt : 1; // 1-unit probe keeps a fresh rate on the cards before typing
+        const pair = `${sell.symbol}-${buy.symbol}`;
+        const reversePair = `${buy.symbol}-${sell.symbol}`;
+        const t = setTimeout(async () => {
+            try {
+                const res = await fetch(`${KEEPER_URL_ARC}/swap/quote`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ inputToken: sell.symbol, outputToken: buy.symbol, amount: askAmt })
+                });
+                const data = await res.json();
+                const rate = Number(data?.rate);
+                if (data?.success && rate > 0) {
+                    setSwapRates(prev => ({ ...prev, [pair]: rate, [reversePair]: 1 / rate }));
+                    const bps = Number(data?.feeBps);
+                    if (bps > 0) setSwapFeeRate(bps / 10000);
+                }
+            } catch { /* keep the last known indicative rate */ }
+        }, 600);
+        return () => clearTimeout(t);
+    }, [swapSel?.sellToken?.symbol, swapSel?.buyToken?.symbol, swapSel?.sellAmount]);
+
+    const ARC_SWAP_RPC = 'https://rpc.testnet.arc.io';
+
+    // Executes the whole on-chain swap: server builds the approval + swap
+    // calldata (quoting happens server-side so nothing can be forged), the
+    // main wallet signs approval (ERC-20 inputs only) then the swap, and the
+    // receipt decides the verdict — all notifications through NotifyFlash.
+    const executeSwap = async ({ sellAmount, sellToken, buyToken }) => {
+        if (swapBusy) return;
+        const amt = parseFloat(sellAmount);
+        if (!(amt > 0)) return;
+        if (!address) return notify('Connect your wallet first', 'error');
+        // Resolve the signing wallet exactly like the send flow: prefer the
+        // external connector whose address matches, then any external, then
+        // the Privy embedded wallet.
+        const eoaWallet = wallets?.find(w => w.address?.toLowerCase() === (mainWalletAddress || '').toLowerCase())
+            || wallets?.find(w => w.walletClientType !== 'privy')
+            || wallets?.find(w => w.walletClientType === 'privy')
+            || wallets?.[0];
+        if (!eoaWallet) return notify('No connected wallet found — reopen the Transfer Hub', 'error');
+
+        setSwapBusy(true);
+        setSwapStage('Routing your swap…');
+        try {
+            // Arc first (same guarded switch pattern as the send flow)
+            try {
+                await Promise.race([
+                    eoaWallet.switchChain?.(5042002),
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+                ]);
+            } catch { /* already on Arc / switch not needed */ }
+
+            const buildRes = await fetch(`${KEEPER_URL_ARC}/swap/build-tx`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    inputToken: sellToken.symbol,
+                    outputToken: buyToken.symbol,
+                    amount: amt,
+                    address: eoaWallet.address
+                })
+            });
+            const built = await buildRes.json();
+            if (!buildRes.ok || !built?.success || !built?.swap) {
+                throw new Error(built?.error || 'Tower could not route this swap right now');
+            }
+            const { approval, swap } = built;
+
+            const ethProvider = await eoaWallet.getEthereumProvider();
+            const provider = new ethers.BrowserProvider(ethProvider, 'any');
+            const signer = await provider.getSigner();
+            if (!swapReadProviderRef.current) {
+                swapReadProviderRef.current = new ethers.JsonRpcProvider(ARC_SWAP_RPC, 5042002, { staticNetwork: true });
+            }
+            const readProvider = swapReadProviderRef.current;
+
+            // 1) The executor pulls ERC-20 inputs via an approval first.
+            //    Selling the NATIVE USDC needs nothing (Tower skips approval).
+            if (approval?.to && approval?.data) {
+                setSwapStage('Approving the swap…');
+                const approvalTx = await signer.sendTransaction({
+                    to: approval.to,
+                    data: approval.data,
+                    gasLimit: BigInt(approval.gasLimit || 100000),
+                    chainId: 5042002
+                });
+                const approvalReceipt = await readProvider.waitForTransaction(approvalTx.hash, 1);
+                if (!approvalReceipt || approvalReceipt.status !== 1) {
+                    throw new Error('The approval failed on-chain — swap cancelled, nothing was traded');
+                }
+            }
+
+            // 2) The swap itself through the TowerSwapExecutor contract. The
+            //    swap payload reports gasLimit 0x0 — explicit zero is invalid
+            //    on-chain, so omit it and let the node estimate.
+            setSwapStage('Confirming the swap…');
+            let swapGas;
+            try { const g = BigInt(swap.gasLimit); if (g > 0n) swapGas = g; } catch { /* estimate */ }
+            const swapTx = await signer.sendTransaction({
+                to: swap.to,
+                data: swap.data,
+                value: swap?.value && swap.value !== '0' ? BigInt(swap.value) : 0n,
+                ...(swapGas ? { gasLimit: swapGas } : {}),
+                chainId: 5042002
+            });
+            setSwapStage('Waiting for the swap receipt…');
+            const receipt = await readProvider.waitForTransaction(swapTx.hash, 1);
+            if (!receipt || receipt.status !== 1) {
+                throw new Error('The swap failed on-chain — nothing was traded');
+            }
+
+            notify(`Swapped ${amt} ${sellToken.symbol} for about ${built.quote?.output ?? '?'} ${buyToken.symbol}`, 'success');
+        } catch (err) {
+            notify(err?.shortMessage || err?.message || 'Swap failed', 'error');
+        } finally {
+            setSwapBusy(false);
+            setSwapStage('');
+        }
+    };
+
     const { client: smartWalletClient } = useSmartWallets();
 
     // ────────────────────────────────────────────────────────
@@ -1779,11 +1943,14 @@ export function CircleWalletPage({
                                         tokens={SWAP_TOKEN_LIST}
                                         initialSellToken={SWAP_TOKEN_LIST[0]}
                                         initialBuyToken={SWAP_TOKEN_LIST[1]}
-                                        rates={SWAP_RATES}
-                                        balances={currentWallet && currentWallet.key !== 'solana' ? { USDC: Number(currentWallet.bal) || 0 } : {}}
-                                        ctaLabel="Swap — Coming Soon"
-                                        ctaDisabled
-                                        note="Native Arc asset swaps (USDC, EURC, cirBTC) are opening soon. Rates shown are indicative."
+                                        rates={swapRates}
+                                        balances={{ USDC: swapBalances.USDC || 0, EURC: swapBalances.EURC || 0, cirBTC: swapBalances.cirBTC || 0 }}
+                                        feeRate={swapFeeRate}
+                                        onSwap={executeSwap}
+                                        onSelectionChange={handleSwapSelection}
+                                        ctaLabel={swapBusy ? (swapStage || 'Swapping…') : 'Swap'}
+                                        ctaDisabled={swapBusy || !address}
+                                        note="Live Tower Exchange routing across Arc pools — swaps execute on-chain from your Main Wallet."
                                     />
                                 </motion.div>
                             ) : activeTab === 'assets' ? (

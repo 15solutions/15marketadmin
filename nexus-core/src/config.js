@@ -56,6 +56,9 @@ module.exports = {
   SOL_DEVNET_RPC: process.env.SOL_DEVNET_RPC || 'https://api.devnet.solana.com',
   SOL_DEVNET_USDC_MINT: process.env.SOL_DEVNET_USDC_MINT || '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
 
+  // Tower Exchange (DEX aggregator on Arc) — server-side key only
+  TOWER_API_KEY: process.env.TOWER_API_KEY || 'sk_test_5bc5ed2fd64bb7b797bfca2a418c9fe45f073f13ff1df442',
+
   // CORS
   ALLOWED_ORIGINS: (process.env.ALLOWED_ORIGINS || 'https://15market.online').split(',').map(s => s.trim()),
 };
