@@ -550,27 +550,31 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             {/* NFC icon, top right — level with the brand logo */}
             <Nfc size={24} className="absolute top-4 right-6 text-white/65 pointer-events-none" />
 
-            {/* Border beam — the light rides exactly ON the card's outline. A
-                static clip keeps only a thin band over the border ring while
-                the conic gradient behind it rotates: the glow travels along
-                the card's real edge, not as a separate floating beam. */}
-            <div className="pointer-events-none absolute inset-0 rounded-[40px]"
-                style={{
-                    padding: '3px',
-                    maskImage: 'linear-gradient(#000 0 0)',
-                    WebkitMaskImage: 'linear-gradient(#000 0 0)',
-                    maskClip: 'padding-box, border-box',
-                    WebkitMaskClip: 'padding-box, border-box',
-                    maskComposite: 'exclude',
-                    WebkitMaskComposite: 'xor'
-                }}>
-                <motion.div
-                    className="absolute inset-0"
-                    style={{
-                        background: 'conic-gradient(from 0deg, rgba(126,255,199,0) 0deg, rgba(126,255,199,0) 62%, rgba(126,255,199,0.38) 86%, rgba(255,255,255,0.98) 97%, rgba(126,255,199,0) 100%)'
-                    }}
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 5.5, repeat: Infinity, ease: 'linear' }} />
+            {/* Border beam — a soft light glow riding exactly ON the card's
+                outline. The stroke ring is centered on the card's border line
+                (half the glow hugs the edge from inside, half from outside),
+                and three blur layers bloom softly instead of a hard light. */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[40px]">
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 448 260" fill="none">
+                    <defs>
+                        <linearGradient id="beam-stroke-dash" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="rgba(126,255,199,0)" />
+                            <stop offset="42%" stopColor="rgba(126,255,199,0.34)" />
+                            <stop offset="74%" stopColor="rgba(178,255,225,0.72)" />
+                            <stop offset="93%" stopColor="rgba(255,255,255,0.88)" />
+                            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                        </linearGradient>
+                    </defs>
+                    <rect x="0.75" y="0.75" width="446.5" height="258.5" rx="39.25" pathLength="100"
+                        stroke="url(#beam-stroke-dash)" strokeWidth="10" strokeDasharray="22 78" className="aurora-dash"
+                        style={{ filter: 'blur(10px)', opacity: 0.3, strokeLinecap: 'round' }} />
+                    <rect x="0.75" y="0.75" width="446.5" height="258.5" rx="39.25" pathLength="100"
+                        stroke="url(#beam-stroke-dash)" strokeWidth="5" strokeDasharray="22 78" className="aurora-dash"
+                        style={{ filter: 'blur(4.5px)', opacity: 0.52, strokeLinecap: 'round' }} />
+                    <rect x="0.75" y="0.75" width="446.5" height="258.5" rx="39.25" pathLength="100"
+                        stroke="url(#beam-stroke-dash)" strokeWidth="1.9" strokeDasharray="22 78" className="aurora-dash"
+                        style={{ filter: 'blur(1px)', strokeLinecap: 'round' }} />
+                </svg>
             </div>
 
             {/* Card Face: all-white brand logo (top-left, level with the NFC icon) ·
@@ -696,6 +700,9 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 .db-card { background: ${isLight ? 'rgba(255,255,255,0.7)' : 'rgba(10,10,10,0.8)'}; border: 1px solid ${isLight ? 'rgba(26, 97, 64,0.15)' : 'rgba(255,255,255,0.06)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
                 .db-card-alt { background: ${isLight ? 'rgba(255,255,255,0.65)' : 'rgba(10,10,10,0.75)'}; border: 1px solid ${isLight ? 'rgba(26, 97, 64,0.12)' : 'rgba(255,255,255,0.05)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
                 @keyframes breathe { 0%,100%{box-shadow:0 0 20px rgba(26, 97, 64,0.3)} 50%{box-shadow:0 0 40px rgba(26, 97, 64,0.6)} }
+                /* Border beam — soft glow segment travelling along the card outline */
+                @keyframes aurora-slide { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+                .aurora-dash { animation: aurora-slide 5.5s linear infinite; }
             `}</style>
 
             <div className={`absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] ${isLight ? '' : 'hidden'}`} />
