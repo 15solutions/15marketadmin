@@ -1837,7 +1837,7 @@ export function CircleWalletPage({
                                                     {/* Username + wallet label — vertically centered on the left */}
                                                     <div className="flex-1 flex items-center min-w-0">
                                                         <div className="px-1 min-w-0">
-                                                            <span className="block text-[39px] font-black truncate leading-tight">{username || 'Trader'}</span>
+                                                            <span className="block text-[39px] font-black truncate leading-none">{username || 'Trader'}</span>
                                                             <span className="block text-[11px] font-bold tracking-[0.2em] text-white/55 mt-1">{currentWallet.key === 'trading' ? 'Trading' : 'Main'}</span>
                                                         </div>
                                                     </div>
