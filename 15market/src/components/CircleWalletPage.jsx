@@ -1946,7 +1946,7 @@ export function CircleWalletPage({
                             </button>
                         </div>
 
-                        <div className={`flex-1 overflow-visible md:overflow-hidden custom-scrollbar pr-2 pb-20`}>
+                        <div className={`flex-1 overflow-visible md:overflow-hidden custom-scrollbar pr-2 ${activeTab === 'swap' ? '' : 'pb-20'}`}>
                             {activeTab === 'swap' ? (
                                 <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="py-2">
                                     <SwapCard

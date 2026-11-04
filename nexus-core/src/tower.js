@@ -76,7 +76,9 @@ async function towerFetch(path, body) {
         const msg = (payload && payload.error) || `Tower Exchange refused the request (${res.status})`;
         throw Object.assign(new Error(msg), { status: 400 });
     }
-    return payload.data;
+    // Tower wraps swap responses in data{}, but other endpoints (wallet
+    // balance, prices) answer at the top level — hand back whichever exists.
+    return payload.data !== undefined ? payload.data : payload;
 }
 
 const slippage = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 5000)
@@ -166,7 +168,7 @@ async function balanceOf(address) {
         throw Object.assign(new Error('A valid wallet address is required'), { status: 400 });
     }
     const out = {};
-    for (const symbol of Object.keys(KNOWN_TOKENS)) {
+    for (const symbol of ['USDC', 'EURC', 'cirBTC']) {
         try {
             const res = await towerFetch('/wallet/balance', {
                 address: addr,
@@ -176,7 +178,7 @@ async function balanceOf(address) {
                 balanceType: 'token'
             });
             out[symbol] = round8(Number(res?.balance) || 0);
-        } catch (_) {
+        } catch (e) {
             out[symbol] = 0;
         }
     }

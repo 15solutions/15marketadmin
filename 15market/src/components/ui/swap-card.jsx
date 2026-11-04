@@ -51,16 +51,16 @@ function CurrencyInputPanel({
 }) {
   return (
     <Card className="bg-muted rounded-3xl border-none shadow-none">
-      <CardHeader className="p-4 pb-2 flex-row items-center justify-between space-y-0">
-        <span className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
+      <CardHeader className="px-4 py-2 flex-row items-center justify-between space-y-0">
+        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
         {balance !== undefined && (
-          <span className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
+          <span className="flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
             Balance: {balance}
             {onMax && (
               <button
                 type="button"
                 onClick={onMax}
-                className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-primary hover:bg-primary/25 transition-colors"
+                className="rounded-full bg-primary/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary hover:bg-primary/25 transition-colors"
               >
                 Max
               </button>
@@ -68,7 +68,7 @@ function CurrencyInputPanel({
           </span>
         )}
       </CardHeader>
-      <CardContent className="p-4 pt-0">
+      <CardContent className="px-4 pb-3">
         <div className="flex items-center justify-between gap-3">
           <Input
             type="text"
@@ -78,15 +78,15 @@ function CurrencyInputPanel({
             value={value}
             readOnly={readOnly}
             onChange={(e) => onValueChange?.(sanitizeAmount(e.target.value))}
-            className="h-auto min-w-0 flex-1 border-none bg-transparent p-0 text-3xl sm:text-4xl font-semibold tabular-nums shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/40"
+            className="h-auto min-w-0 flex-1 border-none bg-transparent p-0 text-2xl sm:text-3xl font-semibold tabular-nums shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/40"
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="secondary"
-                className="h-12 shrink-0 gap-2 rounded-full px-3 sm:px-4 text-base font-bold"
+                className="h-10 shrink-0 gap-2 rounded-full px-3 sm:px-3.5 text-sm font-bold"
               >
-                <selectedToken.icon className="h-6 w-6" />
+                <selectedToken.icon className="h-5 w-5" />
                 {selectedToken.symbol}
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </Button>
@@ -94,7 +94,7 @@ function CurrencyInputPanel({
             <DropdownMenuContent align="end" className="swap-card-theme z-[10000] w-52">
               {tokens.map((token) => (
                 <DropdownMenuItem key={token.symbol} onSelect={() => onTokenSelect(token)}>
-                  <token.icon className="h-6 w-6" />
+                  <token.icon className="h-5 w-5" />
                   <span className="flex flex-col leading-tight">
                     <span className="font-bold">{token.symbol}</span>
                     <span className="text-xs text-muted-foreground">{token.name}</span>
@@ -105,7 +105,7 @@ function CurrencyInputPanel({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="mt-2 h-5 text-sm text-muted-foreground tabular-nums">
+        <div className="mt-1 h-4 text-xs text-muted-foreground tabular-nums">
           {usdValue !== null && usdValue !== undefined ? `≈ $${usdValue}` : ""}
         </div>
       </CardContent>
@@ -229,17 +229,17 @@ const SwapCard = React.forwardRef(
                   variant="secondary"
                   size="icon"
                   aria-label="Switch tokens"
-                  className="h-11 w-11 rounded-full border-4 border-background"
+                  className="h-9 w-9 rounded-full border-4 border-background"
                   onClick={flip}
                 >
-                  <ArrowDown className="h-5 w-5" />
+                  <ArrowDown className="h-4 w-4" />
                 </Button>
               </motion.div>
             </div>
           </div>
 
           {/* Preview rows */}
-          <div className="mt-4 flex flex-col gap-2 px-1 text-sm tabular-nums">
+          <div className="mt-2.5 flex flex-col gap-1 px-1 text-xs tabular-nums">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Rate</span>
               <span className="font-semibold">
@@ -258,14 +258,14 @@ const SwapCard = React.forwardRef(
           <Button
             type="button"
             size="lg"
-            className="mt-5 h-14 w-full rounded-2xl text-base font-bold"
+            className="mt-3 h-11 w-full rounded-2xl text-sm font-bold"
             disabled={!canSubmit}
             onClick={() => onSwap?.({ sellAmount, buyAmount, sellToken, buyToken })}
           >
             {buttonLabel}
           </Button>
 
-          {note && <p className="mt-3 text-center text-xs text-muted-foreground">{note}</p>}
+          {note && <p className="mt-1.5 text-center text-[10px] text-muted-foreground">{note}</p>}
         </CardContent>
       </Card>
     );
