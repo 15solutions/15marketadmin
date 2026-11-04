@@ -86,6 +86,15 @@ const slippage = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(
 
 const round8 = (n) => Math.round(n * 1e8) / 1e8;
 
+// Tower's upstream answers run 1.6-8 s per call, so identical (pair, amount)
+// quotes are re-served from a short-lived cache. This is what makes a
+// "preview the swap, then confirm it" round trip feel instant: the build's
+// mandatory re-quote hits the cache the client's preview just filled.
+const quoteCache = new Map(); // 'sell|buy|raw|sli' -> { at, result }
+const QUOTE_TTL_MS = 15000;
+
+// Tower's upstream answers run 1.6-8 s per call, so identical (pair, amount)
+
 /**
  * Quote a swap from a DISPLAY amount ("12.5"). Tokens are addressed directly
  * (symbol resolution only happens for symbols outside the registry) and the
@@ -131,57 +140,92 @@ async function quote({ inputToken, outputToken, amount, slippageTolerance }) {
     const s = String(amtNum);
     const dot = s.indexOf('.');
     const clipped = dot === -1 ? s : s.slice(0, dot + 1 + canonDec);
-    const raw = await towerFetch('/swap/quote', {
+    const raw = ethers.parseUnits(clipped, canonDec).toString();
+
+    // Serve identical requests from the short-lived cache (a build's re-quote
+    // lands ~seconds after the card's preview filled it).
+    const cacheKey = `${sellAddr}|${buyAddr}|${raw}|${slippage(slippageTolerance)}`;
+    const cached = quoteCache.get(cacheKey);
+    if (cached && (Date.now() - cached.at) < QUOTE_TTL_MS) {
+        return cached.result;
+    }
+
+    const res = await towerFetch('/swap/quote', {
         inputToken: sellAddr,
         outputToken: buyAddr,
-        inputAmount: ethers.parseUnits(clipped, canonDec).toString(),
+        inputAmount: raw,
         slippageTolerance: slippage(slippageTolerance),
         chainId: config.CHAIN_ID
     });
 
-    const output = Number(raw?.outputAmount || '0') / 1e18;
-    const minOutRaw = Number(raw?.minOut || '0') / 1e18;
-    return {
-        quote: raw,
+    const output = Number(res?.outputAmount || '0') / 1e18;
+    const minOutRaw = Number(res?.minOut || '0') / 1e18;
+    const result = {
+        quote: res,
         outputTokenSymbol: buy,
         outputTokenAddress: buyAddr,
         inputTokenSymbol: sell,
         output: round8(output),
         minOut: round8(minOutRaw),
         rate: amtNum > 0 ? round8(output / amtNum) : 0,
-        priceImpact: raw?.priceImpact ?? null,
-        dexName: raw?.dexName ?? null,
-        dexId: raw?.dexId ?? null,
-        feeBps: raw?.feeBps ?? null
+        priceImpact: res?.priceImpact ?? null,
+        dexName: res?.dexName ?? null,
+        dexId: res?.dexId ?? null,
+        feeBps: res?.feeBps ?? null
     };
+    // Trim the cache so a long session cannot grow it unbounded.
+    if (quoteCache.size > 40) {
+        const oldest = [...quoteCache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+        if (oldest) quoteCache.delete(oldest[0]);
+    }
+    quoteCache.set(cacheKey, { at: Date.now(), result });
+    return result;
 }
 
 /**
- * Balances for the hub's swap tokens — read through Tower's wallet indexer.
- * The swap executes against the on-chain tokens (the ERC-20 USDC at
- * KNOWN_TOKENS.USDC, not the native gas bucket), so these are the honest
- * sellable numbers for the card.
+ * Balances for the hub's swap tokens — read straight from the chain. On Arc
+ * the gas coin and the USDC contract are one ledger (verified: eth_getBalance
+ * equals ERC-20 balanceOf / 1e12), so an ERC-20 balanceOf per token IS what
+ * the user's wallet shows. The chain answers a parallel batch of eth_calls
+ * in well under a second, versus 5-8 s per call through Tower's indexer.
+ * A failed read returns null (the face keeps pulsing) rather than a fake 0.
  */
 async function balanceOf(address) {
     const addr = String(address || '').toLowerCase();
     if (!isAddress(addr)) {
         throw Object.assign(new Error('A valid wallet address is required'), { status: 400 });
     }
-    const out = {};
-    for (const symbol of ['USDC', 'EURC', 'cirBTC']) {
+    const readToken = async (tokenAddress) => {
         try {
-            const res = await towerFetch('/wallet/balance', {
-                address: addr,
-                chainId: 'arc-testnet',
-                rpcUrl: 'https://rpc.testnet.arc.io',
-                tokenAddress: KNOWN_TOKENS[symbol],
-                balanceType: 'token'
-            });
-            out[symbol] = round8(Number(res?.balance) || 0);
-        } catch (e) {
-            out[symbol] = 0;
+            const out = await rpc.callWithTimeout(
+                rpc.provider.call({
+                    to: tokenAddress,
+                    data: '0x70a08231' + addr.slice(2).padStart(64, '0') // balanceOf(address)
+                }),
+                6000
+            );
+            const [raw] = ethers.AbiCoder.defaultAbiCoder().decode(['uint256'], out);
+            return BigInt(raw.toString());
+        } catch (_) {
+            return null;
         }
-    }
+    };
+    const [usdcRaw, eurcRaw, cirRaw, nativeRaw] = await Promise.all([
+        readToken(KNOWN_TOKENS['USDC']),
+        readToken(KNOWN_TOKENS['EURC']),
+        readToken(KNOWN_TOKENS['cirBTC']),
+        rpc.provider.getBalance(addr).catch(() => null)
+    ]);
+    const unit = (raw, dec) => raw === null
+        ? null
+        : round8(Number(ethers.formatUnits(raw, dec)));
+    const out = {
+        USDC: usdcRaw !== null
+            ? unit(usdcRaw, 6)
+            : (nativeRaw !== null ? round8(Number(ethers.formatEther(nativeRaw))) : null),
+        EURC: unit(eurcRaw, 6),
+        cirBTC: unit(cirRaw, 8)
+    };
     return { balances: out };
 }
 

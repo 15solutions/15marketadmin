@@ -543,7 +543,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             .then(r => r.json())
             .then(d => {
                 const b = {};
-                for (const [sym, val] of Object.entries(d?.balances || {})) b[sym] = Number(val) || 0;
+                for (const [sym, val] of Object.entries(d?.balances || {})) {
+                    // null from the server = chain read failed — keep unknown so
+                    // the card face pulses instead of claiming 0.
+                    if (val !== null && val !== undefined) b[sym] = Number(val) || 0;
+                }
                 setDashAssetTokens(prev => ({ ...prev, [key]: b }));
             })
             .catch(() => {
@@ -657,14 +661,13 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         style={{ transformPerspective: 1100, backfaceVisibility: 'hidden' }}
                         className="absolute inset-0 z-20 h-full flex flex-col py-4 px-6"
                     >
-                        <div className="flex items-center justify-between px-1">
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Assets on Arc</span>
-                            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">{isTrading ? 'Trading wallet' : 'Main wallet'}</span>
+                        <div className="flex items-center justify-end px-1">
+                            <span className="text-[9px] font-bold tracking-[0.16em] text-white/40">{cardAddress ? `${cardAddress.slice(0, 5)}…${cardAddress.slice(-4)}`.toUpperCase() : ''}</span>
                         </div>
                         <div className="flex-1 flex flex-col justify-center gap-2 min-w-0 py-2">
                             {DASH_ASSETS.map((a) => {
-                                const v = a.isBalance ? Number(cardBalance || 0) : dashAssetRow(kind, a.symbol, cardAddress);
-                                const text = a.isBalance ? fmtAsset(v) : (v === undefined ? null : fmtAsset(v));
+                                const v = dashAssetRow(kind, a.symbol, cardAddress);
+                                const text = v === undefined ? null : fmtAsset(v);
                                 return (
                                     <div key={a.symbol} className="flex items-center justify-between gap-3 py-2 px-4 rounded-2xl bg-white/[0.07] border border-white/10">
                                         <div className="flex items-center gap-3 min-w-0">

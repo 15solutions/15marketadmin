@@ -281,7 +281,11 @@ export function CircleWalletPage({
             .then(r => r.json())
             .then(d => {
                 const b = {};
-                for (const [sym, val] of Object.entries(d?.balances || {})) b[sym] = Number(val) || 0;
+                for (const [sym, val] of Object.entries(d?.balances || {})) {
+                    // A null from the server means "chain read failed" — keep it
+                    // unknown so the numbers pulse instead of claiming 0.
+                    if (val !== null && val !== undefined) b[sym] = Number(val) || 0;
+                }
                 setHubAssetTokens(prev => ({ ...prev, [key]: b }));
             })
             .catch(() => {
@@ -318,68 +322,76 @@ export function CircleWalletPage({
         { symbol: 'cirBTC', name: 'Circle Bitcoin', glyph: '₿' },
     ];
 
-    // Sellable balances — Tower's on-chain token bucket (the ERC-20 USDC the
-    // swap actually executes against, not the native gas bucket).
-    const [swapBalances, setSwapBalances] = useState({});
+    // Force a fresh read of a card's wallet tokens (used by the hydrate
+    // effect and right after a successful swap — the signed wallet's chain
+    // state just changed, so every surface re-reads it).
+    const refreshHubAssets = useCallback((walletKey) => {
+        const addr = walletKey === 'trading' ? sessionAddress : address;
+        const key = String(addr || '').toLowerCase();
+        setHubAssetTokens(prev => { const c = { ...prev }; delete c[key]; return c; });
+        assetInFlightRef.current.delete(key);
+        ensureHubAssetBalances(addr);
+    }, [sessionAddress, address, ensureHubAssetBalances]);
+
+    // Hydrate the showing card's wallet tokens: the swap panel and the assets
+    // face both read this cache, so a cold entry triggers one chain read.
     useEffect(() => {
-        if (!address) return;
-        let dead = false;
-        (async () => {
-            try {
-                const res = await fetch(`${KEEPER_URL_ARC}/swap/balance/${String(address).toLowerCase()}`);
-                const data = await res.json();
-                if (!dead && data?.success) {
-                    const b = {};
-                    for (const [k, v] of Object.entries(data.balances || {})) b[k] = Number(v) || 0;
-                    setSwapBalances(b);
-                }
-            } catch { /* balances stay empty */ }
-        })();
-        return () => { dead = true; };
-    }, [address]);
+        const addr = activeWalletIdx === 0 ? sessionAddress : address;
+        const key = String(addr || '').toLowerCase();
+        if (!/^0x[a-f0-9]{40}$/.test(key)) return undefined;
+        if (hubAssetTokens[key] !== undefined) return undefined; // already known / loading
+        const t = setTimeout(() => ensureHubAssetBalances(addr), 200);
+        return () => clearTimeout(t);
+    }, [activeWalletIdx, sessionAddress, address, hubAssetTokens, ensureHubAssetBalances]);
 
     useEffect(() => {
         if (!swapSel?.sellToken || !swapSel?.buyToken) return;
         const sell = swapSel.sellToken, buy = swapSel.buyToken;
         if (sell.symbol === buy.symbol) return;
-        const amt = parseFloat(swapSel.sellAmount);
-        const askAmt = (Number.isFinite(amt) && amt > 0) ? amt : 1; // 1-unit probe keeps a fresh rate on the cards before typing
         const pair = `${sell.symbol}-${buy.symbol}`;
         const reversePair = `${buy.symbol}-${sell.symbol}`;
-        const t = setTimeout(async () => {
+        let dead = false;
+        (async () => {
             try {
                 const res = await fetch(`${KEEPER_URL_ARC}/swap/quote`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ inputToken: sell.symbol, outputToken: buy.symbol, amount: askAmt })
+                    body: JSON.stringify({ inputToken: sell.symbol, outputToken: buy.symbol, amount: 1 })
                 });
                 const data = await res.json();
                 const rate = Number(data?.rate);
-                if (data?.success && rate > 0) {
+                if (!dead && data?.success && rate > 0) {
                     setSwapRates(prev => ({ ...prev, [pair]: rate, [reversePair]: 1 / rate }));
                     const bps = Number(data?.feeBps);
                     if (bps > 0) setSwapFeeRate(bps / 10000);
                 }
             } catch { /* keep the last known indicative rate */ }
-        }, 600);
-        return () => clearTimeout(t);
-    }, [swapSel?.sellToken?.symbol, swapSel?.buyToken?.symbol, swapSel?.sellAmount]);
+        })();
+        return () => { dead = true; };
+    }, [swapSel?.sellToken?.symbol, swapSel?.buyToken?.symbol]);
 
     const ARC_SWAP_RPC = 'https://rpc.testnet.arc.io';
 
     // Executes the whole on-chain swap: server builds the approval + swap
     // calldata (quoting happens server-side so nothing can be forged), the
-    // main wallet signs approval (ERC-20 inputs only) then the swap, and the
-    // receipt decides the verdict — all notifications through NotifyFlash.
-    const executeSwap = async ({ sellAmount, sellToken, buyToken }) => {
+    // wallet matching the showing CARD signs the approval (ERC-20 inputs
+    // only) then the swap, and the receipt decides the verdict — all
+    // notifications through NotifyFlash.
+    const executeSwap = async ({ sellAmount, sellToken, buyToken, walletKey }) => {
         if (swapBusy) return;
         const amt = parseFloat(sellAmount);
         if (!(amt > 0)) return;
         if (!address) return notify('Connect your wallet first', 'error');
-        // Resolve the signing wallet exactly like the send flow: prefer the
-        // external connector whose address matches, then any external, then
-        // the Privy embedded wallet.
-        const eoaWallet = wallets?.find(w => w.address?.toLowerCase() === (mainWalletAddress || '').toLowerCase())
+        // The signed wallet decides where the deduction actually lands, so it
+        // must be the wallet whose card the user is looking at: the trading
+        // card swaps the session wallet, the main card swaps the connected
+        // wallet. Preference mirrors the send flow (address match first).
+        const forTrading = walletKey === 'trading';
+        const hostAddress = forTrading ? (sessionAddress || mainWalletAddress) : mainWalletAddress;
+        const eoaWallet = wallets?.find(w => w.address?.toLowerCase() === String(hostAddress || '').toLowerCase())
+            || wallets?.find(w => forTrading
+                ? w.walletClientType === 'privy'
+                : w.walletClientType !== 'privy')
             || wallets?.find(w => w.walletClientType !== 'privy')
             || wallets?.find(w => w.walletClientType === 'privy')
             || wallets?.[0];
@@ -455,7 +467,11 @@ export function CircleWalletPage({
                 throw new Error('The swap failed on-chain — nothing was traded');
             }
 
-            notify(`Swapped ${amt} ${sellToken.symbol} for about ${built.quote?.output ?? '?'} ${buyToken.symbol}`, 'success');
+            // The signed wallet's chain state just moved — drop its cache so
+            // the card, the swap panel and the assets face re-read the chain.
+            refreshHubAssets(walletKey);
+            const shortFrom = `${String(eoaWallet.address || '').slice(0, 5)}…${String(eoaWallet.address || '').slice(-4)}`;
+            notify(`Swapped ${amt} ${sellToken.symbol} for about ${built.quote?.output ?? '?'} ${buyToken.symbol} in ${shortFrom}`, 'success');
         } catch (err) {
             notify(err?.shortMessage || err?.message || 'Swap failed', 'error');
         } finally {
@@ -1906,14 +1922,13 @@ export function CircleWalletPage({
                                                             style={{ transformPerspective: 1100, backfaceVisibility: 'hidden' }}
                                                             className="absolute inset-0 z-20 h-full flex flex-col py-4 px-6"
                                                         >
-                                                            <div className="flex items-center justify-between px-1">
-                                                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Assets on Arc</span>
-                                                                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">{currentWallet.key === 'trading' ? 'Trading wallet' : 'Main wallet'}</span>
+                                                            <div className="flex items-center justify-end px-1">
+                                                                <span className="text-[9px] font-bold tracking-[0.16em] text-white/40">{currentWallet.address ? `${currentWallet.address.slice(0, 5)}…${currentWallet.address.slice(-4)}`.toUpperCase() : ''}</span>
                                                             </div>
                                                             <div className="flex-1 flex flex-col justify-center gap-2 min-w-0 py-2">
                                                                 {HUB_ASSETS.map((a) => {
-                                                                    const v = a.isBalance ? Number(currentWallet.bal || 0) : hubAssetRow(currentWallet.key, a.symbol);
-                                                                    const text = a.isBalance ? fmtAsset(v) : (v === undefined ? null : fmtAsset(v));
+                                                                    const v = hubAssetRow(currentWallet.key, a.symbol);
+                                                                    const text = v === undefined ? null : fmtAsset(v);
                                                                     return (
                                                                         <div key={a.symbol} className="flex items-center justify-between gap-3 py-2 px-4 rounded-2xl bg-white/[0.07] border border-white/10">
                                                                             <div className="flex items-center gap-3 min-w-0">
@@ -2069,13 +2084,17 @@ export function CircleWalletPage({
                                         initialSellToken={SWAP_TOKEN_LIST[0]}
                                         initialBuyToken={SWAP_TOKEN_LIST[1]}
                                         rates={swapRates}
-                                        balances={{ USDC: swapBalances.USDC || 0, EURC: swapBalances.EURC || 0, cirBTC: swapBalances.cirBTC || 0 }}
+                                        balances={{
+                                            USDC: hubAssetRow(currentWallet.key, 'USDC'),
+                                            EURC: hubAssetRow(currentWallet.key, 'EURC'),
+                                            cirBTC: hubAssetRow(currentWallet.key, 'cirBTC')
+                                        }}
                                         feeRate={swapFeeRate}
-                                        onSwap={executeSwap}
+                                        onSwap={(payload) => executeSwap({ ...payload, walletKey: currentWallet.key })}
                                         onSelectionChange={handleSwapSelection}
                                         ctaLabel={swapBusy ? (swapStage || 'Swapping…') : 'Swap'}
                                         ctaDisabled={swapBusy || !address}
-                                        note="Live Tower Exchange routing across Arc pools — swaps execute on-chain from your Main Wallet."
+                                        note={`Swaps execute on-chain from your ${currentWallet.key === 'trading' ? 'Trading' : 'Main'} Wallet.`}
                                     />
                                 </motion.div>
                             ) : activeTab === 'assets' ? (
