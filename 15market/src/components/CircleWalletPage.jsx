@@ -255,6 +255,69 @@ export function CircleWalletPage({
             && prev.buyToken === sel?.buyToken) ? prev : sel);
     }, []);
 
+    // ─── Card flip → assets face ────────────────────────────────────────────
+    // Tapping a credit card flips it over to show the assets that wallet
+    // holds: USDC (the wallet's own USDC), EURC and cirBTC (Arc's accepted
+    // assets, read per wallet address through the Tower wallet indexer).
+    const [assetCardsRevealed, setAssetCardsRevealed] = useState({}); // walletKey -> bool
+    const [hubAssetTokens, setHubAssetTokens] = useState({}); // addressLower -> {USDC, EURC, cirBTC} | undefined(fetching)
+    const assetInFlightRef = useRef(new Set());
+    const cardDragStampRef = useRef(0);
+
+    const fmtAsset = (n) => {
+        const v = Number(n);
+        if (!Number.isFinite(v)) return null;
+        if (v > 0 && v < 0.000001) return '<0.000001';
+        if (v > 0 && v < 1) return parseFloat(v.toFixed(6)).toString();
+        return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const ensureHubAssetBalances = useCallback((addr) => {
+        const key = String(addr || '').toLowerCase();
+        if (!/^0x[a-f0-9]{40}$/.test(key) || assetInFlightRef.current.has(key)) return;
+        assetInFlightRef.current.add(key);
+        setHubAssetTokens(prev => ({ ...prev, [key]: null })); // null = fetching
+        fetch(`${KEEPER_URL_ARC}/swap/balance/${key}`)
+            .then(r => r.json())
+            .then(d => {
+                const b = {};
+                for (const [sym, val] of Object.entries(d?.balances || {})) b[sym] = Number(val) || 0;
+                setHubAssetTokens(prev => ({ ...prev, [key]: b }));
+            })
+            .catch(() => {
+                // Drop the entry so the next open retries the fetch.
+                setHubAssetTokens(prev => { const c = { ...prev }; delete c[key]; return c; });
+            })
+            .finally(() => { assetInFlightRef.current.delete(key); });
+    }, []);
+
+    const toggleCardAssets = (walletKey) => {
+        if (Date.now() - cardDragStampRef.current < 250) return; // a swipe just happened
+        const opening = !assetCardsRevealed[walletKey];
+        setAssetCardsRevealed(prev => ({ ...prev, [walletKey]: !prev[walletKey] }));
+        if (!opening) return;
+        // Every flip to the assets face re-reads that wallet's tokens fresh.
+        const addr = walletKey === 'trading' ? sessionAddress : address;
+        const key = String(addr || '').toLowerCase();
+        setHubAssetTokens(prev => { const c = { ...prev }; delete c[key]; return c; });
+        assetInFlightRef.current.delete(key);
+        ensureHubAssetBalances(addr);
+    };
+
+    const hubAssetRow = (walletKey, symbol) => {
+        const addr = (walletKey === 'trading' ? sessionAddress : address) || '';
+        const b = hubAssetTokens[String(addr).toLowerCase()];
+        if (!b) return undefined; // fetching
+        return b[symbol];
+    };
+
+    // Arc offers three assets on-chain; the card face lists them all.
+    const HUB_ASSETS = [
+        { symbol: 'USDC', name: 'USD Coin', glyph: '$', isBalance: true },
+        { symbol: 'EURC', name: 'Euro Coin', glyph: '€' },
+        { symbol: 'cirBTC', name: 'Circle Bitcoin', glyph: '₿' },
+    ];
+
     // Sellable balances — Tower's on-chain token bucket (the ERC-20 USDC the
     // swap actually executes against, not the native gas bucket).
     const [swapBalances, setSwapBalances] = useState({});
@@ -1770,6 +1833,7 @@ export function CircleWalletPage({
                                             drag="x"
                                             dragConstraints={{ left: 0, right: 0 }}
                                             onDragEnd={(e, info) => {
+                                                cardDragStampRef.current = Date.now();
                                                 if (info.offset.x < -100) handleSwipeWallet('left');
                                                 else if (info.offset.x > 100) handleSwipeWallet('right');
                                             }}
@@ -1781,7 +1845,8 @@ export function CircleWalletPage({
                                             className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
                                         >
                                             <div
-                                                className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] text-white"
+                                                onClick={() => toggleCardAssets(currentWallet.key)}
+                                                className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] text-white cursor-pointer"
                                                 style={{
                                                     fontFamily: '"Comfortaa", cursive',
                                                     background: 'linear-gradient(145deg, #1a6140 0%, #123f28 55%, #0b3220 100%)',
@@ -1825,46 +1890,96 @@ export function CircleWalletPage({
                                                     </svg>
                                                 </div>
 
-                                                {/* Card Face: all-white brand logo (top-left) · username (+ wallet
+                                                {/* Card Face ⇄ Assets Face — a tap on the card flips it over.
+                                                    Front: all-white brand logo (top-left) · username (+ wallet
                                                     label beneath) centered on the left half · bottom line =
-                                                    wallet address + copy (left) with the balance on its right */}
-                                                <div className="h-full flex flex-col relative z-20 py-4 px-7">
-
-                                                    {/* 15market logo — all white, top-left, shifted upward */}
-                                                    <img src="/gowlogo.png" alt="15market" className="h-[110px] w-auto self-start -translate-y-[30%]"
-                                                        style={{ filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
-
-                                                    {/* Username + wallet label — vertically centered on the left */}
-                                                    <div className="flex-1 flex items-center min-w-0">
-                                                        <div className="px-1 min-w-0">
-                                                            <span className="block text-[39px] font-black truncate leading-none">{username || 'Trader'}</span>
-                                                            <span className="block text-[11px] font-bold tracking-[0.2em] text-white/55 mt-1">{currentWallet.key === 'trading' ? 'Trading' : 'Main'}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Bottom line: wallet address + copy (left) · balance (right) */}
-                                                    <div className="flex items-end justify-between gap-4">
-                                                        <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
-                                                            onClick={() => { if (currentWallet.address) handleCopy(currentWallet.address); }}>
-                                                            <p className="text-left text-[19.2px] font-bold text-white/70 truncate leading-none"
-                                                                style={{ transform: 'translateY(-5%)', fontFamily: '"Comfortaa", cursive' }}>
-                                                                {currentWallet.address
-                                                                    ? `${currentWallet.address.slice(0, 5)}...${currentWallet.address.slice(-4)}`.toUpperCase()
-                                                                    : 'XXXX...XXXX'}
-                                                            </p>
-                                                            {copied
-                                                                ? <Check size={13} className="flex-none text-white/70" />
-                                                                : <Copy size={13} className="flex-none text-white/70" />}
-                                                        </div>
-                                                        <div className="text-right leading-none shrink-0">
-                                                            <div className="text-[56px] font-black tracking-tighter tabular-nums leading-none"
-                                                                style={{ textShadow: '0 6px 24px rgba(0,0,0,0.40)' }}>
-                                                                ${parseFloat(currentWallet.bal || 0).toFixed(2)}
-                                                                <span className="text-[13px] ml-1.5 font-bold text-white/70">USDC</span>
+                                                    wallet address + copy (left) with the balance on its right.
+                                                    Back: the assets that wallet holds (USDC · EURC · cirBTC). */}
+                                                <AnimatePresence mode="wait" initial={false}>
+                                                    {assetCardsRevealed[currentWallet.key] ? (
+                                                        <motion.div
+                                                            key="assets"
+                                                            initial={{ rotateY: 90, scale: 0.94 }}
+                                                            animate={{ rotateY: 0, scale: 1 }}
+                                                            exit={{ rotateY: -90, scale: 0.94 }}
+                                                            transition={{ rotateY: { duration: 0.3, ease: 'easeInOut' }, scale: { duration: 0.3, ease: 'easeInOut' } }}
+                                                            style={{ transformPerspective: 1100, backfaceVisibility: 'hidden' }}
+                                                            className="absolute inset-0 z-20 h-full flex flex-col py-4 px-6"
+                                                        >
+                                                            <div className="flex items-center justify-between px-1">
+                                                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Assets on Arc</span>
+                                                                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">{currentWallet.key === 'trading' ? 'Trading wallet' : 'Main wallet'}</span>
                                                             </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                            <div className="flex-1 flex flex-col justify-center gap-2 min-w-0 py-2">
+                                                                {HUB_ASSETS.map((a) => {
+                                                                    const v = a.isBalance ? Number(currentWallet.bal || 0) : hubAssetRow(currentWallet.key, a.symbol);
+                                                                    const text = a.isBalance ? fmtAsset(v) : (v === undefined ? null : fmtAsset(v));
+                                                                    return (
+                                                                        <div key={a.symbol} className="flex items-center justify-between gap-3 py-2 px-4 rounded-2xl bg-white/[0.07] border border-white/10">
+                                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                                <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 text-[15px] font-black text-white/95 leading-none shrink-0">{a.glyph}</span>
+                                                                                <span className="min-w-0">
+                                                                                    <span className="block text-[13px] font-black uppercase tracking-wide leading-none">{a.symbol}</span>
+                                                                                    <span className="block text-[9px] font-bold uppercase tracking-[0.18em] text-white/50 mt-1 truncate">{a.name}</span>
+                                                                                </span>
+                                                                            </div>
+                                                                            <span className={`text-[15px] font-black tabular-nums leading-none ${text === null ? 'animate-pulse text-white/40' : ''}`}>
+                                                                                {text === null ? '· · ·' : text}
+                                                                            </span>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                            <p className="text-center text-[8px] font-bold uppercase tracking-[0.3em] text-white/35">Tap card to flip back</p>
+                                                        </motion.div>
+                                                    ) : (
+                                                        <motion.div
+                                                            key="face"
+                                                            initial={{ rotateY: -90, scale: 0.94 }}
+                                                            animate={{ rotateY: 0, scale: 1 }}
+                                                            exit={{ rotateY: 90, scale: 0.94 }}
+                                                            transition={{ rotateY: { duration: 0.3, ease: 'easeInOut' }, scale: { duration: 0.3, ease: 'easeInOut' } }}
+                                                            style={{ transformPerspective: 1100, backfaceVisibility: 'hidden' }}
+                                                            className="absolute inset-0 z-20 h-full flex flex-col py-4 px-7"
+                                                        >
+
+                                                            {/* 15market logo — all white, top-left, shifted upward */}
+                                                            <img src="/gowlogo.png" alt="15market" className="h-[110px] w-auto self-start -translate-y-[30%]"
+                                                                style={{ filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
+
+                                                            {/* Username + wallet label — vertically centered on the left */}
+                                                            <div className="flex-1 flex items-center min-w-0">
+                                                                <div className="px-1 min-w-0">
+                                                                    <span className="block text-[39px] font-black truncate leading-none">{username || 'Trader'}</span>
+                                                                    <span className="block text-[11px] font-bold tracking-[0.2em] text-white/55 mt-1">{currentWallet.key === 'trading' ? 'Trading' : 'Main'}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Bottom line: wallet address + copy (left) · balance (right) */}
+                                                            <div className="flex items-end justify-between gap-4">
+                                                                <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
+                                                                    onClick={(e) => { e.stopPropagation(); if (currentWallet.address) handleCopy(currentWallet.address); }}>
+                                                                    <p className="text-left text-[19.2px] font-bold text-white/70 truncate leading-none"
+                                                                        style={{ transform: 'translateY(-5%)', fontFamily: '"Comfortaa", cursive' }}>
+                                                                        {currentWallet.address
+                                                                            ? `${currentWallet.address.slice(0, 5)}...${currentWallet.address.slice(-4)}`.toUpperCase()
+                                                                            : 'XXXX...XXXX'}
+                                                                    </p>
+                                                                    {copied
+                                                                        ? <Check size={13} className="flex-none text-white/70" />
+                                                                        : <Copy size={13} className="flex-none text-white/70" />}
+                                                                </div>
+                                                                <div className="text-right leading-none shrink-0">
+                                                                    <div className="text-[56px] font-black tracking-tighter tabular-nums leading-none"
+                                                                        style={{ textShadow: '0 6px 24px rgba(0,0,0,0.40)' }}>
+                                                                        ${parseFloat(currentWallet.bal || 0).toFixed(2)}
+                                                                        <span className="text-[13px] ml-1.5 font-bold text-white/70">USDC</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
                                         </motion.div>
                                     </AnimatePresence>

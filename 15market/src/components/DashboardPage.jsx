@@ -517,6 +517,67 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
 
     const truncate = (str) => str ? `${str.slice(0, 6)}...${str.slice(-4)}` : "";
 
+    // ─── CARD FLIP → ASSETS FACE ────────────────────────────────────────────
+    // Tapping a credit card flips it over to show the assets that wallet
+    // holds: USDC (the wallet's own USDC) plus EURC and cirBTC (Arc's
+    // accepted assets, read per wallet address through the Tower indexer).
+    const [cardAssetsRevealed, setCardAssetsRevealed] = useState({}); // kind -> bool
+    const [dashAssetTokens, setDashAssetTokens] = useState({}); // addressLower -> {USDC, EURC, cirBTC} | null(fetching)
+    const dashAssetInFlightRef = useRef(new Set());
+    const dashDragStampRef = useRef(0);
+
+    const fmtAsset = (n) => {
+        const v = Number(n);
+        if (!Number.isFinite(v)) return null;
+        if (v > 0 && v < 0.000001) return '<0.000001';
+        if (v > 0 && v < 1) return parseFloat(v.toFixed(6)).toString();
+        return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const ensureDashAssetBalances = useCallback((addr) => {
+        const key = String(addr || '').toLowerCase();
+        if (!/^0x[a-f0-9]{40}$/.test(key) || dashAssetInFlightRef.current.has(key)) return;
+        dashAssetInFlightRef.current.add(key);
+        setDashAssetTokens(prev => ({ ...prev, [key]: null })); // null = fetching
+        fetch(`${KEEPER_URL_ARC}/swap/balance/${key}`)
+            .then(r => r.json())
+            .then(d => {
+                const b = {};
+                for (const [sym, val] of Object.entries(d?.balances || {})) b[sym] = Number(val) || 0;
+                setDashAssetTokens(prev => ({ ...prev, [key]: b }));
+            })
+            .catch(() => {
+                // Drop the entry so the next tap retries the fetch.
+                setDashAssetTokens(prev => { const c = { ...prev }; delete c[key]; return c; });
+            })
+            .finally(() => { dashAssetInFlightRef.current.delete(key); });
+    }, []);
+
+    const toggleCardAssets = (kind, addr) => {
+        if (Date.now() - dashDragStampRef.current < 250) return; // a swipe just happened
+        const opening = !cardAssetsRevealed[kind];
+        setCardAssetsRevealed(prev => ({ ...prev, [kind]: !prev[kind] }));
+        if (!opening) return;
+        // Every flip to the assets face re-reads that wallet's tokens fresh.
+        const key = String(addr || '').toLowerCase();
+        setDashAssetTokens(prev => { const c = { ...prev }; delete c[key]; return c; });
+        dashAssetInFlightRef.current.delete(key);
+        ensureDashAssetBalances(addr);
+    };
+
+    const dashAssetRow = (kind, symbol, addr) => {
+        const b = dashAssetTokens[String(addr || '').toLowerCase()];
+        if (!b) return undefined; // fetching
+        return b[symbol];
+    };
+
+    // Arc offers three assets on-chain; the card face lists them all.
+    const DASH_ASSETS = [
+        { symbol: 'USDC', name: 'USD Coin', glyph: '$', isBalance: true },
+        { symbol: 'EURC', name: 'Euro Coin', glyph: '€' },
+        { symbol: 'cirBTC', name: 'Circle Bitcoin', glyph: '₿' },
+    ];
+
     // ─── WALLET CARD — Brand-green credit card (Transfer-Hub dimensions) ───────
     // Same card dimensions as the Transfer Hub swipeable wallet card
     // (h-[220px]/md:h-[260px], rounded-[40px], metallic gold chip, topographic
@@ -533,7 +594,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         const cardBalance = isTrading ? sessionBalance : evmBalance;
         return (
         <div
-            className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] group text-white"
+            onClick={() => toggleCardAssets(kind, cardAddress)}
+            className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] group text-white cursor-pointer"
             style={{
                 fontFamily: '"Comfortaa", cursive',
                 background: 'linear-gradient(145deg, #1a6140 0%, #123f28 55%, #0b3220 100%)',
@@ -577,49 +639,98 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 </svg>
             </div>
 
-            {/* Card Face: all-white brand logo (top-left, level with the NFC icon) ·
+            {/* Card Face ⇄ Assets Face — a tap on the card flips it over.
+                Front: all-white brand logo (top-left, level with the NFC icon) ·
                 username (+ wallet label beneath) centered on the left half ·
                 bottom line = wallet address + copy (left) with the balance on
                 its right, like a card number. One font size for every element —
                 the canvas is uniformly scaled so the card always matches
-                mobile and desktop. */}
-            <div className="h-full flex flex-col relative z-20 py-4 px-7">
-
-                {/* 15market logo — all white, top-left, shifted upward */}
-                <img src="/gowlogo.png" alt="15market" className="h-[110px] w-auto self-start -translate-y-[30%]"
-                    style={{ filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
-
-                {/* Username + wallet label — vertically centered on the left */}
-                <div className="flex-1 flex items-center min-w-0">
-                    <div className="px-1 min-w-0">
-                        <span className="block text-[39px] font-black truncate leading-none">{userProfile?.username || 'Trader'}</span>
-                        <span className="block text-[11px] font-bold tracking-[0.2em] text-white/55 mt-1">{isTrading ? 'Trading' : 'Main'}</span>
-                    </div>
-                </div>
-
-                {/* Bottom line: wallet address + copy (left) · balance (right).
-                    Address slightly bigger than the USDC tag and nudged 5% up
-                    off the baseline so it reads as its own element. */}
-                <div className="flex items-end justify-between gap-4">
-                    <div className="flex items-end gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
-                        onClick={() => { if (cardAddress) { navigator.clipboard.writeText(cardAddress); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } }}>
-                        <p className="text-left text-[19.2px] font-bold text-white/70 truncate leading-none"
-                            style={{ transform: 'translateY(-5%)', fontFamily: '"Comfortaa", cursive' }}>
-                            {cardAddress
-                                ? `${cardAddress.slice(0, 5)}...${cardAddress.slice(-4)}`.toUpperCase()
-                                : (isTrading && isSignerInitializing ? 'SYNCING...' : 'XXXX...XXXX')}
-                        </p>
-                        <Copy size={13} className="flex-none text-white/70" />
-                    </div>
-                    <div className="text-right leading-none shrink-0">
-                        <div className="text-[56px] font-black tracking-tighter tabular-nums leading-none"
-                            style={{ textShadow: '0 6px 24px rgba(0,0,0,0.40)' }}>
-                            ${parseFloat(cardBalance || 0).toFixed(2)}
-                            <span className="text-[13px] ml-1.5 font-bold text-white/70">USDC</span>
+                mobile and desktop. Back: the assets that wallet holds. */}
+            <AnimatePresence mode="wait" initial={false}>
+                {cardAssetsRevealed[kind] ? (
+                    <motion.div
+                        key="assets"
+                        initial={{ rotateY: 90, scale: 0.94 }}
+                        animate={{ rotateY: 0, scale: 1 }}
+                        exit={{ rotateY: -90, scale: 0.94 }}
+                        transition={{ rotateY: { duration: 0.3, ease: 'easeInOut' }, scale: { duration: 0.3, ease: 'easeInOut' } }}
+                        style={{ transformPerspective: 1100, backfaceVisibility: 'hidden' }}
+                        className="absolute inset-0 z-20 h-full flex flex-col py-4 px-6"
+                    >
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Assets on Arc</span>
+                            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">{isTrading ? 'Trading wallet' : 'Main wallet'}</span>
                         </div>
-                    </div>
-                </div>
-            </div>
+                        <div className="flex-1 flex flex-col justify-center gap-2 min-w-0 py-2">
+                            {DASH_ASSETS.map((a) => {
+                                const v = a.isBalance ? Number(cardBalance || 0) : dashAssetRow(kind, a.symbol, cardAddress);
+                                const text = a.isBalance ? fmtAsset(v) : (v === undefined ? null : fmtAsset(v));
+                                return (
+                                    <div key={a.symbol} className="flex items-center justify-between gap-3 py-2 px-4 rounded-2xl bg-white/[0.07] border border-white/10">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 text-[15px] font-black text-white/95 leading-none shrink-0">{a.glyph}</span>
+                                            <span className="min-w-0">
+                                                <span className="block text-[13px] font-black uppercase tracking-wide leading-none">{a.symbol}</span>
+                                                <span className="block text-[9px] font-bold uppercase tracking-[0.18em] text-white/50 mt-1 truncate">{a.name}</span>
+                                            </span>
+                                        </div>
+                                        <span className={`text-[15px] font-black tabular-nums leading-none ${text === null ? 'animate-pulse text-white/40' : ''}`}>
+                                            {text === null ? '· · ·' : text}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className="text-center text-[8px] font-bold uppercase tracking-[0.3em] text-white/35">Tap card to flip back</p>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        key="face"
+                        initial={{ rotateY: -90, scale: 0.94 }}
+                        animate={{ rotateY: 0, scale: 1 }}
+                        exit={{ rotateY: 90, scale: 0.94 }}
+                        transition={{ rotateY: { duration: 0.3, ease: 'easeInOut' }, scale: { duration: 0.3, ease: 'easeInOut' } }}
+                        style={{ transformPerspective: 1100, backfaceVisibility: 'hidden' }}
+                        className="absolute inset-0 z-20 h-full flex flex-col py-4 px-7"
+                    >
+
+                        {/* 15market logo — all white, top-left, shifted upward */}
+                        <img src="/gowlogo.png" alt="15market" className="h-[110px] w-auto self-start -translate-y-[30%]"
+                            style={{ filter: 'brightness(0) invert(1)', opacity: 0.95 }} />
+
+                        {/* Username + wallet label — vertically centered on the left */}
+                        <div className="flex-1 flex items-center min-w-0">
+                            <div className="px-1 min-w-0">
+                                <span className="block text-[39px] font-black truncate leading-none">{userProfile?.username || 'Trader'}</span>
+                                <span className="block text-[11px] font-bold tracking-[0.2em] text-white/55 mt-1">{isTrading ? 'Trading' : 'Main'}</span>
+                            </div>
+                        </div>
+
+                        {/* Bottom line: wallet address + copy (left) · balance (right).
+                            Address slightly bigger than the USDC tag and nudged 5% up
+                            off the baseline so it reads as its own element. */}
+                        <div className="flex items-end justify-between gap-4">
+                            <div className="flex items-end gap-2 cursor-pointer hover:opacity-80 transition-opacity min-w-0"
+                                onClick={(e) => { e.stopPropagation(); if (cardAddress) { navigator.clipboard.writeText(cardAddress); setToast('Address Copied!'); setTimeout(() => setToast(null), 2000); } }}>
+                                <p className="text-left text-[19.2px] font-bold text-white/70 truncate leading-none"
+                                    style={{ transform: 'translateY(-5%)', fontFamily: '"Comfortaa", cursive' }}>
+                                    {cardAddress
+                                        ? `${cardAddress.slice(0, 5)}...${cardAddress.slice(-4)}`.toUpperCase()
+                                        : (isTrading && isSignerInitializing ? 'SYNCING...' : 'XXXX...XXXX')}
+                                </p>
+                                <Copy size={13} className="flex-none text-white/70" />
+                            </div>
+                            <div className="text-right leading-none shrink-0">
+                                <div className="text-[56px] font-black tracking-tighter tabular-nums leading-none"
+                                    style={{ textShadow: '0 6px 24px rgba(0,0,0,0.40)' }}>
+                                    ${parseFloat(cardBalance || 0).toFixed(2)}
+                                    <span className="text-[13px] ml-1.5 font-bold text-white/70">USDC</span>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
         </div>
         );
@@ -655,6 +766,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             drag="x"
                             dragConstraints={{ left: 0, right: 0 }}
                             onDragEnd={(e, info) => {
+                                dashDragStampRef.current = Date.now();
                                 if (info.offset.x < -100) showCard('main');
                                 else if (info.offset.x > 100) showCard('trading');
                             }}
