@@ -49,6 +49,11 @@ let notificationStats = { sent: 0, failed: 0, emailsSent: 0, emailsFailed: 0, pu
 // brightness(0) invert(1) filter produced, pre-scaled so it is a 5 KB
 // download instead of 1.7 MB).
 const EMAIL_LOGO_URL = process.env.EMAIL_LOGO_URL || 'https://15market.online/gowlogo-white.png';
+// Light-scheme counterpart: the SAME logo pre-inverted (pixels baked via
+// pngjs), so devices whose system theme is light get a visible-on-light
+// logo without depending on CSS filter chains (which mail clients strip —
+// the reason the pre-whitened asset exists in the first place).
+const EMAIL_LOGO_URL_LIGHT = process.env.EMAIL_LOGO_URL_LIGHT || 'https://15market.online/gowlogo-dark.png';
 const EMAIL_OUTBOX_PATH = path.join(__dirname, '..', '..', 'data', 'email-outbox.json');
 
 // The design's typefaces cannot be fetched by most mail clients — keep
@@ -110,6 +115,14 @@ function getEmailShell(innerHtml) {
     // client can ever show a white page around the design. Everything is
     // inline styles + bgcolor: mail clients strip <style> blocks and do
     // not fetch web fonts, so nothing here may depend on either.
+    //
+    // SYSTEM DARK/LIGHT: the device's theme decides the palette. The inline
+    // styles carry the DARK design (the universal fallback — clients that
+    // understand nothing render exactly as before), and the media query
+    // below re-skins every hook to the light palette when the OS is light.
+    // Author `!important` declarations beat inline styles, which is why the
+    // hooks work despite the fully inlined markup. The <style> block only
+    // ever EXTENDS what already renders, never carries it.
     return `
     <!DOCTYPE html>
     <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -117,36 +130,57 @@ function getEmailShell(innerHtml) {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700;900&family=Inter:wght@400;600;700&display=swap');</style>
+        <style>
+            /* System light theme: pale brand-green canvas, dark ink, the
+               pre-inverted logo. Dark stays whatever the inline styles say. */
+            @media (prefers-color-scheme: light) {
+                .em-bg { background-color: #F4F7F5 !important; }
+                .em-title { color: #0a261a !important; }
+                .em-body { color: #3b4a43 !important; }
+                .em-divider { background-color: rgba(11, 38, 26, 0.14) !important; }
+                .em-foot { color: #7d8d85 !important; }
+                .em-foot-brand { color: #0a261a !important; }
+                .em-foot-warn { color: #b45309 !important; }
+                .em-soft { color: #6b7c74 !important; }
+                .em-strong { color: #133a2a !important; }
+                .em-code { color: #159b62 !important; }
+                .em-codelabel { color: #7d8d85 !important; }
+                .em-logo-dark { display: none !important; }
+                .em-logo-light { display: inline-block !important; }
+            }
+        </style>
     </head>
-    <body style="margin:0; padding:0; background-color:#070a09;">
-        <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#070a09" style="width:100%; background-color:#070a09; margin:0; padding:0; border-collapse:collapse;">
+    <body class="em-bg" style="margin:0; padding:0; background-color:#070a09;">
+        <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#070a09" class="em-bg" style="width:100%; background-color:#070a09; margin:0; padding:0; border-collapse:collapse;">
             <tr>
-                <td align="center" bgcolor="#070a09" style="background-color:#070a09; padding:52px 20px 44px;">
+                <td align="center" bgcolor="#070a09" class="em-bg" style="background-color:#070a09; padding:52px 20px 44px;">
                     <table role="presentation" width="540" border="0" cellpadding="0" cellspacing="0" style="width:100%; max-width:540px; border-collapse:collapse; text-align:left;">
-                        <!-- Logo row — the pre-whitened asset. Mail clients do not
-                             run CSS filter chains; the old brightness/invert trick
-                             left the raw (dark) logo on the dark background. -->
+                        <!-- Logo row — two pre-colored assets, one per system
+                             theme. Mail clients do not run CSS filter chains,
+                             so the colors are baked into both bitmaps and the
+                             media query just picks which one shows. -->
                         <tr>
                             <td align="center" style="padding:0 0 30px; text-align:center;">
-                                <img src="${EMAIL_LOGO_URL}" alt="15market" width="115" height="115" style="display:inline-block; width:115px; height:115px; border:0; outline:none; text-decoration:none;" />
+                                <img class="em-logo-dark" src="${EMAIL_LOGO_URL}" alt="15market" width="115" height="115" style="display:inline-block; width:115px; height:115px; border:0; outline:none; text-decoration:none;" />
+                                <img class="em-logo-light" src="${EMAIL_LOGO_URL_LIGHT}" alt="15market" width="115" height="115" style="display:none; width:115px; height:115px; border:0; outline:none; text-decoration:none;" />
                             </td>
                         </tr>
                         <tr>
                             <td style="padding:0 0 34px; font-size:0; line-height:0;">
-                                <div style="height:1px; background-color:rgba(255,255,255,0.12); line-height:1px; font-size:0px;">&nbsp;</div>
+                                <div class="em-divider" style="height:1px; background-color:rgba(255,255,255,0.12); line-height:1px; font-size:0px;">&nbsp;</div>
                             </td>
                         </tr>
                         ${innerHtml}
                         <tr>
                             <td style="padding:40px 0 26px; font-size:0; line-height:0;">
-                                <div style="height:1px; background-color:rgba(255,255,255,0.12); line-height:1px; font-size:0px;">&nbsp;</div>
+                                <div class="em-divider" style="height:1px; background-color:rgba(255,255,255,0.12); line-height:1px; font-size:0px;">&nbsp;</div>
                             </td>
                         </tr>
                         <!-- Footer — company line + no-reply warning, inlined. -->
                         <tr>
-                            <td align="center" style="text-align:center; font-size:11px; line-height:1.6; color:#6f7f77; font-family:${EMAIL_FONT_BODY};">
-                                <p style="margin:0 0 6px;"><span style="font-family:${EMAIL_FONT_BRAND}; font-weight:700; color:#ffffff;">15market</span> (c) 2026 &#183; All rights reserved</p>
-                                <p style="margin:0; color:#e0a166; font-weight:600;">Warning: this is a no-reply email address. Replies to this email will not be read or processed.</p>
+                            <td align="center" class="em-foot" style="text-align:center; font-size:11px; line-height:1.6; color:#6f7f77; font-family:${EMAIL_FONT_BODY};">
+                                <p style="margin:0 0 6px;"><span class="em-foot-brand" style="font-family:${EMAIL_FONT_BRAND}; font-weight:700; color:#ffffff;">15market</span> (c) 2026 &#183; All rights reserved</p>
+                                <p class="em-foot-warn" style="margin:0; color:#e0a166; font-weight:600;">Warning: this is a no-reply email address. Replies to this email will not be read or processed.</p>
                             </td>
                         </tr>
                     </table>
@@ -167,11 +201,12 @@ function getEmailTemplate(title, message, type) {
     // Body-only layout: title + message directly under the header divider.
     // No type badge, no buttons — the email IS the message. Every style is
     // inline: nothing here may depend on a <style> block or a web font.
+    // The em-* classes re-skin these to the light palette on light devices.
     return getEmailShell(`
         <tr>
             <td style="padding:0;">
-                <h2 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:24px; color:#ffffff; margin:0 0 18px; line-height:1.3; text-align:left;">${title}</h2>
-                <p style="font-family:${EMAIL_FONT_BODY}; font-size:15px; line-height:1.7; color:#b9c9c0; margin:0;">${message}</p>
+                <h2 class="em-title" style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:24px; color:#ffffff; margin:0 0 18px; line-height:1.3; text-align:left;">${title}</h2>
+                <p class="em-body" style="font-family:${EMAIL_FONT_BODY}; font-size:15px; line-height:1.7; color:#b9c9c0; margin:0;">${message}</p>
             </td>
         </tr>
     `);
@@ -328,13 +363,13 @@ function getOtpEmailTemplate(code) {
     return getEmailShell(`
         <tr>
             <td style="padding:0;">
-                <h2 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:24px; color:#ffffff; margin:0 0 18px; line-height:1.3; text-align:left;">Verify Your Email</h2>
-                <p style="font-family:${EMAIL_FONT_BODY}; font-size:15px; line-height:1.7; color:#b9c9c0; margin:0 0 30px;">Use the code below to complete your verification.</p>
+                <h2 class="em-title" style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:24px; color:#ffffff; margin:0 0 18px; line-height:1.3; text-align:left;">Verify Your Email</h2>
+                <p class="em-body" style="font-family:${EMAIL_FONT_BODY}; font-size:15px; line-height:1.7; color:#b9c9c0; margin:0 0 30px;">Use the code below to complete your verification.</p>
                 <div style="text-align:center;">
-                    <div style="font-family:${EMAIL_FONT_BODY}; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:#6f7f77; margin:0 0 16px;">Verification Code</div>
-                    <div style="font-family:${EMAIL_FONT_CODE}; font-weight:900; font-size:44px; letter-spacing:14px; color:#2ecc8f; line-height:1.2;">${code}</div>
+                    <div class="em-codelabel" style="font-family:${EMAIL_FONT_BODY}; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:#6f7f77; margin:0 0 16px;">Verification Code</div>
+                    <div class="em-code" style="font-family:${EMAIL_FONT_CODE}; font-weight:900; font-size:44px; letter-spacing:14px; color:#2ecc8f; line-height:1.2;">${code}</div>
                 </div>
-                <p style="font-family:${EMAIL_FONT_BODY}; font-size:13px; line-height:1.7; color:#8fa097; margin:30px 0 0;">Enter this <strong style="color:#e2ece5;">one-time code</strong> on the application page. It expires in <strong style="color:#e2ece5;">10 minutes</strong>. If you did not request this code, ignore this email.</p>
+                <p class="em-soft" style="font-family:${EMAIL_FONT_BODY}; font-size:13px; line-height:1.7; color:#8fa097; margin:30px 0 0;">Enter this <strong class="em-strong" style="color:#e2ece5;">one-time code</strong> on the application page. It expires in <strong class="em-strong" style="color:#e2ece5;">10 minutes</strong>. If you did not request this code, ignore this email.</p>
             </td>
         </tr>
     `);

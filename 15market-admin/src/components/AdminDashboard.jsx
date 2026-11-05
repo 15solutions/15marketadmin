@@ -2893,22 +2893,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 {mailReader.status === 'failed' && (
                                     <div className="text-[9px] font-black uppercase tracking-widest text-red-500">Delivery failed — {mailReader.detail || 'unknown error'}</div>
                                 )}
-                                {/* The stored design previewed exactly as it landed in a client */}
-                                {mailReader.loadingFull ? (
-                                    <div className={`px-4 py-10 rounded-xl border text-center text-[9px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'border-black/10' : 'border-white/10'}`}>Loading design…</div>
-                                ) : mailReader.html ? (
-                                    <iframe
-                                        title="email-preview"
-                                        srcDoc={mailReader.html}
-                                        sandbox=""
-                                        className="w-full h-[420px] rounded-xl border bg-white"
-                                        style={{ borderColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }}
-                                    />
-                                ) : (
-                                    <div className={`px-4 py-3 rounded-xl text-[11px] leading-relaxed ${isLight ? 'bg-[#F4F6F5] text-black/70' : 'bg-white/5 text-white/70'}`}>
-                                        {mailReader.message || '(no body content)'}
-                                    </div>
-                                )}
+                                {/* The message itself, straight on the console
+                                    background — no design/preview chrome, just
+                                    what the mail says. */}
+                                <div className={`text-[12px] leading-relaxed whitespace-pre-wrap break-words px-0.5 ${isLight ? 'text-black/70' : 'text-white/70'}`}>
+                                    {mailReader.message || '(no body content)'}
+                                </div>
                             </div>
                         )}
 
@@ -2948,17 +2938,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 </div>
                                 {inboxReader.loadingFull ? (
                                     <div className={`px-4 py-10 rounded-xl border text-center text-[9px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'border-black/10' : 'border-white/10'}`}>Opening mail…</div>
-                                ) : inboxReader.html ? (
-                                    <iframe
-                                        title="inbound-mail"
-                                        srcDoc={inboxReader.html}
-                                        sandbox=""
-                                        className="w-full h-[420px] rounded-xl border bg-white"
-                                        style={{ borderColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }}
-                                    />
                                 ) : (
-                                    <div className={`px-4 py-3 rounded-xl text-[11px] leading-relaxed whitespace-pre-wrap break-words ${isLight ? 'bg-[#F4F6F5] text-black/70' : 'bg-white/5 text-white/70'}`}>
-                                        {inboxReader.text || inboxReader.preview || '(no body content)'}
+                                    /* The message itself on the console background —
+                                        no sandboxed design frame, just the words
+                                        the sender wrote. */
+                                    <div className={`text-[12px] leading-relaxed whitespace-pre-wrap break-words px-0.5 ${isLight ? 'text-black/70' : 'text-white/70'}`}>
+                                        {inboxReader.text || inboxReader.message || inboxReader.preview || '(no body content)'}
                                     </div>
                                 )}
                                 {Array.isArray(inboxReader.attachments) && inboxReader.attachments.length > 0 && (
