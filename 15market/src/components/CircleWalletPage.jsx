@@ -1922,9 +1922,6 @@ export function CircleWalletPage({
                                                             style={{ transformPerspective: 1100, backfaceVisibility: 'hidden' }}
                                                             className="absolute inset-0 z-20 h-full flex flex-col py-4 px-6"
                                                         >
-                                                            <div className="flex items-center justify-end px-1">
-                                                                <span className="text-[9px] font-bold tracking-[0.16em] text-white/40">{currentWallet.address ? `${currentWallet.address.slice(0, 5)}…${currentWallet.address.slice(-4)}`.toUpperCase() : ''}</span>
-                                                            </div>
                                                             <div className="flex-1 flex flex-col justify-center gap-2 min-w-0 py-2">
                                                                 {HUB_ASSETS.map((a) => {
                                                                     const v = hubAssetRow(currentWallet.key, a.symbol);
