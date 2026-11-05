@@ -1442,6 +1442,21 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         if (adminTab === 'mail' && canMail) fetchMails();
     }, [adminTab, canMail, dataEpoch]);
 
+    useEffect(() => {
+        if (adminTab !== 'mail' || !canMail) return;
+        fetchInbound();
+        const t = setInterval(fetchInbound, 30000);
+        return () => clearInterval(t);
+    }, [adminTab, canMail, dataEpoch]);
+
+    // A new arrival pings in over the socket — refresh the badge even if the
+    // console is parked on another tab.
+    useEffect(() => {
+        if (!canMail) return;
+        const unbind = socketService.on('mail_inbound', () => { fetchInboundRef.current?.(); });
+        return () => unbind();
+    }, [canMail]);
+
     // Reader open — pulls the full stored email (design HTML) for preview.
     const openMail = async (m) => {
         setMailReader({ ...m, loadingFull: true });
@@ -1479,6 +1494,53 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         } catch (e) {
             notify(e.message, 'error');
         } finally { setMailSendBusy(false); }
+    };
+
+    // ── Inbox — the receiving end of support@15market.online ────────────
+    // Resend's inbound parse delivers anything sent to the domain to the
+    // backend webhook, which mirrors it here (memory + disk, same as the
+    // outbox). Reads are marked server-side so the badge stays honest, and
+    // the socket ring pushes arrivals live.
+    const [mailTab, setMailTab] = useState('sent'); // sent | received
+    const [inboxList, setInboxList] = useState([]);
+    const [inboxUnread, setInboxUnread] = useState(0);
+    const [inboxBusy, setInboxBusy] = useState(false);
+    const [inboxReader, setInboxReader] = useState(null);
+    const fetchInboundRef = useRef(() => {});
+
+    const fetchInbound = async () => {
+        setInboxBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/mail/inbound`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                setInboxList(Array.isArray(data.emails) ? data.emails : []);
+                setInboxUnread(Number(data.unread) || 0);
+            }
+        } catch { /* inbox stays as-is; badge refreshes on next tick */ }
+        finally { setInboxBusy(false); }
+    };
+    fetchInboundRef.current = fetchInbound;
+
+    const openInbound = async (m) => {
+        setMailCompose(false);
+        setInboxReader({ ...m, loadingFull: true });
+        if (mailTab !== 'received') setMailTab('received');
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/mail/inbound/${encodeURIComponent(m.id)}`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.email) setInboxReader(data.email);
+            else setInboxReader(m);
+        } catch {
+            setInboxReader(m); // head without preview still reads fine
+        }
+        // Read receipt — fire and forget, then re-sync the badge locally.
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/mail/inbound/${encodeURIComponent(m.id)}/read`, { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            setInboxUnread(Number.isFinite(data.unread) ? data.unread : Math.max(0, inboxUnread - (m.read ? 0 : 1)));
+            setInboxList(prev => prev.map(r => r.id === m.id ? { ...r, read: true } : r));
+        } catch { /* badge refreshes on next tick */ }
     };
 
     // Fiat formatting + expandable row detail — local to the fiat panel.
@@ -2642,7 +2704,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 )}
 
                 {/* MAIL — platform email console. Left rail: the outbox of
-                    every automated + admin-sent email; right: the reader, or
+                    every automated + admin-sent email, and — since Resend's
+                    inbound parse landed — the inbox: anything anybody emails
+                    to @15market.online arrives here. Right: the reader, or
                     the compose pane. Same plain design as the emails
                     themselves (logo header, company + no-reply footer). */}
                 {activeNav === 'mail' && canMail && (
@@ -2656,22 +2720,44 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div>
                                     <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Mail</div>
                                     <div className="text-[8px] font-black uppercase tracking-widest opacity-40">
-                                        {mailList.length} in the outbox · automated &amp; manual
+                                        {mailTab === 'sent'
+                                            ? `${mailList.length} in the outbox · automated &amp; manual`
+                                            : `support@15market.online · ${inboxUnread} unread`}
                                     </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
+                                {/* Received / Sent switch */}
+                                <div className={`flex items-center p-1 rounded-xl border ${isLight ? 'border-black/10 bg-black/[0.03]' : 'border-white/10 bg-white/5'}`}>
+                                    <button
+                                        onClick={() => { setMailTab('received'); setMailReader(null); }}
+                                        className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all inline-flex items-center gap-1.5 ${mailTab === 'received' ? 'bg-[#1A6140] text-white' : 'opacity-50 hover:opacity-80'}`}
+                                    >
+                                        Received
+                                        {inboxUnread > 0 && (
+                                            <span className="px-1.5 min-w-[16px] py-[1px] rounded-full bg-amber-400 text-black text-[7px] font-black tabular-nums">{inboxUnread}</span>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => { setMailTab('sent'); setInboxReader(null); }}
+                                        className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${mailTab === 'sent' ? 'bg-[#1A6140] text-white' : 'opacity-50 hover:opacity-80'}`}
+                                    >
+                                        Sent
+                                    </button>
+                                </div>
+                                {mailTab === 'sent' && (
+                                    <button
+                                        onClick={() => setMailFilter(prev => prev === 'all' ? 'system' : prev === 'system' ? 'manual' : 'all')}
+                                        className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                    >
+                                        Filter: {mailFilter}
+                                    </button>
+                                )}
                                 <button
-                                    onClick={() => setMailFilter(prev => prev === 'all' ? 'system' : prev === 'system' ? 'manual' : 'all')}
+                                    onClick={mailTab === 'sent' ? fetchMails : fetchInbound}
                                     className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
                                 >
-                                    Filter: {mailFilter}
-                                </button>
-                                <button
-                                    onClick={fetchMails}
-                                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
-                                >
-                                    <span className="inline-flex items-center gap-2"><RefreshCw size={11} className={mailBusy ? 'animate-spin' : ''} /> Refresh</span>
+                                    <span className="inline-flex items-center gap-2"><RefreshCw size={11} className={mailBusy || inboxBusy ? 'animate-spin' : ''} /> Refresh</span>
                                 </button>
                                 <button
                                     onClick={() => { setMailCompose(true); setMailReader(null); }}
@@ -2682,7 +2768,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         </div>
 
-                        {/* Outbox rows */}
+                        {/* Outbox rows — Sent tab */}
+                        {mailTab === 'sent' && (
                         <div className={`flex flex-col min-w-0 max-h-[560px] overflow-y-auto no-scrollbar border-y ${isLight ? 'border-black/5' : 'border-white/10'}`}>
                             {mailList.filter(m => mailFilter === 'all' || m.kind === mailFilter).length === 0 && (
                                 <div className="py-6 px-2 text-center text-[9px] font-medium opacity-40">
@@ -2712,6 +2799,40 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 </div>
                             ))}
                         </div>
+                        )}
+
+                        {/* INBOX rows — Received tab: anything anybody emails to
+                            the domain lands here, newest first, unread rows
+                            carry the amber dot. */}
+                        {mailTab === 'received' && (
+                            <div className={`flex flex-col min-w-0 max-h-[560px] overflow-y-auto no-scrollbar border-y ${isLight ? 'border-black/5' : 'border-white/10'}`}>
+                                {inboxList.length === 0 && (
+                                    <div className="py-6 px-3 text-center text-[9px] font-medium opacity-40">
+                                        {inboxBusy ? 'Loading inbox…' : 'No received emails yet — anything sent to @15market.online arrives here'}
+                                    </div>
+                                )}
+                                {inboxList.map((m, i) => (
+                                    <div
+                                        key={m.id || i}
+                                        onClick={() => openInbound(m)}
+                                        className={`flex items-center gap-3 px-2 py-2.5 border-b cursor-pointer transition-colors ${isLight ? 'border-black/5 hover:bg-black/[0.03]' : 'border-white/5 hover:bg-white/[0.03]'} ${inboxReader?.id === m.id ? (isLight ? 'bg-[#1A6140]/5' : 'bg-[#1A6140]/10') : ''}`}
+                                    >
+                                        <span className={`w-1.5 h-1.5 rounded-full flex-none ${m.read ? 'bg-transparent' : 'bg-amber-400'}`} />
+                                        <span className={`flex-none text-[6px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${isLight ? 'bg-amber-500/10 text-amber-600' : 'bg-amber-400/10 text-amber-400'}`}>In</span>
+                                        <span className="w-40 md:w-52 min-w-0 text-[10px] font-bold truncate flex-none" style={{ color: isLight ? '#0a261a' : '#fff' }}>
+                                            {m.fromName ? `${m.fromName} · ${m.fromAddr}` : m.fromAddr}
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <div className={`text-[10px] font-black truncate ${m.read ? 'opacity-60' : ''} ${isLight ? 'text-black' : 'text-white'}`}>{m.subject}</div>
+                                            <div className="text-[8px] opacity-40 truncate">{m.preview || '(no preview)'}</div>
+                                        </div>
+                                        <div className="flex-none text-[8px] opacity-30 font-mono text-right">
+                                            {new Date(m.receivedAt).toLocaleString([], { year: '2-digit', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         {/* Compose pane — the normal email surface */}
                         {mailCompose && (
@@ -2786,6 +2907,68 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 ) : (
                                     <div className={`px-4 py-3 rounded-xl text-[11px] leading-relaxed ${isLight ? 'bg-[#F4F6F5] text-black/70' : 'bg-white/5 text-white/70'}`}>
                                         {mailReader.message || '(no body content)'}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* INBOX reader — the received email exactly as it was
+                            written: stored HTML in a sandboxed frame, plain
+                            text fallback, attachments listed. Scripts and
+                            forms are dead inside the sandbox; images load so
+                            the mail reads like it does in a real client. */}
+                        {mailTab === 'received' && inboxReader && !mailCompose && (
+                            <div className={`border rounded-2xl p-5 flex flex-col gap-3 ${isLight ? 'border-black/10 bg-white/60' : 'border-white/10 bg-white/[0.02]'}`}>
+                                <div className="flex items-start justify-between gap-3 flex-wrap">
+                                    <div className="min-w-0">
+                                        <div className={`text-sm font-black tracking-tight ${isLight ? 'text-black' : 'text-white'}`}>{inboxReader.subject}</div>
+                                        <div className={`text-[8px] font-black uppercase tracking-widest opacity-40 mt-1`}>
+                                            From {inboxReader.from || inboxReader.fromAddr} · to {inboxReader.to} · {new Date(inboxReader.receivedAt).toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setMailCompose(true);
+                                                setInboxReader(null);
+                                                setMailDraft({ to: inboxReader.fromAddr || '', subject: `Re: ${inboxReader.subject || ''}`, message: '', type: 'info' });
+                                            }}
+                                            title="Open the compose drawer addressed to this sender"
+                                            className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-[#1A6140] text-white hover:brightness-110"
+                                        >
+                                            Reply
+                                        </button>
+                                        <button
+                                            onClick={() => setInboxReader(null)}
+                                            className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                                {inboxReader.loadingFull ? (
+                                    <div className={`px-4 py-10 rounded-xl border text-center text-[9px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'border-black/10' : 'border-white/10'}`}>Opening mail…</div>
+                                ) : inboxReader.html ? (
+                                    <iframe
+                                        title="inbound-mail"
+                                        srcDoc={inboxReader.html}
+                                        sandbox=""
+                                        className="w-full h-[420px] rounded-xl border bg-white"
+                                        style={{ borderColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }}
+                                    />
+                                ) : (
+                                    <div className={`px-4 py-3 rounded-xl text-[11px] leading-relaxed whitespace-pre-wrap break-words ${isLight ? 'bg-[#F4F6F5] text-black/70' : 'bg-white/5 text-white/70'}`}>
+                                        {inboxReader.text || inboxReader.preview || '(no body content)'}
+                                    </div>
+                                )}
+                                {Array.isArray(inboxReader.attachments) && inboxReader.attachments.length > 0 && (
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-[7px] font-black uppercase tracking-widest opacity-40">Attachments</span>
+                                        {inboxReader.attachments.map((a, i) => (
+                                            <span key={i} className={`text-[8px] font-bold px-2 py-1 rounded-lg ${isLight ? 'bg-black/5 text-black/60' : 'bg-white/10 text-white/60'}`}>
+                                                {a.filename}{a.size ? ` · ${(Number(a.size) / 1024).toFixed(0)} KB` : ''}
+                                            </span>
+                                        ))}
                                     </div>
                                 )}
                             </div>
@@ -2917,7 +3100,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     ADMIN_TAMPER: 'Admin tamper', RATE_ABUSE: 'Rate abuse',
                                     ADMIN_LOGIN: 'Admin login', IP_BLOCKED: 'IP blocked',
                                     IP_UNBLOCKED: 'IP unblocked', USER_SUSPENDED: 'User access change',
-                                    TREASURY_DRAIN: 'Treasury drained', TREASURY_SEND: 'Treasury send', TREASURY_LOW: 'Treasury low'
+                                    TREASURY_DRAIN: 'Treasury drained', TREASURY_SEND: 'Treasury send', TREASURY_LOW: 'Treasury low',
+                                    MAIL_RECEIVED: 'Inbound mail'
                                 };
                                 const blockedNow = siemBlocked.some(b => b.ip === ev.ip);
                                 const blockable = ev.ip && ev.ip !== 'unknown' && ev.ip !== 'admin';

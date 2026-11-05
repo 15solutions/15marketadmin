@@ -102,7 +102,15 @@ const clientIP = (req) => {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+/**
+ * Capture the raw request body for every JSON route — the mail inbound
+ * webhook verifies a Svix HMAC over the EXACT bytes Resend signed, and a
+ * re-serialized body would never match.
+ */
+app.use(express.json({
+    limit: '10mb',
+    verify: (req, res, buf) => { req.rawBody = buf; }
+}));
 
 /**
  * IP choke — BEFORE every route: a blocked address gets the same 403 on
@@ -715,6 +723,65 @@ app.post('/admin/emails/send', requirePerm('emails.send'), async (req, res) => {
     const out = await notificationService.sendAdminEmail({ to, subject, message, type });
     if (!out.ok) return res.status(400).json({ error: out.error });
     res.json({ ok: true, mock: out.mock === true });
+});
+
+/**
+ * MAIL INBOUND — the receiving end of support@15market.online.
+ *
+ * Resend's inbound parse posts every email addressed to the domain here (the
+ * catch-all webhook configured in the Resend dashboard → this public route).
+ * Public, unauthenticated, but Svix-signed: with RESEND_WEBHOOK_SECRET set the
+ * signature over the exact raw bytes is enforced; without it the webhook is
+ * accepted in dev mode (logged loudly) so receiving works before the secret
+ * is copied over.
+ */
+const mailbox = require('./mailbox');
+
+app.post('/mail/inbound', (req, res) => {
+    try {
+        const secret = process.env.RESEND_WEBHOOK_SECRET || '';
+        if (secret) {
+            const check = mailbox.verifyResendSignature(
+                req.headers,
+                req.rawBody ? req.rawBody.toString('utf8') : '',
+                secret
+            );
+            if (!check.verified) {
+                console.warn(`[MailInbound] webhook rejected — ${check.reason}`);
+                return res.status(401).json({ error: 'Invalid webhook signature' });
+            }
+        } else {
+            console.warn('[MailInbound] accepting UNSIGNED inbound webhook — set RESEND_WEBHOOK_SECRET to enforce Svix signatures');
+        }
+        const out = mailbox.recordInbound(req.body);
+        if (out.ok && !out.duplicate && out.email) {
+            io.emit('mail_inbound', { id: out.email.id, from: out.email.fromAddr, subject: out.email.subject });
+            siem.addEvent({
+                type: 'MAIL_RECEIVED',
+                severity: 'info',
+                message: `Inbound mail to ${(out.email.to || 'support@15market.online').split(',')[0]} from ${out.email.fromAddr} — "${out.email.subject || '(no subject)'}"`
+            });
+        }
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+// Console inbox — headers + preview for the list, full body for the reader,
+// and a read receipt so the Received badge stays honest.
+app.get('/admin/mail/inbound', requirePerm('emails.send'), (req, res) => {
+    res.json({ emails: mailbox.listInbound(), unread: mailbox.unread() });
+});
+app.get('/admin/mail/inbound/:id', requirePerm('emails.send'), (req, res) => {
+    const m = mailbox.getInbound(req.params.id);
+    if (!m) return res.status(404).json({ error: 'Email not found' });
+    res.json({ email: m });
+});
+app.post('/admin/mail/inbound/:id/read', requirePerm('emails.send'), (req, res) => {
+    const out = mailbox.markRead(req.params.id);
+    if (!out.ok) return res.status(404).json({ error: out.error });
+    res.json(out);
 });
 
 /**
