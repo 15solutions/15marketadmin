@@ -463,6 +463,19 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         try { localStorage.setItem('15m_admin_section', key); } catch (e) {}
     };
 
+    // Mobile bottom strip: 9 sections cannot fit a phone width, so the bar
+    // shows the first four tabs and swipes horizontally for the rest — the
+    // half-visible fifth tab hints that more is one swipe away. Whatever
+    // section becomes active (also via socket-driven redirects) scrolls
+    // itself into view so nothing is hidden behind the edge.
+    const mobileNavRefs = useRef({});
+    useEffect(() => {
+        const el = mobileNavRefs.current[adminTab];
+        if (el) {
+            try { el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); } catch (e) {}
+        }
+    }, [adminTab]);
+
     // Sidebar expanded (full menu) ↔ collapsed (icon rail).
     const [sidebarOpen, setSidebarOpen] = useState(() => {
         try { return localStorage.getItem('15m_admin_sidebar') !== 'collapsed'; } catch (e) { return true; }
@@ -3505,32 +3518,39 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
              </AnimatePresence>
              </main>
 
-            {/* MOBILE bottom tab bar — the five sections, glass strip, safe-area aware.
-                Badges (pending withdrawals) show as amber dots. Hidden on a
-                dedicated single-task dashboard — one task needs no nav. */}
+            {/* MOBILE bottom tab bar — a swipeable strip: the first four tabs
+                fill the width and the fifth peeks at the edge to show there
+                is more (Mail, Referrals, Broadcast, SIEM, Security…); each
+                tab is fixed-width so nothing is ever squeezed out or hidden.
+                The active tab auto-scrolls into view. Badges (pending
+                withdrawals) show as amber dots. Hidden on a dedicated
+                single-task dashboard — one task needs no nav. */}
             {!dedicatedMode && (
-            <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] flex items-stretch border-t backdrop-blur-3xl px-1.5 pt-1 overflow-x-auto no-scrollbar ${isLight ? 'bg-white/85 border-black/10' : 'bg-[#0A0A0A]/90 border-white/10'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
-                {visibleNav.map(t => {
-                    const Icon = t.icon;
-                    const active = activeNav === t.key;
-                    const badge = t.key === 'referrals' ? refWithdrawals.filter(w => w.status === 'pending').length : 0;
-                    return (
-                        <button
-                            key={t.key}
-                            onClick={() => selectSection(t.key)}
-                            className={`relative flex-1 min-w-[64px] flex flex-col items-center gap-1 py-2 rounded-2xl transition-all active:scale-95 ${active
-                                ? 'text-[#3CB371]'
-                                : isLight ? 'text-black/40' : 'text-white/40'}`}
-                        >
-                            {active && <motion.div layoutId="mob-tab-dot" className="absolute top-0 h-[3px] w-7 rounded-full bg-[#3CB371]" />}
-                            <Icon size={18} className="flex-none" />
-                            <span className="text-[6.5px] font-black uppercase tracking-widest truncate max-w-full">{t.label}</span>
-                            {badge > 0 && (
-                                <span className="absolute top-1 right-2 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[7px] font-black leading-none">{badge}</span>
-                            )}
-                        </button>
-                    );
-                })}
+            <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] border-t backdrop-blur-3xl ${isLight ? 'bg-white/85 border-black/10' : 'bg-[#0A0A0A]/90 border-white/10'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
+                <div className="flex items-stretch px-1.5 pt-1 overflow-x-auto no-scrollbar snap-x snap-mandatory">
+                    {visibleNav.map((t, i) => {
+                        const Icon = t.icon;
+                        const active = activeNav === t.key;
+                        const badge = t.key === 'referrals' ? refWithdrawals.filter(w => w.status === 'pending').length : 0;
+                        return (
+                            <button
+                                key={t.key}
+                                ref={(el) => { if (el) mobileNavRefs.current[t.key] = el; else delete mobileNavRefs.current[t.key]; }}
+                                onClick={() => selectSection(t.key)}
+                                className={`relative flex-none w-[84px] shrink-0 snap-start flex flex-col items-center gap-1 py-2 rounded-2xl transition-all active:scale-95 ${active
+                                    ? 'text-[#3CB371]'
+                                    : isLight ? 'text-black/40' : 'text-white/40'}`}
+                            >
+                                {active && <motion.div layoutId="mob-tab-dot" className="absolute top-0 h-[3px] w-7 rounded-full bg-[#3CB371]" />}
+                                <Icon size={18} className="flex-none" />
+                                <span className="text-[7px] font-black uppercase tracking-widest truncate max-w-full">{t.label}</span>
+                                {badge > 0 && (
+                                    <span className="absolute top-1 right-2.5 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[7px] font-black leading-none">{badge}</span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
             )}
 
