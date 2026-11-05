@@ -864,6 +864,32 @@ emitAdminStats(); // Initial broadcast
 setInterval(emitAdminStats, 10000); // Periodic 10s sync
 
 /**
+ * Daily percentage changes — feeds `macro_24h` on the MAIN socket.
+ * priceService already polls Binance's 24hr ticker (priceChangePercent per
+ * asset, refreshed every 60s into cache.binance24h) and cache.get24hChange
+ * falls back to the rolling snapshot for assets without a Binance pair —
+ * but nothing ever broadcast it, so the desktop asset list (ETH/BTC/SOL
+ * daily %) sat on its +0.00% default forever. One payload, all assets.
+ */
+function buildChanges24hPayload() {
+    const out = {};
+    for (const key of Object.keys(priceService.ASSETS || {})) {
+        try {
+            const change = cache.get24hChange(key);
+            if (change !== null && change !== undefined && Number.isFinite(change)) out[key] = change;
+        } catch { /* one asset must never kill the payload */ }
+    }
+    return out;
+}
+io.emit('macro_24h', buildChanges24hPayload()); // initial broadcast after the first Binance poll lands
+setInterval(() => {
+    try {
+        const payload = buildChanges24hPayload();
+        if (Object.keys(payload).length > 0) io.emit('macro_24h', payload);
+    } catch { /* the daily ticker must never take the loop down */ }
+}, 60000);
+
+/**
  * Put trades that were open when the process died back into cache.trades.
  *
  * cache.trades only lives in memory, so without this a restart silently strands
@@ -1011,6 +1037,14 @@ io.on('connection', (socket) => {
   // Push latest odds on connection
   if (oddsEngine.currentOdds) {
     socket.emit('live_odds', oddsEngine.currentOdds);
+  }
+
+  // Daily percentage changes on connection — the desktop market list
+  // (LeftSidebar) reads macro_24h; without a connect-time push a freshly
+  // opened dashboard sits on +0.00% until the next minute tick.
+  const changes24h = buildChanges24hPayload();
+  if (Object.keys(changes24h).length > 0) {
+    socket.emit('macro_24h', changes24h);
   }
 });
 
