@@ -49,7 +49,8 @@ import {
     UserCog,
     Send,
     Copy,
-    AlertCircle
+    AlertCircle,
+    Droplets
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
@@ -70,6 +71,7 @@ const NAV = [
     { key: 'users', label: 'Users', hint: 'Directory · Access control', icon: UserCog },
     { key: 'fiat', label: 'Fiat Withdrawals', hint: 'Bank payout · Requests', icon: Landmark },
     { key: 'mail', label: 'Mail', hint: 'Outbox · Compose', icon: Mail },
+    { key: 'liquidity', label: 'Liquidity', hint: 'Treasury · Drain · Send', icon: Droplets },
     { key: 'referrals', label: 'Referral Program', hint: 'Participants · Earnings · Requests', icon: Users },
     { key: 'broadcast', label: 'Broadcast', hint: 'Live banner · Alerts', icon: Radio },
     { key: 'siem', label: 'SIEM', hint: 'Threats · Intrusions', icon: ShieldAlert },
@@ -1165,6 +1167,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             : t.key === 'broadcast' ? canBroadcast
             : t.key === 'siem' ? hasPerm('dashboard.siem')
             : t.key === 'security' ? hasPerm('dashboard.security')
+            : t.key === 'liquidity' ? hasPerm('admin.liquidity')
             : true
     );
     const dedicatedMode = visibleNav.length <= 1;
@@ -1263,6 +1266,85 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         // (info-severity events aren't socket-pushed) — refresh quietly on
         // a slow tick while the console sits on this tab.
         const t = setInterval(fetchSiem, 30000);
+        return () => clearInterval(t);
+    }, [adminTab, dataEpoch]);
+
+    // ── Liquidity — treasury drain + direct sends, one live snapshot ──────
+    // The snapshot reads the CHAIN (treasury contract balance + operator
+    // wallet), not a database: this panel reports what can actually move.
+    // Every write (drain/send) lands a SIEM event, so this panel's history
+    // is the SIEM feed filtered to treasury types.
+    const [liq, setLiq] = useState(null);
+    const [liqBusy, setLiqBusy] = useState(false);
+    const [liqError, setLiqError] = useState('');
+    const [drainAmount, setDrainAmount] = useState('');
+    const [drainBusy, setDrainBusy] = useState(false);
+    const [sendTo, setSendTo] = useState('');
+    const [sendAmount, setSendAmount] = useState('');
+    const [sendBusy, setSendBusy] = useState(false);
+
+    const fetchLiquidity = async () => {
+        setLiqBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/liquidity`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) { setLiq(data); setLiqError(''); }
+            else setLiqError(data.error || `The treasury read refused the request (${res.status})`);
+        } catch (e) {
+            setLiqError(e?.message || 'The treasury could not be reached — check the API connection');
+        } finally { setLiqBusy(false); }
+    };
+
+    // Drain the treasury → operator wallet. 'all' (empty input) is the
+    // deliberate whole-balance sweep; the backend gates it on contract
+    // ownership so a doomed transaction is refused before it burns gas.
+    const handleDrain = async () => {
+        if (drainBusy || liqBusy) return;
+        setDrainBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/liquidity/drain`, {
+                method: 'POST',
+                body: JSON.stringify({ amount: drainAmount.trim() ? drainAmount.trim() : 'all' })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Drain failed');
+            notify(`Treasury drained — ${data.drained} USDC to the operator wallet`, 'success');
+            setDrainAmount('');
+            fetchLiquidity();
+        } catch (e) {
+            notify(e.message, 'error');
+        } finally { setDrainBusy(false); }
+    };
+
+    // Send USDC from the operator wallet to any address — the same flow the
+    // Transfer Hub gives users, minus the wallet picker (the operator wallet
+    // is THE sender). The backend keeps a gas reserve on the operator.
+    const handleLiquiditySend = async () => {
+        if (sendBusy || liqBusy) return;
+        const to = sendTo.trim();
+        const amount = sendAmount.trim();
+        if (!/^0x[a-fA-F0-9]{40}$/.test(to)) { notify('Enter a valid destination wallet address', 'error'); return; }
+        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) { notify('Enter an amount of USDC to send', 'error'); return; }
+        setSendBusy(true);
+        try {
+            const res = await adminFetch(`${KEEPER_URL_ARC}/admin/liquidity/send`, {
+                method: 'POST',
+                body: JSON.stringify({ address: to, amount })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Send failed');
+            notify(`${data.amount} USDC sent to ${to.slice(0, 6)}…${to.slice(-4)} — tx ${String(data.hash || '').slice(0, 10)}…`, 'success');
+            setSendAmount('');
+            fetchLiquidity();
+        } catch (e) {
+            notify(e.message, 'error');
+        } finally { setSendBusy(false); }
+    };
+
+    useEffect(() => {
+        if (adminTab !== 'liquidity') return;
+        fetchLiquidity();
+        const t = setInterval(fetchLiquidity, 30000);
         return () => clearInterval(t);
     }, [adminTab, dataEpoch]);
 
@@ -2834,7 +2916,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     AUTH_FAILURE: 'Auth failure', AUTH_BRUTEFORCE: 'Brute force',
                                     ADMIN_TAMPER: 'Admin tamper', RATE_ABUSE: 'Rate abuse',
                                     ADMIN_LOGIN: 'Admin login', IP_BLOCKED: 'IP blocked',
-                                    IP_UNBLOCKED: 'IP unblocked', USER_SUSPENDED: 'User access change'
+                                    IP_UNBLOCKED: 'IP unblocked', USER_SUSPENDED: 'User access change',
+                                    TREASURY_DRAIN: 'Treasury drained', TREASURY_SEND: 'Treasury send', TREASURY_LOW: 'Treasury low'
                                 };
                                 const blockedNow = siemBlocked.some(b => b.ip === ev.ip);
                                 const blockable = ev.ip && ev.ip !== 'unknown' && ev.ip !== 'admin';
@@ -2866,6 +2949,166 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 );
                             })}
                         </div>
+                    </div>
+                )}
+
+                {/* LIQUIDITY — treasury drain + direct sends. Every number on
+                    this panel is an on-chain read (treasury contract balance +
+                    operator wallet balance), never a stored figure: the console
+                    only claims liquidity the chain confirms can actually move.
+                    Both writes land in the SIEM feed automatically. */}
+                {activeNav === 'liquidity' && (
+                    <div className="w-full flex flex-col gap-6 min-w-0">
+
+                        {/* Stat strip */}
+                        <div className="flex overflow-x-auto no-scrollbar gap-3 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible">
+                            {[
+                                { label: 'Treasury USDC', value: liq?.treasuryBalance != null ? Number(liq.treasuryBalance).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—', color: '#1A6140' },
+                                { label: 'Operator USDC', value: liq?.operatorBalance != null ? Number(liq.operatorBalance).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—', color: '#3b82f6' },
+                                { label: 'Treasury owner', value: liq ? (liq.operatorIsOwner ? 'Verified' : liq.ready ? 'Mismatch' : 'Unconfigured') : '—', color: liq?.operatorIsOwner ? '#1A6140' : '#f59e0b' }
+                            ].map((stat, i) => (
+                                <div key={i} className="border-l-2 pl-3 min-w-0 flex-none w-[128px] snap-start md:w-auto md:flex-1" style={{ borderColor: `${stat.color}55` }}>
+                                    <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
+                                    <div className={`text-lg md:text-xl font-black tracking-tight tabular-nums leading-tight truncate ${isLight ? 'text-black' : 'text-white'}`}>{stat.value}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Head */}
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-[#1A6140]/10 text-[#1A6140] flex items-center justify-center">
+                                    <Droplets size={15} />
+                                </div>
+                                <div>
+                                    <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Treasury Liquidity</div>
+                                    <div className={`text-[8px] font-black uppercase tracking-widest opacity-40 truncate max-w-[320px]`}>
+                                        {liq?.treasuryAddress ? `Treasury ${liq.treasuryAddress.slice(0, 6)}…${liq.treasuryAddress.slice(-4)} → operator ${liq.operatorAddress ? `${liq.operatorAddress.slice(0, 6)}…${liq.operatorAddress.slice(-4)}` : '—'}` : 'Chain read pending'}
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={fetchLiquidity}
+                                className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                            >
+                                <span className="inline-flex items-center gap-2"><RefreshCw size={11} className={liqBusy ? 'animate-spin' : ''} /> Refresh</span>
+                            </button>
+                        </div>
+
+                        {/* Unreachable — same honesty rule as the SIEM feed */}
+                        {liqError && (
+                            <div className={`flex items-center gap-3 px-2 lg:px-3 py-2.5 rounded-lg border ${isLight ? 'border-amber-500/30 bg-amber-500/5' : 'border-amber-500/25 bg-amber-500/5'}`}>
+                                <AlertCircle size={13} className="text-amber-500 flex-none" />
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-amber-500">Treasury unreachable</span>
+                                <span className={`text-[10px] font-medium min-w-0 truncate ${isLight ? 'text-black/60' : 'text-white/60'}`}>{liqError}</span>
+                            </div>
+                        )}
+
+                        {liq && liq.ready && (
+                            <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+
+                                {/* DRAIN — sweep treasury liquidity into the
+                                    operator wallet. Blank input = the whole
+                                    balance; anything else is capped to what the
+                                    contract actually holds. */}
+                                <div className={`rounded-2xl border p-4 ${isLight ? 'bg-white border-black/10' : 'bg-white/[0.03] border-white/10'}`}>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Flame size={13} className="text-red-500 flex-none" />
+                                        <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isLight ? 'text-black' : 'text-white'}`}>Drain Treasury</span>
+                                        <span className={`ml-auto text-[7px] font-black uppercase tracking-widest px-1.5 py-[2px] rounded-full ${isLight ? 'bg-red-500/10 text-red-500' : 'bg-red-500/15 text-red-400'}`}>On-chain</span>
+                                    </div>
+                                    <div className={`text-[9px] leading-relaxed mb-3 ${isLight ? 'text-black/50' : 'text-white/50'}`}>
+                                        Pulls liquidity out of the treasury contract into the operator wallet. Blank amount = the whole balance. Suspended payouts keep flowing from this balance — drain only what you intend to move.
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        {[{ l: 'ALL', v: '' }, { l: '25%', v: liq?.treasuryBalance ? (Number(liq.treasuryBalance) * 0.25).toFixed(6) : '' }, { l: '50%', v: liq?.treasuryBalance ? (Number(liq.treasuryBalance) * 0.5).toFixed(6) : '' }].map(q => (
+                                            <button
+                                                key={q.l}
+                                                onClick={() => setDrainAmount(q.v)}
+                                                className={`px-2.5 py-1 rounded-lg border text-[8px] font-black uppercase tracking-widest transition-colors ${drainAmount === q.v
+                                                    ? 'bg-[#1A6140] text-white border-[#1A6140]'
+                                                    : isLight ? 'border-black/10 text-black/50 hover:bg-black/5' : 'border-white/15 text-white/50 hover:bg-white/5'}`}
+                                            >
+                                                {q.l}
+                                            </button>
+                                        ))}
+                                        <span className={`ml-auto text-[8px] font-mono opacity-40`}>{liq?.treasuryBalance ? `${Number(liq.treasuryBalance).toFixed(2)} available` : ''}</span>
+                                    </div>
+                                    <input
+                                        value={drainAmount}
+                                        onChange={(e) => setDrainAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                                        placeholder="USDC amount · blank = ALL"
+                                        inputMode="decimal"
+                                        className={`w-full px-4 py-2.5 rounded-xl border text-[11px] font-black outline-none transition-all mb-2 ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-white/5 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    />
+                                    <button
+                                        onClick={handleDrain}
+                                        disabled={drainBusy}
+                                        className="w-full py-3 rounded-xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
+                                    >
+                                        {drainBusy ? 'Draining on-chain…' : drainAmount ? `Drain ${drainAmount} USDC` : 'Drain full treasury'}
+                                    </button>
+                                </div>
+
+                                {/* SEND — the Transfer Hub flow, operator edition:
+                                    one token (USDC · Arc), a destination, an
+                                    amount, and the send button. The operator
+                                    wallet signs; the backend refuses anything
+                                    that would eat its gas reserve. */}
+                                <div className={`rounded-2xl border p-4 flex flex-col ${isLight ? 'bg-white border-black/10' : 'bg-white/[0.03] border-white/10'}`}>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Send size={13} className="text-[#3b82f6] flex-none" />
+                                        <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isLight ? 'text-black' : 'text-white'}`}>Send USDC</span>
+                                        <span className={`ml-auto text-[7px] font-black uppercase tracking-widest px-1.5 py-[2px] rounded-full ${isLight ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : 'bg-[#3b82f6]/15 text-blue-300'}`}>Any wallet</span>
+                                    </div>
+
+                                    {/* Token — USDC is THE coin on Arc (gas ledger), one pick, no swap */}
+                                    <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border mb-2 ${isLight ? 'bg-black/[0.03] border-black/10' : 'bg-white/5 border-white/10'}`}>
+                                        <div className="w-8 h-8 rounded-full bg-[#2775CA] flex items-center justify-center text-white text-[9px] font-black flex-none">US</div>
+                                        <div className="min-w-0">
+                                            <div className="text-[11px] font-black leading-tight text-[#2775CA]">USDC</div>
+                                            <div className="text-[7px] font-bold uppercase tracking-widest opacity-40">Arc network · native</div>
+                                        </div>
+                                        <div className="ml-auto text-right">
+                                            <div className="text-[7px] font-black uppercase tracking-widest opacity-40">Operator</div>
+                                            <div className={`text-[9px] font-bold tabular-nums ${isLight ? 'text-black' : 'text-white'}`}>{liq?.operatorBalance ? `${Number(liq.operatorBalance).toFixed(2)} USDC` : '—'}</div>
+                                        </div>
+                                    </div>
+
+                                    <input
+                                        value={sendTo}
+                                        onChange={(e) => setSendTo(e.target.value.trim())}
+                                        placeholder="Destination wallet address (0x…)"
+                                        spellCheck={false}
+                                        className={`w-full px-4 py-2.5 rounded-xl border text-[10px] font-mono outline-none transition-all mb-2 ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-white/5 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    />
+                                    <input
+                                        value={sendAmount}
+                                        onChange={(e) => setSendAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                                        placeholder="Amount in USDC"
+                                        inputMode="decimal"
+                                        className={`w-full px-4 py-2.5 rounded-xl border text-[11px] font-black outline-none transition-all mb-2 ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-white/5 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    />
+                                    <button
+                                        onClick={handleLiquiditySend}
+                                        disabled={sendBusy}
+                                        className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 ${isLight ? 'bg-black text-white hover:bg-[#1A6140]' : 'bg-white text-black hover:bg-[#1A6140] hover:text-white'}`}
+                                    >
+                                        {sendBusy ? 'Sending on-chain…' : 'Send USDC'}
+                                    </button>
+                                    <div className={`text-[8px] leading-relaxed mt-2 opacity-40`}>
+                                        Signs with the operator wallet. A gas reserve stays locked on it — sends that would strand the wallet below its next gas bill are refused.
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {liq && !liq.ready && (
+                            <div className={`rounded-2xl border p-5 text-center ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-white/[0.03]'}`}>
+                                <div className="text-[10px] font-black uppercase tracking-widest opacity-60">Treasury not configured</div>
+                                <div className="text-[9px] opacity-40 mt-1">Set TREASURY_ADDRESS and PRIVATE_KEY on the API, then restart nexus-core.</div>
+                            </div>
+                        )}
                     </div>
                 )}
 

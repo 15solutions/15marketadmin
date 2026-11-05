@@ -359,6 +359,56 @@ app.post('/admin/siem/unblock', requirePerm('dashboard.siem'), (req, res) => {
 });
 
 /**
+ * LIQUIDITY MANAGEMENT — the treasury console.
+ * GET  /admin/liquidity — where the treasury + operator money lives, one read.
+ * POST /admin/liquidity/drain { amount: 'all' | '45.5' } — pull treasury
+ *      liquidity into the operator wallet (treasury.withdraw, owner-gated).
+ * POST /admin/liquidity/send { address, amount } — direct native USDC send
+ *      from the operator to any wallet, refusal if it eats the gas reserve.
+ * Both writes land in the SIEM feed so treasury movement is always audited.
+ */
+const liquidity = require('./liquidity');
+
+app.get('/admin/liquidity', requirePerm('admin.liquidity'), async (req, res) => {
+    try {
+        res.json(await liquidity.snapshot());
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/admin/liquidity/drain', requirePerm('admin.liquidity'), async (req, res) => {
+    try {
+        const out = await liquidity.drain(req.body?.amount, { by: req.admin?.email || 'admin' });
+        siem.addEvent({
+            type: 'TREASURY_DRAIN',
+            severity: 'critical',
+            message: `Treasury drained: ${out.drained} USDC → operator ${out.to.slice(0, 6)}…${out.to.slice(-4)} by ${req.admin?.email || 'admin'} (tx ${String(out.hash).slice(0, 12)}…)`
+        });
+        io.emit('treasury_update');
+        res.json(out);
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.post('/admin/liquidity/send', requirePerm('admin.liquidity'), async (req, res) => {
+    try {
+        const out = await liquidity.send(req.body?.address, req.body?.amount, { by: req.admin?.email || 'admin' });
+        siem.addEvent({
+            type: 'TREASURY_SEND',
+            severity: 'high',
+            message: `Treasury send: ${out.amount} USDC → ${out.to.slice(0, 6)}…${out.to.slice(-4)} by ${req.admin?.email || 'admin'} (tx ${String(out.hash).slice(0, 12)}…)`
+        });
+        io.emit('treasury_update');
+        res.json(out);
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+
+/**
  * USERS — the platform directory for the admin Users panel.
  * GET  /admin/users — slim rows (identity, balance, access state) for every
  *     profile; sorted newest first.

@@ -103,13 +103,14 @@ const ALL_PERMISSIONS = [
   'dashboard.analytics',// see the Analytics section (globe, reach, users)
   'dashboard.siem',     // see the SIEM threat feed
   'dashboard.security', // see the Security section (protocols + admin roster)
+  'admin.liquidity',    // Liquidity console: treasury drain + direct sends
   'admins.manage'       // create admins/moderators — root-only, NOT grantable
 ];
 
 const ROLE_DEFAULTS = {
   root: ['*'],
   admin: ['ref.withdrawals', 'ref.manage', 'users.manage', 'emails.send', 'platform.settings', 'broadcast.send', 'trades.maintenance',
-          'dashboard.overview', 'dashboard.analytics', 'dashboard.siem', 'dashboard.security'],
+          'dashboard.overview', 'dashboard.analytics', 'dashboard.siem', 'dashboard.security', 'admin.liquidity'],
   moderator: ['ref.withdrawals']
 };
 
