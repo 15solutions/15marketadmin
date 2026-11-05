@@ -48,7 +48,8 @@ import {
     CalendarClock,
     UserCog,
     Send,
-    Copy
+    Copy,
+    AlertCircle
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { adminFetch, clearSession } from "../utils/adminAuth";
@@ -1195,6 +1196,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const [siemEvents, setSiemEvents] = useState([]);
     const [siemSummary, setSiemSummary] = useState(null);
     const [siemBusy, setSiemBusy] = useState(false);
+    const [siemError, setSiemError] = useState('');
     // Watchlist (≥5 failed admin logins in 10m — flagged for blocking) and
     // the live blocklist (IPs choked from the entire platform).
     const [siemFlagged, setSiemFlagged] = useState([]);
@@ -1205,14 +1207,21 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         setSiemBusy(true);
         try {
             const res = await adminFetch(`${KEEPER_URL_ARC}/admin/siem/events`);
+            const data = await res.json().catch(() => ({}));
             if (res.ok) {
-                const data = await res.json().catch(() => ({}));
                 setSiemEvents(Array.isArray(data.events) ? data.events : []);
                 setSiemSummary(data.summary || null);
                 setSiemFlagged(Array.isArray(data.flaggedIPs) ? data.flaggedIPs : []);
                 setSiemBlocked(Array.isArray(data.blockedIPs) ? data.blockedIPs : []);
+                setSiemError('');
+            } else {
+                // A failed fetch must never read as "no events happened" —
+                // surface the failure so the feed stays honest.
+                setSiemError(data?.error || `The SIEM feed refused the request (${res.status})`);
             }
-        } catch (e) { /* feed stays as-is */ }
+        } catch (e) {
+            setSiemError(e?.message || 'The SIEM feed could not be reached — check the API connection');
+        }
         finally { setSiemBusy(false); }
     };
 
@@ -1587,8 +1596,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
 
     return (
         <div className={`h-[100dvh] md:h-screen w-full flex overflow-hidden relative ${isLight ? 'bg-[#F4F7F5] text-black' : 'bg-[#050505] text-white'}`}>
-            {/* Background Flair */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            {/* Background Flair — dark mode only: in light mode the console
+                background is ONE flat color top to bottom (root, top bar,
+                sidebar, bottom bar are all #F4F7F5), so the tinted blur blobs
+                are hidden rather than re-tinting regions of the page. */}
+            <div className={`${isLight ? 'hidden' : 'absolute inset-0 pointer-events-none overflow-hidden'}`}>
                 <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#1A6140]/5 rounded-full blur-[120px]" />
                 <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#1A6140]/3 rounded-full blur-[120px]" />
             </div>
@@ -1597,7 +1609,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 A dedicated single-task dashboard hides it entirely: their
                 page IS the whole UI. */}
             {!dedicatedMode && (<nav
-                className={`relative z-50 flex-none hidden md:flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-white/60 border-[#1A6140]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
+                className={`relative z-50 flex-none hidden md:flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-[#F4F7F5] border-[#1A6140]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
                 {/* Brand head — same wordmark as the user side, ADMIN beside it */}
                 <div className="flex-none px-4 pt-5 pb-4 flex items-center gap-3 overflow-hidden">
                     {sidebarOpen ? (
@@ -2795,9 +2807,22 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                         )}
 
+                        {/* Feed unreachable — say so LOUDLY: an empty panel must
+                            never be mistaken for a quiet network. */}
+                        {siemError && (
+                            <div className={`flex items-center gap-3 px-2 lg:px-3 py-2.5 rounded-lg border ${isLight ? 'border-amber-500/30 bg-amber-500/5' : 'border-amber-500/25 bg-amber-500/5'}`}>
+                                <AlertCircle size={13} className="text-amber-500 flex-none" />
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-amber-500">Feed unreachable</span>
+                                <span className={`text-[10px] font-medium min-w-0 truncate ${isLight ? 'text-black/60' : 'text-white/60'}`}>{siemError}</span>
+                                <span className={`text-[9px] font-black uppercase tracking-widest ml-auto flex-none ${siemBusy ? 'opacity-50' : 'opacity-80'}`}>
+                                    {siemBusy ? 'Reconnecting…' : 'Auto-retries on next tick'}
+                                </span>
+                            </div>
+                        )}
+
                         {/* Event feed — plain rows, no boxes */}
                         <div className={`flex flex-col min-w-0 max-h-[520px] overflow-y-auto no-scrollbar border-y ${isLight ? 'border-black/5' : 'border-white/10'}`}>
-                            {siemEvents.length === 0 && (
+                            {siemEvents.length === 0 && !siemError && (
                                 <div className="py-6 px-2 text-center text-[9px] font-medium opacity-40">
                                     No security events recorded. Authentication, tamper and rate watchers are live on every call.
                                 </div>
@@ -3526,7 +3551,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 withdrawals) show as amber dots. Hidden on a dedicated
                 single-task dashboard — one task needs no nav. */}
             {!dedicatedMode && (
-            <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] border-t backdrop-blur-3xl ${isLight ? 'bg-white/85 border-black/10' : 'bg-[#0A0A0A]/90 border-white/10'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
+            <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] border-t ${isLight ? 'bg-[#F4F7F5] border-black/10' : 'bg-[#0A0A0A]/90 border-white/10'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
                 <div className="flex items-stretch px-1.5 pt-1 overflow-x-auto no-scrollbar snap-x snap-mandatory">
                     {visibleNav.map((t, i) => {
                         const Icon = t.icon;

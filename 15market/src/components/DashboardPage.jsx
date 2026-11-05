@@ -817,7 +817,9 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 .aurora-dash { animation: aurora-slide 5.5s linear infinite; }
             `}</style>
 
-            <div className={`absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] ${isLight ? '' : 'hidden'}`} />
+            {/* In light mode the canvas is one flat #F4F7F5 (same as the admin
+                console) — the carbon-fibre texture overlay stayed dark-only. */}
+            <div className={`absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] hidden`} />
 
             {/* HEADER */}
             <div className="flex items-center justify-between px-4 md:px-10 pb-0 flex-none relative z-10 w-full"

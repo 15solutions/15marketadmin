@@ -3261,7 +3261,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
 
   return (
-    <div className={`min-h-screen ${!isSmallScreen ? 'h-screen' : 'h-screen h-[100dvh]'} w-full text-current selection:bg-[#1A6140]/30 selection:text-white transition-colors duration-500 overflow-hidden font-sans relative ${isLight ? 'bg-white' : 'bg-black'}`}>
+    <div className={`min-h-screen ${!isSmallScreen ? 'h-screen' : 'h-screen h-[100dvh]'} w-full text-current selection:bg-[#1A6140]/30 selection:text-white transition-colors duration-500 overflow-hidden font-sans relative ${isLight ? 'bg-[#F4F7F5]' : 'bg-black'}`}>
       <div className={`fixed inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] ${isLight ? 'hidden' : ''}`} />
 
       {/* Landscape Blocker — branded fullscreen gate for mobile devices in landscape */}
@@ -3273,7 +3273,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className={`fixed inset-0 z-[15000] flex flex-col items-center justify-center ${isLight ? 'bg-white' : 'bg-black'}`}
+            className={`fixed inset-0 z-[15000] flex flex-col items-center justify-center ${isLight ? 'bg-[#F4F7F5]' : 'bg-black'}`}
             style={{ fontFamily: '"Comfortaa", cursive' }}
           >
             {/* Subtle background glow */}

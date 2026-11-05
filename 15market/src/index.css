@@ -272,10 +272,12 @@ input[type=number] {
   box-shadow: none !important;
 }
 
-/* ===== PREMIUM LIGHT MODE — Light Coral Green Branding ===== */
+/* ===== PREMIUM LIGHT MODE — Light Coral Green Branding =====
+   Body background matches the admin console's flat light surface (#F4F7F5)
+   so both apps share the exact same pale brand-green canvas. */
 html.light,
 body.light {
-  background-color: #ffffff !important;
+  background-color: #F4F7F5 !important;
   background-image: none !important;
   background-size: auto !important;
   background-attachment: fixed !important;

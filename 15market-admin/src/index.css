@@ -21,9 +21,15 @@ body {
   transition: background-color 0.3s ease;
 }
 
-/* Light mode body background so transparent elements don't bleed dark */
+/* ONE light background for the whole console — body, app shell, top bar and
+   bottom bar are the same #F4F7F5. (Two duplicate rules used to disagree:
+   #F4F7F5 then #f9fafb — the later one won, so the body behind the app sat a
+   slightly different off-white than the surfaces on top of it, visible above
+   the mobile top bar and in safe areas.) */
 html.light,
-body.light {
+html.light.theme-arc,
+body.light,
+body.light.theme-arc {
   background-color: #F4F7F5 !important;
 }
 
@@ -31,18 +37,6 @@ body.light {
 html.theme-arc,
 body.theme-arc {
   background-color: #0d0d0d !important;
-}
-
-/* LIGHT MODE - Solid Background */
-html.light,
-body.light {
-  background-color: #f9fafb !important;
-}
-
-/* ARC NETWORK - LIGHT MODE */
-html.light.theme-arc,
-body.light.theme-arc {
-  background-color: #f9fafb !important;
 }
 
 #root {
