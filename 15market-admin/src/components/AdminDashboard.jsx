@@ -3978,7 +3978,24 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 withdrawals) show as amber dots. Hidden on a dedicated
                 single-task dashboard — one task needs no nav. */}
             {!dedicatedMode && (
-            <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] border-t ${isLight ? 'bg-[#F4F7F5] border-black/10' : 'bg-[#0A0A0A]/90 border-white/10'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
+            /* Dark mode: NO divider line, NO translucency — the bar color
+               IS the page background (#050505), and the content doesn't
+               butt against a line. Instead everything scrolling toward
+               the bar dissolves through a backdrop blur ramp, as if the
+               page keeps going underneath it. */
+            <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] ${isLight ? 'bg-[#F4F7F5] border-t border-black/10' : 'bg-[#050505]'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
+                {/* Under-blur ramp — only on dark, per the divider-free look */}
+                {!isLight && (
+                <div
+                    className="absolute bottom-full inset-x-0 h-16 pointer-events-none"
+                    style={{
+                        backdropFilter: 'blur(7px)',
+                        WebkitBackdropFilter: 'blur(7px)',
+                        maskImage: 'linear-gradient(to top, black 18%, transparent 96%)',
+                        WebkitMaskImage: 'linear-gradient(to top, black 18%, transparent 96%)'
+                    }}
+                />
+                )}
                 <div className="flex items-stretch px-1.5 pt-1 overflow-x-auto no-scrollbar snap-x snap-mandatory">
                     {visibleNav.map((t, i) => {
                         const Icon = t.icon;
