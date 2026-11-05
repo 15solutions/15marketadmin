@@ -36,10 +36,28 @@ let notificationStats = { sent: 0, failed: 0, emailsSent: 0, emailsFailed: 0, pu
 
 // ─── Email design + outbox ───────────────────────────────────────────────
 // One plain design for EVERY email the platform sends: the 15market logo
-// sits directly on the plain white background, content below, and a shared
+// sits on the plain dark background, title + message below, and a shared
 // footer carrying the company line + the no-reply warning.
-const EMAIL_LOGO_URL = process.env.EMAIL_LOGO_URL || 'https://15market.online/gowlogo.png';
+//
+// MAILBOX-PROOF: email clients strip <style> blocks (Gmail limits them,
+// Outlook desktop deletes them wholesale), refuse web fonts, and know
+// nothing about CSS `filter:` — the old version's logo came through the
+// filter chain either invisible or dark, the fonts fell back, and clients
+// without the body background showed a white page. Everything now lives
+// in inline styles + bgcolor attributes on a table layout, and the logo
+// is a PRE-WHITENED asset (gowlogo-white.png — the exact pixels the old
+// brightness(0) invert(1) filter produced, pre-scaled so it is a 5 KB
+// download instead of 1.7 MB).
+const EMAIL_LOGO_URL = process.env.EMAIL_LOGO_URL || 'https://15market.online/gowlogo-white.png';
 const EMAIL_OUTBOX_PATH = path.join(__dirname, '..', '..', 'data', 'email-outbox.json');
+
+// The design's typefaces cannot be fetched by most mail clients — keep
+// Comfortaa first for the clients that honour the Google Fonts import
+// (Apple Mail / iOS Mail), with the closest web-safe rounded face as the
+// universal fallback so the proportions still read.
+const EMAIL_FONT_BRAND = "'Comfortaa','Trebuchet MS','Verdana',cursive,sans-serif";
+const EMAIL_FONT_BODY = "'Inter','Trebuchet MS','Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const EMAIL_FONT_CODE = "'Inter','SFMono-Regular',Consolas,'Arial Black',monospace";
 
 // Trade outcomes and copy-trading events carry NO email — they already fire
 // as in-app notices + phone push. Blocked at the dispatch layer so nobody
@@ -88,50 +106,53 @@ function getEmail(id) {
 }
 
 function getEmailShell(innerHtml) {
+    // One 100%-width bgcolor'd table wraps a 540px content table so no
+    // client can ever show a white page around the design. Everything is
+    // inline styles + bgcolor: mail clients strip <style> blocks and do
+    // not fetch web fonts, so nothing here may depend on either.
     return `
     <!DOCTYPE html>
-    <html>
+    <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700;900&family=Inter:wght@400;600;700&display=swap');
-            body { margin: 0; padding: 0; background-color: #070a09; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e2ece5; -webkit-font-smoothing: antialiased; }
-            .wrap { width: 100%; background-color: #070a09; padding: 52px 24px 44px; }
-            .head { text-align: center; padding-bottom: 30px; }
-            /* The logo renders pure white on the dark email background no matter
-               which variant ships: crush to black, then invert — alpha survives. */
-            .head img { height: 115px; width: auto; filter: brightness(0) invert(1); }
-            .divider { border: none; border-top: 1px solid rgba(255, 255, 255, 0.12); max-width: 540px; }
-            .head-divider { margin: 0 auto 34px; }
-            .inner { max-width: 540px; margin: 0 auto; }
-            .title { font-family: 'Comfortaa', cursive; font-weight: 900; font-size: 24px; color: #ffffff; margin: 0 0 18px; line-height: 1.3; }
-            .msg { font-size: 15px; line-height: 1.7; color: #b9c9c0; margin: 0; }
-            .msg p { margin: 0 0 12px 0; }
-            .msg p:last-child { margin-bottom: 0; }
-            .footer { max-width: 540px; margin: 0 auto; text-align: center; font-size: 11px; color: #6f7f77; }
-            .footer-divider { margin: 40px auto 26px; }
-            .footer p { margin: 0 0 6px 0; }
-            .footer .company { font-family: 'Comfortaa', cursive; font-weight: 700; color: #ffffff; }
-            .footer .noreply { color: #e0a166; font-weight: 600; }
-            .code-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #6f7f77; margin-bottom: 16px; }
-            .code { font-family: 'Inter', monospace; font-weight: 900; font-size: 44px; letter-spacing: 14px; color: #2ecc8f; line-height: 1.2; }
-            .fineprint { font-size: 13px; line-height: 1.7; color: #8fa097; }
-        </style>
+        <style>@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700;900&family=Inter:wght@400;600;700&display=swap');</style>
     </head>
-    <body>
-        <div class="wrap">
-            <div class="head">
-                <img src="${EMAIL_LOGO_URL}" alt="15market" />
-            </div>
-            <hr class="divider head-divider" />
-            <div class="inner">${innerHtml}</div>
-            <hr class="divider footer-divider" />
-            <div class="footer">
-                <p><span class="company">15market</span> (c) 2026 · All rights reserved</p>
-                <p class="noreply">Warning: this is a no-reply email address. Replies to this email will not be read or processed.</p>
-            </div>
-        </div>
+    <body style="margin:0; padding:0; background-color:#070a09;">
+        <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#070a09" style="width:100%; background-color:#070a09; margin:0; padding:0; border-collapse:collapse;">
+            <tr>
+                <td align="center" bgcolor="#070a09" style="background-color:#070a09; padding:52px 20px 44px;">
+                    <table role="presentation" width="540" border="0" cellpadding="0" cellspacing="0" style="width:100%; max-width:540px; border-collapse:collapse; text-align:left;">
+                        <!-- Logo row — the pre-whitened asset. Mail clients do not
+                             run CSS filter chains; the old brightness/invert trick
+                             left the raw (dark) logo on the dark background. -->
+                        <tr>
+                            <td align="center" style="padding:0 0 30px; text-align:center;">
+                                <img src="${EMAIL_LOGO_URL}" alt="15market" width="115" height="115" style="display:inline-block; width:115px; height:115px; border:0; outline:none; text-decoration:none;" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding:0 0 34px; font-size:0; line-height:0;">
+                                <div style="height:1px; background-color:rgba(255,255,255,0.12); line-height:1px; font-size:0px;">&nbsp;</div>
+                            </td>
+                        </tr>
+                        ${innerHtml}
+                        <tr>
+                            <td style="padding:40px 0 26px; font-size:0; line-height:0;">
+                                <div style="height:1px; background-color:rgba(255,255,255,0.12); line-height:1px; font-size:0px;">&nbsp;</div>
+                            </td>
+                        </tr>
+                        <!-- Footer — company line + no-reply warning, inlined. -->
+                        <tr>
+                            <td align="center" style="text-align:center; font-size:11px; line-height:1.6; color:#6f7f77; font-family:${EMAIL_FONT_BODY};">
+                                <p style="margin:0 0 6px;"><span style="font-family:${EMAIL_FONT_BRAND}; font-weight:700; color:#ffffff;">15market</span> (c) 2026 &#183; All rights reserved</p>
+                                <p style="margin:0; color:#e0a166; font-weight:600;">Warning: this is a no-reply email address. Replies to this email will not be read or processed.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
     </body>
     </html>
     `;
@@ -144,12 +165,15 @@ function init(io) {
 
 function getEmailTemplate(title, message, type) {
     // Body-only layout: title + message directly under the header divider.
-    // No type badge, no buttons — the email IS the message.
+    // No type badge, no buttons — the email IS the message. Every style is
+    // inline: nothing here may depend on a <style> block or a web font.
     return getEmailShell(`
-        <h2 class="title">${title}</h2>
-        <div class="msg">
-            <p>${message}</p>
-        </div>
+        <tr>
+            <td style="padding:0;">
+                <h2 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:24px; color:#ffffff; margin:0 0 18px; line-height:1.3; text-align:left;">${title}</h2>
+                <p style="font-family:${EMAIL_FONT_BODY}; font-size:15px; line-height:1.7; color:#b9c9c0; margin:0;">${message}</p>
+            </td>
+        </tr>
     `);
 }
 
@@ -302,13 +326,17 @@ async function sendNotificationEmail(addr, title, message, type, notification) {
 
 function getOtpEmailTemplate(code) {
     return getEmailShell(`
-        <h2 class="title">Verify Your Email</h2>
-        <p class="msg" style="margin-bottom: 30px;">Use the code below to complete your verification.</p>
-        <div style="text-align: center;">
-            <div class="code-label">Verification Code</div>
-            <div class="code">${code}</div>
-        </div>
-        <p class="fineprint" style="margin: 30px 0 0;">Enter this <strong style="color:#e2ece5;">one-time code</strong> on the application page. It expires in <strong style="color:#e2ece5;">10 minutes</strong>. If you did not request this code, ignore this email.</p>
+        <tr>
+            <td style="padding:0;">
+                <h2 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:24px; color:#ffffff; margin:0 0 18px; line-height:1.3; text-align:left;">Verify Your Email</h2>
+                <p style="font-family:${EMAIL_FONT_BODY}; font-size:15px; line-height:1.7; color:#b9c9c0; margin:0 0 30px;">Use the code below to complete your verification.</p>
+                <div style="text-align:center;">
+                    <div style="font-family:${EMAIL_FONT_BODY}; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:#6f7f77; margin:0 0 16px;">Verification Code</div>
+                    <div style="font-family:${EMAIL_FONT_CODE}; font-weight:900; font-size:44px; letter-spacing:14px; color:#2ecc8f; line-height:1.2;">${code}</div>
+                </div>
+                <p style="font-family:${EMAIL_FONT_BODY}; font-size:13px; line-height:1.7; color:#8fa097; margin:30px 0 0;">Enter this <strong style="color:#e2ece5;">one-time code</strong> on the application page. It expires in <strong style="color:#e2ece5;">10 minutes</strong>. If you did not request this code, ignore this email.</p>
+            </td>
+        </tr>
     `);
 }
 
