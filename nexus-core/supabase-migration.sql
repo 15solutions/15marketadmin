@@ -64,3 +64,44 @@ alter table public.profiles
   add column if not exists suspend_note text;
 
 create index if not exists idx_profiles_suspended on public.profiles(suspended) where suspended = true;
+
+-- ---------------------------------------------------------------------------
+-- Migration 013 - durable mail store: Supabase is the store of record for
+-- both directions of the admin Mail console, so every mail ever sent or
+-- received survives backend restarts and Render's per-deploy disk wipes.
+-- Run in the Supabase SQL editor.
+
+create table if not exists public.mail_outbox (
+  id text primary key,
+  kind text not null default 'system',
+  "to" text not null default '',
+  subject text not null default '',
+  type text not null default 'info',
+  title text not null default '',
+  message text not null default '',
+  status text not null default 'sent',
+  detail text not null default '',
+  html text not null default '',
+  at bigint not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_mail_outbox_at on public.mail_outbox(at desc);
+
+create table if not exists public.mail_inbox (
+  id text primary key,
+  from_raw text not null default '',
+  from_name text not null default '',
+  from_addr text not null default '',
+  to_addr text not null default '',
+  subject text not null default '',
+  html text not null default '',
+  text_body text not null default '',
+  preview text not null default '',
+  attachments jsonb not null default '[]'::jsonb,
+  received_at bigint not null default 0,
+  read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_mail_inbox_received on public.mail_inbox(received_at desc);

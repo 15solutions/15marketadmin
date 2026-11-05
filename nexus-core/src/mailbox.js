@@ -6,21 +6,24 @@
  * (the catch-all endpoint configured in the Resend dashboard). The payload is
  * signed with Svix — `RESEND_WEBHOOK_SECRET` holds the signing secret.
  *
- * Storage mirrors the outbox (notificationService): a 200-message ring buffer,
- * mirrored to disk so the console's inbox survives restarts. Every record
- * carries the full stored HTML so the Mail reader pane can preview the email
- * exactly as the sender wrote it.
+ * Storage: Supabase is the DURABLE STORE OF RECORD (survives restarts and
+ * Render's per-deploy disk wipes); the local JSON mirror is a fallback
+ * snapshot, hydrated at boot and refreshed on every write — same split
+ * profiles.js uses. Nothing here may break the mail path: every Supabase
+ * failure logs a warning and falls back to the file mirror.
  */
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { supabaseUpsert, supabasePatch, supabaseSelect } = require('./supabaseRest');
 
 const INBOX_PATH = path.join(__dirname, '..', 'data', 'email-inbox.json');
+const INBOX_CAP = 500; // hot in-memory window; Supabase keeps everything ever
 
 let inbox = [];
 try {
     const stored = JSON.parse(fs.readFileSync(INBOX_PATH, 'utf8'));
-    if (Array.isArray(stored)) inbox = stored.slice(0, 200);
+    if (Array.isArray(stored)) inbox = stored.slice(0, INBOX_CAP);
 } catch { /* first boot */ }
 
 function persist() {
@@ -32,6 +35,49 @@ function previewOf(text, html) {
     if (text && text.trim()) return text.replace(/\s+/g, ' ').trim().slice(0, 160);
     const body = String(html || '').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]*>/g, ' ');
     return body.replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+
+/** Record → durable row shape (mail_inbox on Supabase). */
+function toRow(rec) {
+    return {
+        id: rec.id,
+        from_raw: rec.from || '',
+        from_name: rec.fromName || '',
+        from_addr: rec.fromAddr || '',
+        to_addr: rec.to || '',
+        subject: rec.subject || '',
+        html: rec.html || '',
+        text_body: rec.text || '',
+        preview: rec.preview || '',
+        attachments: rec.attachments || [],
+        received_at: rec.receivedAt || 0,
+        read: !!rec.read
+    };
+}
+
+/** Durable row → record (boot hydration). */
+function fromRow(row) {
+    return {
+        id: row.id,
+        from: row.from_raw || '',
+        fromName: row.from_name || '',
+        fromAddr: row.from_addr || '',
+        to: row.to_addr || '',
+        subject: row.subject || '',
+        html: row.html || '',
+        text: row.text_body || '',
+        preview: row.preview || '',
+        attachments: Array.isArray(row.attachments) ? row.attachments : [],
+        receivedAt: Number(row.received_at) || 0,
+        read: !!row.read
+    };
+}
+
+/** Fire-and-forget durable write; failures only warn. */
+function mirrorToSupabase(rec) {
+    supabaseUpsert('mail_inbox', [toRow(rec)]).then(ok => {
+        if (!ok) console.warn(`[MailInbox] Supabase mirror failed for ${rec.id}`);
+    }).catch(() => { /* never break the mail path */ });
 }
 
 /**
@@ -72,8 +118,9 @@ function recordInbound(payload = {}) {
     const existing = inbox.find(r => r.id === rec.id);
     if (existing) return { ok: true, email: { ...existing, html: undefined, text: undefined }, duplicate: true };
 
-    inbox = [rec, ...inbox].slice(0, 200);
+    inbox = [rec, ...inbox].slice(0, INBOX_CAP);
     persist();
+    mirrorToSupabase(rec);
     return { ok: true, email: { ...rec, html: undefined, text: undefined } };
 }
 
@@ -96,8 +143,41 @@ function markRead(id) {
     if (!rec.read) {
         rec.read = true;
         persist();
+        // Durable read-receipt — PATCH a column, never upsert (an upsert of a
+        // partial row would reset every other column to its default).
+        supabasePatch('mail_inbox', `id=eq.${encodeURIComponent(rec.id)}`, { read: true }).catch(() => { /* warn only path */ });
     }
     return { ok: true, unread: unread() };
+}
+
+/**
+ * Boot hydration — called once at startup. Supabase is the store of record:
+ * the hot cache is rebuilt from it, and any local-only records (written
+ * before Supabase existed, or while it was unreachable) are folded in and
+ * pushed up so nothing recorded anywhere is ever lost.
+ */
+async function initInbound() {
+    const rows = await supabaseSelect('mail_inbox?select=*&order=received_at.desc&limit=2000');
+    if (!rows || !Array.isArray(rows)) {
+        console.warn('[MailInbox] Supabase hydration unavailable — serving from the local file mirror until it connects.');
+        return { hydrated: 0, pushed: inbox.length };
+    }
+
+    const durable = rows.map(fromRow).filter(r => r.id);
+    const durableIds = new Set(durable.map(r => r.id));
+    const localOnly = inbox.filter(r => !durableIds.has(r.id));
+
+    const merged = [...durable, ...localOnly]
+        .sort((a, b) => (b.receivedAt || 0) - (a.receivedAt || 0))
+        .slice(0, INBOX_CAP);
+    inbox = merged;
+    persist();
+
+    // Backfill: local-only records that Supabase doesn't have yet.
+    let pushed = 0;
+    for (const rec of localOnly) { mirrorToSupabase(rec); pushed++; }
+    console.log(`[MailInbox] hydrated ${durable.length} from Supabase, backfilled ${pushed} local-only records.`);
+    return { hydrated: durable.length, pushed };
 }
 
 /**
@@ -135,4 +215,4 @@ function verifyResendSignature(headers = {}, rawBody = '', secret = '') {
     }
 }
 
-module.exports = { recordInbound, listInbound, getInbound, markRead, unread, verifyResendSignature };
+module.exports = { recordInbound, listInbound, getInbound, markRead, unread, verifyResendSignature, initInbound };

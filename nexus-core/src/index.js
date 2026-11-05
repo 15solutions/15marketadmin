@@ -86,6 +86,10 @@ const isAllowedOrigin = (origin) => {
 const corsOptions = { origin: (origin, cb) => cb(null, isAllowedOrigin(origin)), credentials: true };
 const io = new Server(server, { cors: corsOptions });
 notificationService.init(io);
+// Durable mail stores — Supabase hydrates both directions of the Mail
+// console at boot so every mail ever sent or received survives restarts
+// and Render's per-deploy disk wipes. Backfills local-only records on top.
+notificationService.initOutbox();
 const siem = require('./siem');
 const dailyChange = require('./dailyChange');
 // Every HIGH/CRITICAL SIEM alert reaches open admin dashboards live.
@@ -736,6 +740,8 @@ app.post('/admin/emails/send', requirePerm('emails.send'), async (req, res) => {
  * is copied over.
  */
 const mailbox = require('./mailbox');
+// Boot hydration for the inbound side (Supabase → hot cache + backfill).
+mailbox.initInbound();
 
 app.post('/mail/inbound', (req, res) => {
     try {
@@ -748,6 +754,14 @@ app.post('/mail/inbound', (req, res) => {
             );
             if (!check.verified) {
                 console.warn(`[MailInbound] webhook rejected — ${check.reason}`);
+                // Surface it in SIEM: a rejection on production means the
+                // webhook never records real mail — typically a regenerated
+                // Resend signing secret or a misconfigured endpoint.
+                siem.addEvent({
+                    type: 'MAIL_WEBHOOK_REJECTED',
+                    severity: 'high',
+                    message: `Inbound webhook rejected (${check.reason}) — svix-id ${req.headers['svix-id'] || req.headers['Svix-Id'] || 'none'}. Check the Resend dashboard webhook config + RESEND_WEBHOOK_SECRET.`
+                });
                 return res.status(401).json({ error: 'Invalid webhook signature' });
             }
         } else {

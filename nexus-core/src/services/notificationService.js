@@ -70,12 +70,57 @@ const EMAIL_FONT_CODE = "'Inter','SFMono-Regular',Consolas,'Arial Black',monospa
 const EMAIL_BLOCKED_TITLES = /trade (won|lost)|copy trad|trades copied|provider application/i;
 
 // Outbox: every email (automated + admin-sent) recorded for the admin Mail
-// console. Ring buffer of ~200, mirrored to disk so it survives deploys.
+// console. Supabase is the DURABLE STORE OF RECORD (survives restarts and
+// Render's per-deploy disk wipes); the local JSON mirror is a fallback
+// snapshot, hydrated at boot — same split profiles.js / mailbox.js use.
+const { supabaseUpsert, supabaseSelect } = require('../supabaseRest');
+const OUTBOX_CAP = 500; // hot in-memory window; Supabase keeps everything ever
 let emailOutbox = [];
 try {
     const stored = JSON.parse(fs.readFileSync(EMAIL_OUTBOX_PATH, 'utf8'));
-    if (Array.isArray(stored)) emailOutbox = stored.slice(0, 200);
+    if (Array.isArray(stored)) emailOutbox = stored.slice(0, OUTBOX_CAP);
 } catch (e) { /* blank */ }
+
+/** Outbox record → durable row shape (mail_outbox on Supabase). */
+function outboxToRow(rec) {
+    return {
+        id: rec.id,
+        kind: rec.kind || 'system',
+        to: rec.to || '',
+        subject: rec.subject || '',
+        type: rec.type || 'info',
+        title: rec.title || '',
+        message: rec.message || '',
+        status: rec.status || 'sent',
+        detail: rec.detail || '',
+        html: rec.html || '',
+        at: rec.at || 0
+    };
+}
+
+/** Durable row → record (boot hydration). */
+function outboxFromRow(row) {
+    return {
+        id: row.id,
+        kind: row.kind || 'system',
+        to: row.to || '',
+        subject: row.subject || '',
+        type: row.type || 'info',
+        title: row.title || '',
+        message: row.message || '',
+        html: row.html || '',
+        status: row.status || 'sent',
+        detail: row.detail || '',
+        at: Number(row.at) || 0
+    };
+}
+
+/** Fire-and-forget durable write; failures only warn. */
+function mirrorOutboxToSupabase(rec) {
+    supabaseUpsert('mail_outbox', [outboxToRow(rec)]).then(ok => {
+        if (!ok) console.warn(`[MailOutbox] Supabase mirror failed for ${rec.id}`);
+    }).catch(() => { /* never break the send path */ });
+}
 
 function recordOutbox(entry) {
     const rec = {
@@ -91,7 +136,8 @@ function recordOutbox(entry) {
         detail: entry.detail || '',
         at: Date.now()
     };
-    emailOutbox = [rec, ...emailOutbox].slice(0, 200);
+    emailOutbox = [rec, ...emailOutbox].slice(0, OUTBOX_CAP);
+    mirrorOutboxToSupabase(rec);
     try {
         clearTimeout(recordOutbox._t);
         recordOutbox._t = setTimeout(() => {
@@ -99,6 +145,33 @@ function recordOutbox(entry) {
         }, 400);
     } catch (e) { /* never break the send path */ }
     return rec;
+}
+
+/**
+ * Boot hydration — called once at startup. Supabase is the store of record:
+ * the hot cache is rebuilt from it, and any local-only records are folded in
+ * and pushed up so nothing recorded anywhere is ever lost.
+ */
+async function initOutbox() {
+    const rows = await supabaseSelect('mail_outbox?select=*&order=at.desc&limit=2000');
+    if (!rows || !Array.isArray(rows)) {
+        console.warn('[MailOutbox] Supabase hydration unavailable — serving from the local file mirror until it connects.');
+        return { hydrated: 0, pushed: emailOutbox.length };
+    }
+
+    const durable = rows.map(outboxFromRow).filter(r => r.id);
+    const durableIds = new Set(durable.map(r => r.id));
+    const localOnly = emailOutbox.filter(r => !durableIds.has(r.id));
+
+    emailOutbox = [...durable, ...localOnly]
+        .sort((a, b) => (b.at || 0) - (a.at || 0))
+        .slice(0, OUTBOX_CAP);
+    try { fs.writeFileSync(EMAIL_OUTBOX_PATH, JSON.stringify(emailOutbox)); } catch (e) { /* disk */ }
+
+    let pushed = 0;
+    for (const rec of localOnly) { mirrorOutboxToSupabase(rec); pushed++; }
+    console.log(`[MailOutbox] hydrated ${durable.length} from Supabase, backfilled ${pushed} local-only records.`);
+    return { hydrated: durable.length, pushed };
 }
 
 function listOutbox() {
@@ -451,5 +524,6 @@ module.exports = {
     getEmail,
     getEmailTemplate,
     getOtpEmailTemplate,
-    getStats
+    getStats,
+    initOutbox
 };
