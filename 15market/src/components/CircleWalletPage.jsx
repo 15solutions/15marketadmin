@@ -1827,7 +1827,7 @@ export function CircleWalletPage({
                                     onClick={() => handleSwipeWallet('right')}
                                     title="Previous card"
                                     className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
-                                    style={{ left: '-46px', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}
+                                    style={{ left: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}
                                 >
                                     <ChevronLeft size={18} />
                                 </button>
@@ -1835,7 +1835,7 @@ export function CircleWalletPage({
                                     onClick={() => handleSwipeWallet('left')}
                                     title="Next card"
                                     className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
-                                    style={{ right: '-46px', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}
+                                    style={{ right: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}
                                 >
                                     <ChevronRight size={18} />
                                 </button>
@@ -1857,7 +1857,13 @@ export function CircleWalletPage({
                                             animate={{ rotateY: 0, scale: 1 }}
                                             exit={{ rotateY: 90 * (flipDirRef.current || 1), scale: 0.94 }}
                                             transition={{ rotateY: { duration: 0.34, ease: 'easeInOut' }, scale: { duration: 0.34, ease: 'easeInOut' } }}
-                                            style={{ transformPerspective: 1100, backfaceVisibility: 'hidden', boxShadow: '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20, 241, 149, 0.13)' }}
+                                            style={{ transformPerspective: 1100, backfaceVisibility: 'hidden',
+                                                // Light mode: no dark halo rectangle —
+                                                // tight green-tinted shadow (see the
+                                                // Dashboard card host comment).
+                                                boxShadow: isLight
+                                                    ? '0 10px 24px rgba(26,97,64,0.16), 0 16px 36px rgba(11,50,32,0.12)'
+                                                    : '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20,241,149,0.13)' }}
                                             className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
                                         >
                                             <div
