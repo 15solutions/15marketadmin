@@ -245,9 +245,9 @@ function getEmailShell(innerHtml, headline) {
                             <td style="padding:0 0 28px;">
                                 <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#0E4D30" background="${EMAIL_BANNER_BG_URL}" style="width:100%; background-color:#0E4D30; background-image:url('${EMAIL_BANNER_BG_URL}'); background-repeat:no-repeat; background-size:cover; border-radius:20px; border-collapse:separate;">
                                     <tr>
-                                        <td style="padding:30px 28px 28px;">
-                                            <img src="${EMAIL_LOGO_URL}" alt="15market" width="160" height="160" style="display:block; width:160px; height:160px; border:0; outline:none; text-decoration:none;" />
-                                            <h1 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:30px; line-height:1.22; color:#ffffff; margin:10px 0 0; text-align:left;">${headline || ''}</h1>
+                                        <td style="padding:24px 28px 16px;">
+                                            <img src="${EMAIL_LOGO_URL}" alt="15market" width="108" height="108" style="display:block; width:108px; height:108px; border:0; outline:none; text-decoration:none;" />
+                                            <h1 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:32px; line-height:1.15; color:#ffffff; margin:4px 0 0; text-align:left;">${headline || ''}</h1>
                                         </td>
                                     </tr>
                                 </table>
