@@ -326,8 +326,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         const isWinning = (live > 0 && entry > 0)
             ? (act.direction === 'UP' ? live > entry : live < entry)
             : null; // no live quote yet — neutral amber until the first tick lands
-        const color = isWinning === null ? '#f59e0b' : isWinning ? '#1A6140' : '#FF914D';
-        const head = isWinning === null ? '#fcd34d' : isWinning ? '#1A6140' : '#FFB085';
+        const color = isWinning === null ? '#f59e0b' : isWinning ? '#0E4D30' : '#FF914D';
+        const head = isWinning === null ? '#fcd34d' : isWinning ? '#0E4D30' : '#FFB085';
         return (
             <div className="w-full flex items-center gap-1.5">
                 <div className="flex-1 relative flex items-center min-w-[56px] h-[24px] px-1 select-none">
@@ -376,7 +376,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     // SETTLED / verdict — +payout or LOST, plus the Paid / payout-retry state.
     const renderVerdictFeedCell = (act) => (
         <div className="flex flex-col items-start gap-1 min-w-0">
-            <div className={`text-[10px] font-black uppercase tracking-wide ${act.won ? 'text-[#1A6140]' : (act.status === 'DISPUTE' ? 'text-orange-400 animate-pulse' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : (act.status === 'CANCELLED' ? 'text-amber-500' : 'text-red-500')))}`}>
+            <div className={`text-[10px] font-black uppercase tracking-wide ${act.won ? 'text-[#0E4D30]' : (act.status === 'DISPUTE' ? 'text-orange-400 animate-pulse' : (act.pending || act.type === 'TRADE_PLACED' ? 'text-amber-500' : (act.status === 'CANCELLED' ? 'text-amber-500' : 'text-red-500')))}`}>
                 {act.won
                     ? <span>+${Number(act.payout || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                     : (act.status === 'DISPUTE'
@@ -399,7 +399,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 </button>
             )}
             {act.won && !act.payoutFailed && (act.paid !== false) && (
-                <span className={`px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest w-fit ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-[#1A6140]/20 text-[#4ade80]'}`}>
+                <span className={`px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest w-fit ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-[#0E4D30]/20 text-[#4ade80]'}`}>
                     Paid
                 </span>
             )}
@@ -1717,13 +1717,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         { tag: 'dashboard.security', label: 'Security' }
     ];
 
-    const AdminCard = ({ title, icon: Icon, children, accent = "#1A6140" }) => (
+    const AdminCard = ({ title, icon: Icon, children, accent = "#0E4D30" }) => (
         // Glow language copied from the user side: the card lifts off the
         // canvas with a green bloom (dark) / layered soft shadows (light).
         <div className={`p-6 border rounded-[32px] backdrop-blur-xl relative overflow-hidden group transition-shadow ${
             isLight
-                ? 'bg-white/70 border-[#1A6140]/20 shadow-[0_0_40px_-12px_rgba(26,97,64,0.18),0_24px_48px_-24px_rgba(0,0,0,0.12)]'
-                : 'bg-[#0D0D0D]/80 border-white/5 shadow-[0_0_60px_-15px_rgba(26,97,64,0.22),0_30px_60px_-30px_rgba(0,0,0,0.85)]'
+                ? 'bg-white/70 border-[#0E4D30]/20 shadow-[0_0_40px_-12px_rgba(14,77,48,0.18),0_24px_48px_-24px_rgba(0,0,0,0.12)]'
+                : 'bg-[#0D0D0D]/80 border-white/5 shadow-[0_0_60px_-15px_rgba(14,77,48,0.22),0_30px_60px_-30px_rgba(0,0,0,0.85)]'
         }`}>
             <div className="absolute top-0 left-0 w-1 h-full opacity-40 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: accent }} />
             <div className="flex items-center justify-between mb-6">
@@ -1745,15 +1745,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 sidebar, bottom bar are all #F4F7F5), so the tinted blur blobs
                 are hidden rather than re-tinting regions of the page. */}
             <div className={`${isLight ? 'hidden' : 'absolute inset-0 pointer-events-none overflow-hidden'}`}>
-                <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#1A6140]/5 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#1A6140]/3 rounded-full blur-[120px]" />
+                <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#0E4D30]/5 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#0E4D30]/3 rounded-full blur-[120px]" />
             </div>
 
             {/* Sidebar — desktop operations menu (mobile gets the tab bar).
                 A dedicated single-task dashboard hides it entirely: their
                 page IS the whole UI. */}
             {!dedicatedMode && (<nav
-                className={`relative z-50 flex-none hidden md:flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-[#F4F7F5] border-[#1A6140]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
+                className={`relative z-50 flex-none hidden md:flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-[#F4F7F5] border-[#0E4D30]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
                 {/* Brand head — same wordmark as the user side, ADMIN beside it */}
                 <div className="flex-none px-4 pt-5 pb-4 flex items-center gap-3 overflow-hidden">
                     {sidebarOpen ? (
@@ -1764,7 +1764,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 className="h-[34px] w-[120px] object-cover object-center flex-none"
                             />
                             <span className={`w-px h-9 flex-none ${isLight ? 'bg-black/10' : 'bg-white/15'}`} />
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#1A6140]">Admin</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#0E4D30]">Admin</span>
                         </>
                     ) : (
                         <img
@@ -1787,7 +1787,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 onClick={() => selectSection(t.key)}
                                 title={sidebarOpen ? undefined : t.label}
                                 className={`flex items-center gap-3 px-3.5 py-3.5 rounded-2xl text-left transition-all active:scale-[0.98] ${active
-                                    ? 'bg-[#1A6140] text-white shadow-lg shadow-[#1A6140]/25'
+                                    ? 'bg-[#0E4D30] text-white shadow-lg shadow-[#0E4D30]/25'
                                     : isLight ? 'text-black/50 hover:text-black hover:bg-black/[0.04]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                             >
                                 <Icon size={17} className="flex-none" />
@@ -1830,15 +1830,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     {auth?.email && (
                         <div
                             title={auth.email}
-                            className={`flex items-center gap-3 px-2 py-2 rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-[#1A6140]/20' : 'bg-white/5 border-white/5'}`}
+                            className={`flex items-center gap-3 px-2 py-2 rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-[#0E4D30]/20' : 'bg-white/5 border-white/5'}`}
                         >
-                            <div className="w-8 h-8 rounded-xl bg-[#1A6140] flex items-center justify-center text-white text-[10px] font-black uppercase flex-none">
+                            <div className="w-8 h-8 rounded-xl bg-[#0E4D30] flex items-center justify-center text-white text-[10px] font-black uppercase flex-none">
                                 {auth.email.slice(0, 2)}
                             </div>
                             {sidebarOpen && (
                                 <div className="flex-1 flex flex-col min-w-0">
                                     <span className={`text-[9px] font-black uppercase tracking-widest truncate ${isLight ? 'text-black' : 'text-white'}`}>{auth.email}</span>
-                                    <span className="text-[7px] font-black uppercase tracking-widest text-[#1A6140]">{auth.isRoot ? 'Root' : auth.role || 'Admin'}</span>
+                                    <span className="text-[7px] font-black uppercase tracking-widest text-[#0E4D30]">{auth.isRoot ? 'Root' : auth.role || 'Admin'}</span>
                                 </div>
                             )}
                             <button
@@ -1867,7 +1867,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         className="h-[25px] w-[90px] object-cover object-center flex-none"
                     />
                     <span className={`w-px h-7 flex-none ${isLight ? 'bg-black/10' : 'bg-white/15'}`} />
-                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#1A6140] flex-none">Admin</span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#0E4D30] flex-none">Admin</span>
                     {dedicatedMode && (
                         <span className={`text-[9px] font-black uppercase tracking-[0.25em] opacity-50 truncate ${isLight ? 'text-black' : 'text-white'}`}>
                             {visibleNav[0]?.label}
@@ -1934,7 +1934,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 </div>
                                 <div className={`h-8 w-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
                                 <div>
-                                    <div className={`text-lg font-black tracking-tighter text-[#1A6140]`}>{stats.totalTrades | 0}</div>
+                                    <div className={`text-lg font-black tracking-tighter text-[#0E4D30]`}>{stats.totalTrades | 0}</div>
                                     <div className="text-[8px] font-black uppercase tracking-widest opacity-40">Lifetime total</div>
                                 </div>
                             </div>
@@ -1971,7 +1971,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         <span className="text-[9px] font-mono opacity-30">{String(i + 1).padStart(2, '0')}</span>
                                         {/* Trader column */}
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <div className={`w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center flex-none ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
+                                            <div className={`w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center flex-none ${act.direction === 'UP' ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-red-500/10 text-red-500'}`}>
                                                 {userProfiles[(act.userAddr || act.owner || "").toLowerCase()]?.avatar ? (
                                                     <img
                                                         src={userProfiles[(act.userAddr || act.owner || "").toLowerCase()].avatar}
@@ -1995,7 +1995,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             )}
                                         </div>
                                         {/* Side column */}
-                                        <div className={`flex items-center justify-center px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${act.direction === 'UP' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-500'}`}>
+                                        <div className={`flex items-center justify-center px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${act.direction === 'UP' ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-red-500/10 text-red-500'}`}>
                                             {act.direction === 'UP' ? '▲ Up' : '▼ Down'}
                                         </div>
                                         {/* Amount column */}
@@ -2079,7 +2079,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         ) : Object.entries(stats.userCountries || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([iso, count], i) => (
                             <div key={iso} className={`flex items-center justify-between gap-4 py-2.5 ${i > 0 ? (isLight ? 'border-t border-black/5' : 'border-t border-white/5') : ''}`}>
                                 <div className="flex items-center gap-3">
-                                    <span className={`w-8 py-1 rounded-lg text-[8px] font-black uppercase flex items-center justify-center ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-[#1A6140]/15 text-[#3CB371]'}`}>{iso}</span>
+                                    <span className={`w-8 py-1 rounded-lg text-[8px] font-black uppercase flex items-center justify-center ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-[#0E4D30]/15 text-[#3CB371]'}`}>{iso}</span>
                                     <span className="text-[9px] font-black uppercase tracking-widest opacity-50">Users</span>
                                 </div>
                                 <span className="text-sm font-black text-[#3CB371] whitespace-nowrap">{count}</span>
@@ -2102,7 +2102,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 {isRoot && (
                                     <button
                                         onClick={() => selectSecTab('team')}
-                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${secTab === 'team' ? 'bg-[#1A6140] text-white shadow' : 'opacity-40 hover:opacity-70'}`}
+                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${secTab === 'team' ? 'bg-[#0E4D30] text-white shadow' : 'opacity-40 hover:opacity-70'}`}
                                     >
                                         Admins &amp; Moderators
                                     </button>
@@ -2110,7 +2110,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 {canSettings && (
                                     <button
                                         onClick={() => selectSecTab('protocols')}
-                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${secTab === 'protocols' ? 'bg-[#1A6140] text-white shadow' : 'opacity-40 hover:opacity-70'}`}
+                                        className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${secTab === 'protocols' ? 'bg-[#0E4D30] text-white shadow' : 'opacity-40 hover:opacity-70'}`}
                                     >
                                         Security Protocols
                                     </button>
@@ -2124,34 +2124,34 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             <div className="flex items-center justify-end">
                                 <button
                                     onClick={() => setShowCreateAdmin(v => !v)}
-                                    className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${showCreateAdmin ? 'bg-white/5 border border-white/10 text-white/60' : 'bg-[#1A6140] text-white hover:brightness-110'}`}
+                                    className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${showCreateAdmin ? 'bg-white/5 border border-white/10 text-white/60' : 'bg-[#0E4D30] text-white hover:brightness-110'}`}
                                 >
                                     {showCreateAdmin ? 'Close form' : '+ New admin / mod'}
                                 </button>
                             </div>
 
                             {showCreateAdmin && (
-                                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 border-l-2 border-[#1A6140]/50 pl-3 py-1">
+                                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 border-l-2 border-[#0E4D30]/50 pl-3 py-1">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <input
                                             value={newAdmin.email}
                                             onChange={e => setNewAdmin(prev => ({ ...prev, email: e.target.value }))}
                                             placeholder="email"
-                                            className={`px-4 py-2.5 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                            className={`px-4 py-2.5 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                         />
                                         <input
                                             type="password"
                                             value={newAdmin.password}
                                             onChange={e => setNewAdmin(prev => ({ ...prev, password: e.target.value }))}
                                             placeholder="temp password (8+, Aa1!)"
-                                            className={`px-4 py-2.5 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                            className={`px-4 py-2.5 rounded-2xl border text-[11px] font-black outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                         />
                                         <div className="flex gap-2">
                                             {[['admin', 'Admin'], ['moderator', 'Moderator']].map(([r, l]) => (
                                                 <button
                                                     key={r}
                                                     onClick={() => setNewAdmin(prev => ({ ...prev, role: r, permissions: ROLE_PRESETS[r] }))}
-                                                    className={`flex-1 py-2.5 rounded-2xl border text-[9px] font-black uppercase tracking-widest transition-all ${newAdmin.role === r ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
+                                                    className={`flex-1 py-2.5 rounded-2xl border text-[9px] font-black uppercase tracking-widest transition-all ${newAdmin.role === r ? 'bg-[#0E4D30] text-white border-[#0E4D30]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
                                                 >
                                                     {l}
                                                 </button>
@@ -2168,7 +2168,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                         ...prev,
                                                         permissions: active ? prev.permissions.filter(x => x !== p.tag) : [...prev.permissions, p.tag]
                                                     }))}
-                                                    className={`px-3 py-2 rounded-xl border text-[8px] font-black uppercase tracking-widest transition-all ${active ? 'bg-[#1A6140]/15 text-[#1A6140] border-[#1A6140]/40' : isLight ? 'bg-white border-black/10 text-black/30' : 'bg-white/5 border-white/10 text-white/30'}`}
+                                                    className={`px-3 py-2 rounded-xl border text-[8px] font-black uppercase tracking-widest transition-all ${active ? 'bg-[#0E4D30]/15 text-[#0E4D30] border-[#0E4D30]/40' : isLight ? 'bg-white border-black/10 text-black/30' : 'bg-white/5 border-white/10 text-white/30'}`}
                                                 >
                                                     {active && <Check size={9} className="inline mr-1" />} {p.label}
                                                 </button>
@@ -2178,7 +2178,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     <button
                                         onClick={createAdmin}
                                         disabled={createAdminBusy || !newAdmin.email.trim() || !/^.{8,}$/.test(newAdmin.password) || !(/[a-z]/.test(newAdmin.password) && /[A-Z]/.test(newAdmin.password) && /[0-9]/.test(newAdmin.password) && /[^a-zA-Z0-9]/.test(newAdmin.password))}
-                                        className="w-full py-3 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                                        className="w-full py-3 rounded-2xl bg-[#0E4D30] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
                                     >
                                         {createAdminBusy ? 'Creating…' : 'Create account'}
                                     </button>
@@ -2203,7 +2203,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                     {isRootRow ? (
                                                         <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 text-[7px] font-black uppercase tracking-widest">Root</span>
                                                     ) : (
-                                                        <span className={`px-2 py-0.5 rounded-full border text-[7px] font-black uppercase tracking-widest ${row.role === 'admin' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>{row.role}</span>
+                                                        <span className={`px-2 py-0.5 rounded-full border text-[7px] font-black uppercase tracking-widest ${row.role === 'admin' ? 'bg-[#0E4D30]/10 text-[#0E4D30] border-[#0E4D30]/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>{row.role}</span>
                                                     )}
                                                     {row.suspended && (
                                                         <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest">Suspended</span>
@@ -2222,7 +2222,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                                 key={p.tag}
                                                                 onClick={() => setAdminPermission(row, p.tag)}
                                                                 title={p.label}
-                                                                className={`px-2 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-wide transition-all ${active ? 'bg-[#1A6140]/15 text-[#1A6140] border-[#1A6140]/40' : isLight ? 'bg-black/[0.03] border-black/10 text-black/25 hover:text-black/50' : 'bg-white/5 border-white/10 text-white/25 hover:text-white/50'}`}
+                                                                className={`px-2 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-wide transition-all ${active ? 'bg-[#0E4D30]/15 text-[#0E4D30] border-[#0E4D30]/40' : isLight ? 'bg-black/[0.03] border-black/10 text-black/25 hover:text-black/50' : 'bg-white/5 border-white/10 text-white/25 hover:text-white/50'}`}
                                                             >
                                                                 {active && <Check size={8} className="inline mr-0.5" />} {p.tag.split('.')[1]}
                                                             </button>
@@ -2236,7 +2236,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                     </button>
                                                     <button
                                                         onClick={() => setAdminSuspension(row, !row.suspended)}
-                                                        className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${row.suspended ? 'bg-[#1A6140] text-white border-[#1A6140]' : 'bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20'}`}
+                                                        className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${row.suspended ? 'bg-[#0E4D30] text-white border-[#0E4D30]' : 'bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20'}`}
                                                     >
                                                         {row.suspended ? 'Unsuspend' : 'Suspend'}
                                                     </button>
@@ -2266,18 +2266,18 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             {/* Maintenance row */}
                             <div className="py-4 flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-4 min-w-0">
-                                    <Settings size={18} className={`flex-none ${platformSettings.maintenanceMode ? 'text-[#1A6140]' : 'opacity-30'} ${platformSettings.maintenanceMode ? 'animate-spin-slow' : ''}`} />
+                                    <Settings size={18} className={`flex-none ${platformSettings.maintenanceMode ? 'text-[#0E4D30]' : 'opacity-30'} ${platformSettings.maintenanceMode ? 'animate-spin-slow' : ''}`} />
                                     <div className="min-w-0">
                                         <h4 className={`text-[11px] font-black uppercase flex items-center gap-2 ${isLight ? 'text-black' : 'text-white'}`}>
                                             Maintenance Mode
-                                            {platformSettings.maintenanceMode && <span className="px-2 py-0.5 rounded-full bg-[#1A6140]/10 text-[#1A6140] border border-[#1A6140]/30 text-[7px] font-black uppercase tracking-widest">Active</span>}
+                                            {platformSettings.maintenanceMode && <span className="px-2 py-0.5 rounded-full bg-[#0E4D30]/10 text-[#0E4D30] border border-[#0E4D30]/30 text-[7px] font-black uppercase tracking-widest">Active</span>}
                                         </h4>
                                         <p className="text-[9px] opacity-40 font-medium mt-0.5">Full system lock — redirects all users to the maintenance screen. Prevents any interactions with the protocol.</p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => updateSettings({ maintenanceMode: !platformSettings.maintenanceMode })}
-                                    className={`w-14 h-8 rounded-full relative p-1 flex-none transition-all ${platformSettings.maintenanceMode ? 'bg-[#1A6140]' : isLight ? 'bg-black/20' : 'bg-white/10'}`}
+                                    className={`w-14 h-8 rounded-full relative p-1 flex-none transition-all ${platformSettings.maintenanceMode ? 'bg-[#0E4D30]' : isLight ? 'bg-black/20' : 'bg-white/10'}`}
                                 >
                                     <motion.div
                                         animate={{ x: platformSettings.maintenanceMode ? 24 : 0 }}
@@ -2331,7 +2331,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         {/* Head */}
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-[#1A6140]/10 text-[#1A6140] flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-xl bg-[#0E4D30]/10 text-[#0E4D30] flex items-center justify-center">
                                     <UserCog size={15} />
                                 </div>
                                 <div>
@@ -2346,7 +2346,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     value={userSearch}
                                     onChange={e => setUserSearch(e.target.value)}
                                     placeholder="Search address, username, email…"
-                                    className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold outline-none w-44 md:w-56 transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold outline-none w-44 md:w-56 transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                 />
                                 <button
                                     onClick={fetchUsers}
@@ -2386,7 +2386,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 {u.avatar ? (
                                                     <img src={u.avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-none" />
                                                 ) : (
-                                                    <div className="w-6 h-6 rounded-full bg-[#1A6140]/15 text-[#1A6140] flex items-center justify-center flex-none">
+                                                    <div className="w-6 h-6 rounded-full bg-[#0E4D30]/15 text-[#0E4D30] flex items-center justify-center flex-none">
                                                         <UserCog size={11} />
                                                     </div>
                                                 )}
@@ -2405,7 +2405,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             </div>
                                             <span className={`text-[10px] font-black tabular-nums truncate ${isLight ? 'text-black' : 'text-white'}`}>{(Number(u.balance) || 0).toFixed(2)}</span>
                                             <span className="hidden md:block">
-                                                <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${suspended ? 'bg-red-500/15 text-red-500' : 'text-[#1A6140]'}`}>
+                                                <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${suspended ? 'bg-red-500/15 text-red-500' : 'text-[#0E4D30]'}`}>
                                                     {suspended ? '● Suspended' : '● Active'}
                                                 </span>
                                             </span>
@@ -2444,7 +2444,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleSuspendUser(addr, false); }}
                                                                 disabled={suspendBusy === addr}
-                                                                className="px-3 py-2 rounded-xl bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-40"
+                                                                className="px-3 py-2 rounded-xl bg-[#0E4D30] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-40"
                                                             >
                                                                 {suspendBusy === addr ? '…' : 'Reinstate Access'}
                                                             </button>
@@ -2477,7 +2477,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     <div className="w-full flex flex-col gap-4 min-w-0">
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-[#1A6140]/10 text-[#1A6140] flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-xl bg-[#0E4D30]/10 text-[#0E4D30] flex items-center justify-center">
                                     <Landmark size={15} />
                                 </div>
                                 <div>
@@ -2532,7 +2532,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         <span className={`text-[10px] font-black uppercase tracking-widest truncate ${isLight ? 'text-black/70' : 'text-white/70'}`}>
                                             {r.address?.slice(0, 6)}…{r.address?.slice(-4)}
                                         </span>
-                                        <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded w-fit ${r.source === 'trading' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-sky-500/10 text-sky-500'}`}>
+                                        <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded w-fit ${r.source === 'trading' ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-sky-500/10 text-sky-500'}`}>
                                             {r.source}
                                         </span>
                                         <span className={`text-[11px] font-black font-mono ${isLight ? 'text-black' : 'text-white'}`}>{fmtUsdAdmin(r.amount)}</span>
@@ -2550,7 +2550,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 <Copy size={11} />
                                             </button>
                                         </div>
-                                        <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded border w-fit ${r.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : r.status === 'approved' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                                        <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-1 rounded border w-fit ${r.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : r.status === 'approved' ? 'bg-[#0E4D30]/10 text-[#0E4D30] border-[#0E4D30]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
                                             {r.status}
                                         </span>
                                         <span className="text-[8px] opacity-30 font-mono">{new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -2564,7 +2564,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                         onClick={(e) => { e.stopPropagation(); decideFiat(r.id, 'approve'); }}
                                                         disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
                                                         title="Approve — pays out, emails the user"
-                                                        className="p-2 rounded-lg bg-[#1A6140] text-white hover:brightness-110 transition-all disabled:opacity-40"
+                                                        className="p-2 rounded-lg bg-[#0E4D30] text-white hover:brightness-110 transition-all disabled:opacity-40"
                                                     >
                                                         <Check size={12} />
                                                     </button>
@@ -2669,7 +2669,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 <button
                                                     onClick={() => decideFiat(r.id, 'approve')}
                                                     disabled={fiatDeciding === r.id + ':approve' || fiatDeciding === r.id + ':deny'}
-                                                    className="flex-1 py-3 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                                                    className="flex-1 py-3 rounded-2xl bg-[#0E4D30] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
                                                 >
                                                     Approve — email the user
                                                 </button>
@@ -2689,7 +2689,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             <div className="flex flex-col gap-1.5">
                                                 {(r.timeline || []).map((ev, j) => (
                                                     <div key={j} className="flex items-center gap-2 text-[8px] font-bold">
-                                                        <span className="text-[#1A6140]">{(ev.event || '').toUpperCase()}</span>
+                                                        <span className="text-[#0E4D30]">{(ev.event || '').toUpperCase()}</span>
                                                         <span className="opacity-40">{new Date(ev.at).toLocaleString()}</span>
                                                         <span className="opacity-30">{ev.by}</span>
                                                     </div>
@@ -2714,7 +2714,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         {/* Head */}
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-[#1A6140]/10 text-[#1A6140] flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-xl bg-[#0E4D30]/10 text-[#0E4D30] flex items-center justify-center">
                                     <Mail size={15} />
                                 </div>
                                 <div>
@@ -2731,7 +2731,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div className={`flex items-center p-1 rounded-xl border ${isLight ? 'border-black/10 bg-black/[0.03]' : 'border-white/10 bg-white/5'}`}>
                                     <button
                                         onClick={() => { setMailTab('received'); setMailReader(null); }}
-                                        className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all inline-flex items-center gap-1.5 ${mailTab === 'received' ? 'bg-[#1A6140] text-white' : 'opacity-50 hover:opacity-80'}`}
+                                        className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all inline-flex items-center gap-1.5 ${mailTab === 'received' ? 'bg-[#0E4D30] text-white' : 'opacity-50 hover:opacity-80'}`}
                                     >
                                         Received
                                         {inboxUnread > 0 && (
@@ -2740,7 +2740,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     </button>
                                     <button
                                         onClick={() => { setMailTab('sent'); setInboxReader(null); }}
-                                        className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${mailTab === 'sent' ? 'bg-[#1A6140] text-white' : 'opacity-50 hover:opacity-80'}`}
+                                        className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${mailTab === 'sent' ? 'bg-[#0E4D30] text-white' : 'opacity-50 hover:opacity-80'}`}
                                     >
                                         Sent
                                     </button>
@@ -2761,7 +2761,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 </button>
                                 <button
                                     onClick={() => { setMailCompose(true); setMailReader(null); }}
-                                    className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-[#1A6140] text-white hover:brightness-110 inline-flex items-center gap-2"
+                                    className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-[#0E4D30] text-white hover:brightness-110 inline-flex items-center gap-2"
                                 >
                                     <Send size={11} /> Compose
                                 </button>
@@ -2780,9 +2780,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 <div
                                     key={m.id || i}
                                     onClick={() => openMail(m)}
-                                    className={`flex items-center gap-3 px-2 py-2.5 border-b cursor-pointer transition-colors ${isLight ? 'border-black/5 hover:bg-black/[0.03]' : 'border-white/5 hover:bg-white/[0.03]'} ${mailReader?.id === m.id ? (isLight ? 'bg-[#1A6140]/5' : 'bg-[#1A6140]/10') : ''}`}
+                                    className={`flex items-center gap-3 px-2 py-2.5 border-b cursor-pointer transition-colors ${isLight ? 'border-black/5 hover:bg-black/[0.03]' : 'border-white/5 hover:bg-white/[0.03]'} ${mailReader?.id === m.id ? (isLight ? 'bg-[#0E4D30]/5' : 'bg-[#0E4D30]/10') : ''}`}
                                 >
-                                    <span className={`flex-none text-[6px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${m.kind === 'manual' ? 'bg-sky-500/10 text-sky-500' : 'bg-[#1A6140]/10 text-[#1A6140]'}`}>
+                                    <span className={`flex-none text-[6px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${m.kind === 'manual' ? 'bg-sky-500/10 text-sky-500' : 'bg-[#0E4D30]/10 text-[#0E4D30]'}`}>
                                         {m.kind === 'manual' ? 'Sent' : 'System'}
                                     </span>
                                     <span className="w-40 md:w-52 min-w-0 text-[10px] font-bold truncate flex-none" style={{ color: isLight ? '#0a261a' : '#fff' }}>{m.to}</span>
@@ -2815,7 +2815,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     <div
                                         key={m.id || i}
                                         onClick={() => openInbound(m)}
-                                        className={`flex items-center gap-3 px-2 py-2.5 border-b cursor-pointer transition-colors ${isLight ? 'border-black/5 hover:bg-black/[0.03]' : 'border-white/5 hover:bg-white/[0.03]'} ${inboxReader?.id === m.id ? (isLight ? 'bg-[#1A6140]/5' : 'bg-[#1A6140]/10') : ''}`}
+                                        className={`flex items-center gap-3 px-2 py-2.5 border-b cursor-pointer transition-colors ${isLight ? 'border-black/5 hover:bg-black/[0.03]' : 'border-white/5 hover:bg-white/[0.03]'} ${inboxReader?.id === m.id ? (isLight ? 'bg-[#0E4D30]/5' : 'bg-[#0E4D30]/10') : ''}`}
                                     >
                                         <span className={`w-1.5 h-1.5 rounded-full flex-none ${m.read ? 'bg-transparent' : 'bg-amber-400'}`} />
                                         <span className={`flex-none text-[6px] font-black uppercase tracking-widest px-1.5 py-1 rounded ${isLight ? 'bg-amber-500/10 text-amber-600' : 'bg-amber-400/10 text-amber-400'}`}>In</span>
@@ -2843,20 +2843,20 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         value={mailDraft.to}
                                         onChange={e => setMailDraft(prev => ({ ...prev, to: e.target.value }))}
                                         placeholder="To — recipient@email.com"
-                                        className={`px-3 py-2.5 rounded-xl border text-[11px] font-bold outline-none transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                        className={`px-3 py-2.5 rounded-xl border text-[11px] font-bold outline-none transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                     />
                                     <input
                                         value={mailDraft.subject}
                                         onChange={e => setMailDraft(prev => ({ ...prev, subject: e.target.value }))}
                                         placeholder="Subject"
-                                        className={`px-3 py-2.5 rounded-xl border text-[11px] font-bold outline-none transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                        className={`px-3 py-2.5 rounded-xl border text-[11px] font-bold outline-none transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                     />
                                 </div>
                                 <textarea
                                     value={mailDraft.message}
                                     onChange={e => setMailDraft(prev => ({ ...prev, message: e.target.value }))}
                                     placeholder="Write the message…"
-                                    className={`w-full h-28 p-3 rounded-xl border text-[11px] font-medium resize-none outline-none transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    className={`w-full h-28 p-3 rounded-xl border text-[11px] font-medium resize-none outline-none transition-colors ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                 />
                                 <div className="flex items-center justify-between gap-2 flex-wrap">
                                     <span className="text-[7px] font-black uppercase tracking-widest opacity-30">
@@ -2865,7 +2865,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     <button
                                         onClick={sendMail}
                                         disabled={mailSendBusy || !mailDraft.to.trim() || !mailDraft.message.trim()}
-                                        className="px-4 py-2.5 rounded-xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-40 inline-flex items-center gap-2"
+                                        className="px-4 py-2.5 rounded-xl bg-[#0E4D30] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-40 inline-flex items-center gap-2"
                                     >
                                         <Send size={11} /> {mailSendBusy ? 'Sending…' : 'Send Email'}
                                     </button>
@@ -2924,7 +2924,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 setMailDraft({ to: inboxReader.fromAddr || '', subject: `Re: ${inboxReader.subject || ''}`, message: '', type: 'info' });
                                             }}
                                             title="Open the compose drawer addressed to this sender"
-                                            className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-[#1A6140] text-white hover:brightness-110"
+                                            className="px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-[#0E4D30] text-white hover:brightness-110"
                                         >
                                             Reply
                                         </button>
@@ -3132,9 +3132,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         {/* Stat strip */}
                         <div className="flex overflow-x-auto no-scrollbar gap-3 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible">
                             {[
-                                { label: 'Treasury USDC', value: liq?.treasuryBalance != null ? Number(liq.treasuryBalance).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—', color: '#1A6140' },
+                                { label: 'Treasury USDC', value: liq?.treasuryBalance != null ? Number(liq.treasuryBalance).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—', color: '#0E4D30' },
                                 { label: 'Operator USDC', value: liq?.operatorBalance != null ? Number(liq.operatorBalance).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—', color: '#3b82f6' },
-                                { label: 'Treasury owner', value: liq ? (liq.operatorIsOwner ? 'Verified' : liq.ready ? 'Mismatch' : 'Unconfigured') : '—', color: liq?.operatorIsOwner ? '#1A6140' : '#f59e0b' }
+                                { label: 'Treasury owner', value: liq ? (liq.operatorIsOwner ? 'Verified' : liq.ready ? 'Mismatch' : 'Unconfigured') : '—', color: liq?.operatorIsOwner ? '#0E4D30' : '#f59e0b' }
                             ].map((stat, i) => (
                                 <div key={i} className="border-l-2 pl-3 min-w-0 flex-none w-[128px] snap-start md:w-auto md:flex-1" style={{ borderColor: `${stat.color}55` }}>
                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 truncate">{stat.label}</div>
@@ -3146,7 +3146,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         {/* Head */}
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-[#1A6140]/10 text-[#1A6140] flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-xl bg-[#0E4D30]/10 text-[#0E4D30] flex items-center justify-center">
                                     <Droplets size={15} />
                                 </div>
                                 <div>
@@ -3195,7 +3195,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 key={q.l}
                                                 onClick={() => setDrainAmount(q.v)}
                                                 className={`px-2.5 py-1 rounded-lg border text-[8px] font-black uppercase tracking-widest transition-colors ${drainAmount === q.v
-                                                    ? 'bg-[#1A6140] text-white border-[#1A6140]'
+                                                    ? 'bg-[#0E4D30] text-white border-[#0E4D30]'
                                                     : isLight ? 'border-black/10 text-black/50 hover:bg-black/5' : 'border-white/15 text-white/50 hover:bg-white/5'}`}
                                             >
                                                 {q.l}
@@ -3208,12 +3208,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         onChange={(e) => setDrainAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                                         placeholder="USDC amount · blank = ALL"
                                         inputMode="decimal"
-                                        className={`w-full px-4 py-2.5 rounded-xl border text-[11px] font-black outline-none transition-all mb-2 ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-white/5 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                        className={`w-full px-4 py-2.5 rounded-xl border text-[11px] font-black outline-none transition-all mb-2 ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-white/5 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                     />
                                     <button
                                         onClick={handleDrain}
                                         disabled={drainBusy}
-                                        className="w-full py-3 rounded-xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
+                                        className="w-full py-3 rounded-xl bg-[#0E4D30] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
                                     >
                                         {drainBusy ? 'Draining on-chain…' : drainAmount ? `Drain ${drainAmount} USDC` : 'Drain full treasury'}
                                     </button>
@@ -3249,19 +3249,19 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         onChange={(e) => setSendTo(e.target.value.trim())}
                                         placeholder="Destination wallet address (0x…)"
                                         spellCheck={false}
-                                        className={`w-full px-4 py-2.5 rounded-xl border text-[10px] font-mono outline-none transition-all mb-2 ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-white/5 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                        className={`w-full px-4 py-2.5 rounded-xl border text-[10px] font-mono outline-none transition-all mb-2 ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-white/5 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                     />
                                     <input
                                         value={sendAmount}
                                         onChange={(e) => setSendAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                                         placeholder="Amount in USDC"
                                         inputMode="decimal"
-                                        className={`w-full px-4 py-2.5 rounded-xl border text-[11px] font-black outline-none transition-all mb-2 ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-white/5 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                        className={`w-full px-4 py-2.5 rounded-xl border text-[11px] font-black outline-none transition-all mb-2 ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-white/5 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                     />
                                     <button
                                         onClick={handleLiquiditySend}
                                         disabled={sendBusy}
-                                        className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 ${isLight ? 'bg-black text-white hover:bg-[#1A6140]' : 'bg-white text-black hover:bg-[#1A6140] hover:text-white'}`}
+                                        className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 ${isLight ? 'bg-black text-white hover:bg-[#0E4D30]' : 'bg-white text-black hover:bg-[#0E4D30] hover:text-white'}`}
                                     >
                                         {sendBusy ? 'Sending on-chain…' : 'Send USDC'}
                                     </button>
@@ -3296,7 +3296,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             value={broadcastText}
                             onChange={(e) => setBroadcastText(e.target.value)}
                             placeholder="Enter system broadcast message…"
-                            className={`w-full h-24 md:h-28 p-4 rounded-2xl border text-sm font-bold resize-none overflow-hidden transition-all outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                            className={`w-full h-24 md:h-28 p-4 rounded-2xl border text-sm font-bold resize-none overflow-hidden transition-all outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                         />
 
                         {/* Schedule control — transmit NOW, or open the branded
@@ -3306,7 +3306,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             <span className={`text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>Schedule</span>
                             <button
                                 onClick={() => { setScheduleMode(false); setScheduleDate(""); }}
-                                className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${!scheduleMode ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
+                                className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${!scheduleMode ? 'bg-[#0E4D30] text-white border-[#0E4D30]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
                             >
                                 Now
                             </button>
@@ -3354,7 +3354,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     <button
                                         key={m}
                                         onClick={() => setBroadcastDuration(m * 60)}
-                                        className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
+                                        className={`px-4 py-2.5 rounded-xl border text-[10px] font-black transition-all ${broadcastDuration === m * 60 ? 'bg-[#0E4D30] text-white border-[#0E4D30]' : isLight ? 'bg-white border-black/10 text-black opacity-50 hover:opacity-100' : 'bg-white/5 border-white/5 text-white opacity-50 hover:opacity-100'}`}
                                     >
                                         {m}m
                                     </button>
@@ -3363,7 +3363,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             <button
                                 onClick={handleUpdateBroadcast}
                                 disabled={isSaving || !broadcastText}
-                                className="flex items-center justify-center gap-3 py-3 px-6 bg-[#1A6140] text-white rounded-2xl font-black uppercase tracking-[0.25em] text-[10px] shadow-[0_16px_32px_-10px_rgba(26,97,64,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
+                                className="flex items-center justify-center gap-3 py-3 px-6 bg-[#0E4D30] text-white rounded-2xl font-black uppercase tracking-[0.25em] text-[10px] shadow-[0_16px_32px_-10px_rgba(14,77,48,0.3)] hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40"
                             >
                                 <Radio size={14} />
                                 <span>{isSaving ? 'Transmitting…' : scheduleMode ? 'Arm Broadcast' : 'Transmit Broadcast'}</span>
@@ -3380,7 +3380,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             </div>
                             <div className={`h-8 w-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
                             <div>
-                                <div className="text-lg font-black tracking-tighter text-[#1A6140]">{broadcastList.filter(b => b.status === 'LIVE').length}</div>
+                                <div className="text-lg font-black tracking-tighter text-[#0E4D30]">{broadcastList.filter(b => b.status === 'LIVE').length}</div>
                                 <div className="text-[8px] font-black uppercase tracking-widest opacity-40">Live now</div>
                             </div>
                             {broadcastList.filter(b => b.status === 'SCHEDULED').length > 0 && (
@@ -3422,7 +3422,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 const isEditing = editingBroadcastId === String(b.id);
                                 const busy = busyBroadcastId === String(b.id);
                                 const statusChip = b.status === 'LIVE'
-                                    ? { label: '● Live', cls: 'text-[#1A6140] bg-[#1A6140]/10' }
+                                    ? { label: '● Live', cls: 'text-[#0E4D30] bg-[#0E4D30]/10' }
                                     : b.status === 'SCHEDULED'
                                         ? { label: '◷ Scheduled', cls: 'text-amber-500 bg-amber-500/10' }
                                         : b.status === 'WITHDRAWN'
@@ -3446,13 +3446,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                         autoFocus
                                                         value={editBroadcastDraft}
                                                         onChange={(e) => setEditBroadcastDraft(e.target.value)}
-                                                        className={`w-full h-14 p-2.5 rounded-xl border text-xs font-bold resize-none outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                                        className={`w-full h-14 p-2.5 rounded-xl border text-xs font-bold resize-none outline-none ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                                     />
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             onClick={() => handleSaveBroadcastEdit(b.id)}
                                                             disabled={busy}
-                                                            className="px-4 py-1.5 rounded-lg bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest disabled:opacity-40"
+                                                            className="px-4 py-1.5 rounded-lg bg-[#0E4D30] text-white text-[9px] font-black uppercase tracking-widest disabled:opacity-40"
                                                         >Save</button>
                                                         <button
                                                             onClick={() => { setEditingBroadcastId(null); setEditBroadcastDraft(""); }}
@@ -3548,7 +3548,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             <button
                                 key={k}
                                 onClick={() => setWdSection(k)}
-                                className={`px-4 md:px-5 py-3 rounded-2xl border text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${wdSection === k ? 'bg-[#1A6140] text-white border-[#1A6140] shadow-lg shadow-[#1A6140]/20' : isLight ? 'bg-white/60 border-black/10 text-black/50 hover:text-black' : 'bg-white/5 border-white/10 text-white/40 hover:text-white'}`}
+                                className={`px-4 md:px-5 py-3 rounded-2xl border text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${wdSection === k ? 'bg-[#0E4D30] text-white border-[#0E4D30] shadow-lg shadow-[#0E4D30]/20' : isLight ? 'bg-white/60 border-black/10 text-black/50 hover:text-black' : 'bg-white/5 border-white/10 text-white/40 hover:text-white'}`}
                             >
                                 {l}
                                 {k === 'withdrawals' && refWithdrawals.filter(w => w.status === 'pending').length > 0 && (
@@ -3578,13 +3578,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         <button
                                             key={k}
                                             onClick={() => setWdFilter(k)}
-                                            className={`px-3 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${wdFilter === k ? 'bg-[#1A6140] text-white border-[#1A6140]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
+                                            className={`px-3 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${wdFilter === k ? 'bg-[#0E4D30] text-white border-[#0E4D30]' : isLight ? 'bg-white border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
                                         >
                                             {l}
                                         </button>
                                     ))}
                                 </div>
-                                <button onClick={fetchRefWithdrawals} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20' : 'bg-[#1A6140]/15 text-[#3CB371] hover:bg-[#1A6140]/25'}`}>
+                                <button onClick={fetchRefWithdrawals} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30] hover:bg-[#0E4D30]/20' : 'bg-[#0E4D30]/15 text-[#3CB371] hover:bg-[#0E4D30]/25'}`}>
                                     <RefreshCw size={13} />
                                 </button>
                             </div>
@@ -3627,7 +3627,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                     <button
                                                         onClick={() => setRefWithdrawalStatus(w.id, 'paid')}
                                                         disabled={processingId === w.id}
-                                                        className="px-3 py-2 rounded-xl bg-[#1A6140] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                                                        className="px-3 py-2 rounded-xl bg-[#0E4D30] text-white text-[8px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
                                                     >
                                                         {processingId === w.id ? '…' : 'Approve'}
                                                     </button>
@@ -3640,7 +3640,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                     </button>
                                                 </>
                                             ) : (
-                                                <span className={`shrink-0 px-3 py-1.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${w.status === 'paid' ? 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                                                <span className={`shrink-0 px-3 py-1.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${w.status === 'paid' ? 'bg-[#0E4D30]/10 text-[#0E4D30] border-[#0E4D30]/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
                                                     {w.status === 'paid' ? 'Approved' : 'Cancelled'}
                                                 </span>
                                             )}
@@ -3675,10 +3675,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         onChange={e => setRefUsersQ(e.target.value)}
                                         onKeyDown={e => { if (e.key === 'Enter') fetchRefUsers(); }}
                                         placeholder="Search username or address…"
-                                        className={`w-full pl-10 pr-3 py-2.5 rounded-xl border text-[10px] font-bold outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                        className={`w-full pl-10 pr-3 py-2.5 rounded-xl border text-[10px] font-bold outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                     />
                                 </div>
-                                <button onClick={() => fetchRefUsers()} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20' : 'bg-[#1A6140]/15 text-[#3CB371] hover:bg-[#1A6140]/25'}`}>
+                                <button onClick={() => fetchRefUsers()} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30] hover:bg-[#0E4D30]/20' : 'bg-[#0E4D30]/15 text-[#3CB371] hover:bg-[#0E4D30]/25'}`}>
                                     <RefreshCw size={13} />
                                 </button>
                             </div>
@@ -3735,7 +3735,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                         </span>
                                                     )}
                                                     {u.rateOverride != null && (
-                                                        <span className="px-2 py-1 rounded-full bg-[#1A6140]/10 text-[#1A6140] border border-[#1A6140]/30 text-[7px] font-black uppercase tracking-widest">{u.rateOverride}% Rate</span>
+                                                        <span className="px-2 py-1 rounded-full bg-[#0E4D30]/10 text-[#0E4D30] border border-[#0E4D30]/30 text-[7px] font-black uppercase tracking-widest">{u.rateOverride}% Rate</span>
                                                     )}
                                                     {u.slashed > 0 && (
                                                         <span className="px-2 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[7px] font-black uppercase tracking-widest">−${u.slashed.toFixed(2)}</span>
@@ -3767,7 +3767,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                         <button
                                                             disabled={busyKey('suspend')}
                                                             onClick={() => doRefAction('suspend', { address: u.address, suspended: !u.suspended }, u.suspended ? 'User reinstated in the program' : 'User suspended from the program')}
-                                                            className={`flex items-center justify-center gap-2 py-3.5 px-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${u.suspended ? 'bg-[#1A6140] text-white hover:brightness-110' : 'bg-red-500/15 text-red-500 border border-red-500/30 hover:bg-red-500/25'}`}
+                                                            className={`flex items-center justify-center gap-2 py-3.5 px-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${u.suspended ? 'bg-[#0E4D30] text-white hover:brightness-110' : 'bg-red-500/15 text-red-500 border border-red-500/30 hover:bg-red-500/25'}`}
                                                         >
                                                             {u.suspended ? <UserCheck size={13} /> : <UserX size={13} />} {u.suspended ? 'Unsuspend' : 'Suspend'}
                                                         </button>
@@ -3782,13 +3782,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                                     value={rateVal}
                                                                     onChange={e => setRateDrafts(prev => ({ ...prev, [u.address]: e.target.value }))}
                                                                     placeholder="Rate %"
-                                                                    className={`w-full pl-8 pr-2 py-3 rounded-2xl border text-[10px] font-black outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                                                    className={`w-full pl-8 pr-2 py-3 rounded-2xl border text-[10px] font-black outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                                                 />
                                                             </div>
                                                             <button
                                                                 disabled={busyKey('set-rate')}
                                                                 onClick={() => doRefAction('set-rate', { address: u.address, rate: rateVal.trim() === '' ? null : Number(rateVal) }, rateVal.trim() === '' ? 'Rate reset to program default' : 'Commission rate set')}
-                                                                className="px-4 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                                                                className="px-4 rounded-2xl bg-[#0E4D30] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
                                                             >
                                                                 {busyKey('set-rate') ? '…' : 'Set'}
                                                             </button>
@@ -3834,13 +3834,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 {/* Suspensions tab — everyone currently suspended from the
                     referral program, with unsuspend and quick-slash control */}
                 {activeNav === 'referrals' && wdSection === 'suspended' && (
-                    <AdminCard title="Suspended Participants" icon={Ban} accent="#1A6140">
+                    <AdminCard title="Suspended Participants" icon={Ban} accent="#0E4D30">
                         <div className="flex flex-col gap-4">
                             <div className="flex items-center justify-between gap-3 flex-wrap">
                                 <p className={`text-[8px] font-bold uppercase tracking-wide ${isLight ? 'text-black/40' : 'text-white/40'}`}>
                                     Suspended participants can still browse and place trades, but withdrawal requests are paused until reinstated.
                                 </p>
-                                <button onClick={() => fetchRefUsers()} className="p-3 rounded-2xl bg-[#1A6140]/10 text-[#1A6140] hover:bg-[#1A6140]/20 transition-all shrink-0">
+                                <button onClick={() => fetchRefUsers()} className="p-3 rounded-2xl bg-[#0E4D30]/10 text-[#0E4D30] hover:bg-[#0E4D30]/20 transition-all shrink-0">
                                     <RefreshCw size={14} />
                                 </button>
                             </div>
@@ -3895,7 +3895,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                             <button
                                                 disabled={busyKey('suspend')}
                                                 onClick={() => doRefAction('suspend', { address: u.address, suspended: false }, 'User reinstated in the program')}
-                                                className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#1A6140] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                                                className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0E4D30] text-white text-[9px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
                                             >
                                                 <UserCheck size={13} /> {busyKey('suspend') ? '…' : 'Unsuspend'}
                                             </button>
@@ -3930,7 +3930,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                     value={cancelNote}
                                     onChange={e => setCancelNote(e.target.value)}
                                     placeholder="Why is this request being cancelled…"
-                                    className={`w-full min-h-[110px] p-4 rounded-2xl border text-xs font-bold resize-none outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-[#1A6140] text-black' : 'bg-black/40 border-white/10 focus:border-[#1A6140] text-white'}`}
+                                    className={`w-full min-h-[110px] p-4 rounded-2xl border text-xs font-bold resize-none outline-none transition-all ${isLight ? 'bg-black/5 border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                 />
                             </div>
                             <p className={`text-[9px] font-bold opacity-40 uppercase leading-relaxed ${isLight ? 'text-black' : 'text-white'}`}>
@@ -4007,15 +4007,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             )}
 
             {/* Persistence Layer Status — slim strip inside the main column */}
-            <footer className={`hidden md:flex flex-none px-6 py-2.5 border-t backdrop-blur-3xl flex items-center justify-between ${isLight ? 'bg-white/50 border-[#1A6140]/10' : 'bg-[#0A0A0A]/60 border-white/5'}`}>
+            <footer className={`hidden md:flex flex-none px-6 py-2.5 border-t backdrop-blur-3xl flex items-center justify-between ${isLight ? 'bg-white/50 border-[#0E4D30]/10' : 'bg-[#0A0A0A]/60 border-white/5'}`}>
                 <div className="flex items-center gap-5 min-w-0">
                     <div className="flex items-center gap-2">
-                        <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[#1A6140]' : 'bg-red-500'} animate-pulse`} />
+                        <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[#0E4D30]' : 'bg-red-500'} animate-pulse`} />
                         <span className="text-[8px] font-black uppercase tracking-widest opacity-40 whitespace-nowrap">{isConnected ? 'Node Connected' : 'Node Offline'}</span>
                     </div>
                     <div className={`hidden sm:block h-3 w-px ${isLight ? 'bg-black/10' : 'bg-white/10'}`} />
                     <div className="hidden sm:flex items-center gap-2">
-                        <Shield size={11} className="text-[#1A6140] opacity-50" />
+                        <Shield size={11} className="text-[#0E4D30] opacity-50" />
                         <span className="text-[8px] font-black uppercase tracking-widest opacity-30 whitespace-nowrap">Session Authorized</span>
                     </div>
                 </div>

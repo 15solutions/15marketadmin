@@ -23,7 +23,7 @@ const getLogoFilter = (isLight) => (isLight ? 'brightness(0)' : 'brightness(0) s
 export default function CustomChart({ symbol = 'SOLUSDT', theme = 'dark', currentPrice, activeMarket, setActiveMarket, activeTrades = [], uiVersion = 'v1', priceHistory = [], windowMs = 20000 }) {
     const isDark = theme !== 'light';
     const controlBgAlt = isDark ? 'bg-[#0a0a0a]/95' : 'bg-[#8CB09D]/95';
-    const controlBorder = isDark ? 'border-white/10' : 'border-[#1A6140]/25';
+    const controlBorder = isDark ? 'border-white/10' : 'border-[#0E4D30]/25';
     const controlText = isDark ? 'text-white' : 'text-[#0a261a]';
     const controlTextDim = isDark ? 'text-white/40' : 'text-[#0a261a]/60';
 
@@ -161,8 +161,8 @@ export default function CustomChart({ symbol = 'SOLUSDT', theme = 'dark', curren
                         className="absolute inset-0 z-[60] flex items-center justify-center pointer-events-none"
                     >
                         <div className="relative">
-                            <Loader2 size={36} className="text-[#1A6140] animate-spin opacity-70" />
-                            <div className="absolute inset-0 blur-2xl bg-[#1A6140]/10 animate-pulse" />
+                            <Loader2 size={36} className="text-[#0E4D30] animate-spin opacity-70" />
+                            <div className="absolute inset-0 blur-2xl bg-[#0E4D30]/10 animate-pulse" />
                         </div>
                     </motion.div>
                 )}

@@ -14,11 +14,11 @@ import { KEEPER_URL_ARC, COUNTRY_LIST } from '../constants';
 // to the admin console. Approve / deny decisions arrive by email.
 
 const card = (isLight) => `p-4 md:p-5 rounded-[24px] border ${isLight
-    ? 'bg-white border-black/5 shadow-[0_4px_12px_rgba(26,97,64,0.08)]'
+    ? 'bg-white border-black/5 shadow-[0_4px_12px_rgba(14,77,48,0.08)]'
     : 'bg-[#151515] border-white/5 shadow-xl'}`;
 const chipText = (isLight) => isLight ? 'text-black/40' : 'text-white/40';
 const field = (isLight) => `w-full px-4 py-3.5 rounded-2xl border outline-none transition-all ${isLight
-    ? 'bg-black/5 border-black/10 focus:border-[#1A6140]' : 'bg-white/5 border-white/10 focus:border-[#1A6140]'}`;
+    ? 'bg-black/5 border-black/10 focus:border-[#0E4D30]' : 'bg-white/5 border-white/10 focus:border-[#0E4D30]'}`;
 
 const flagUrl = (code) => `https://flagcdn.com/w40/${String(code || '').toLowerCase()}.png`;
 
@@ -66,12 +66,12 @@ function PickList({ isLight, value, onChange, options, placeholder, icon: Icon, 
                                     aria-selected={active}
                                     onClick={() => { onChange(o.value); setOpen(false); }}
                                     className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                                        active ? 'bg-[#1A6140]/15' : (isLight ? 'hover:bg-black/5' : 'hover:bg-white/5')
+                                        active ? 'bg-[#0E4D30]/15' : (isLight ? 'hover:bg-black/5' : 'hover:bg-white/5')
                                     }`}
                                 >
                                     {o.flag && <img src={flagUrl(o.flag)} alt="" className="w-6 h-4 object-cover rounded-[3px] shrink-0" loading="lazy" />}
                                     <span className={`flex-1 text-[11px] font-bold ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>{o.label}</span>
-                                    {active && <Check size={14} className="text-[#1A6140] shrink-0" strokeWidth={3} />}
+                                    {active && <Check size={14} className="text-[#0E4D30] shrink-0" strokeWidth={3} />}
                                 </button>
                             );
                         })}
@@ -86,7 +86,7 @@ const fmt = (n) => `$${Number(n || 0).toLocaleString(undefined, { maximumFractio
 
 const statusChip = {
     pending: { icon: Clock, cls: 'bg-amber-500/10 text-amber-500 border-amber-500/30', label: 'Pending review' },
-    approved: { icon: CheckCircle2, cls: 'bg-[#1A6140]/10 text-[#1A6140] border-[#1A6140]/30', label: 'Approved' },
+    approved: { icon: CheckCircle2, cls: 'bg-[#0E4D30]/10 text-[#0E4D30] border-[#0E4D30]/30', label: 'Approved' },
     denied: { icon: XCircle, cls: 'bg-red-500/10 text-red-500 border-red-500/30', label: 'Denied' }
 };
 
@@ -230,10 +230,10 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                                 return (
                                     <button key={acc.key} onClick={() => setSource(acc.key)}
                                         className={`p-4 rounded-2xl border text-left transition-all active:scale-[0.97] ${on
-                                            ? 'bg-[#1A6140]/10 border-[#1A6140]/50'
-                                            : (isLight ? 'bg-black/[0.03] border-black/5 hover:border-[#1A6140]/25' : 'bg-white/[0.03] border-white/5 hover:border-[#1A6140]/25')}`}>
-                                        <acc.icon size={16} className={on ? 'text-[#1A6140]' : chipText(isLight)} />
-                                        <p className={`text-[10px] md:text-xs font-black uppercase tracking-widest mt-2 ${on ? 'text-[#1A6140]' : (isLight ? 'text-black/70' : 'text-white/70')}`}>{acc.label}</p>
+                                            ? 'bg-[#0E4D30]/10 border-[#0E4D30]/50'
+                                            : (isLight ? 'bg-black/[0.03] border-black/5 hover:border-[#0E4D30]/25' : 'bg-white/[0.03] border-white/5 hover:border-[#0E4D30]/25')}`}>
+                                        <acc.icon size={16} className={on ? 'text-[#0E4D30]' : chipText(isLight)} />
+                                        <p className={`text-[10px] md:text-xs font-black uppercase tracking-widest mt-2 ${on ? 'text-[#0E4D30]' : (isLight ? 'text-black/70' : 'text-white/70')}`}>{acc.label}</p>
                                         <p className={`text-[9px] font-bold mt-1 ${chipText(isLight)}`}>{acc.bal != null ? fmt(acc.bal) : '…'}</p>
                                     </button>
                                 );
@@ -255,9 +255,9 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                         />
                         {methodsBusy && <p className={`text-[9px] font-black uppercase tracking-widest mt-3 ${chipText(isLight)}`}>Checking methods…</p>}
                         {methods && !methodsBusy && methods.available && (
-                            <div className="mt-3 p-3 rounded-2xl bg-[#1A6140]/10 border border-[#1A6140]/25 flex items-center gap-3">
-                                <Building2 size={15} className="text-[#1A6140] shrink-0" />
-                                <p className="text-[9px] font-black uppercase tracking-widest text-[#1A6140]">
+                            <div className="mt-3 p-3 rounded-2xl bg-[#0E4D30]/10 border border-[#0E4D30]/25 flex items-center gap-3">
+                                <Building2 size={15} className="text-[#0E4D30] shrink-0" />
+                                <p className="text-[9px] font-black uppercase tracking-widest text-[#0E4D30]">
                                     Bank Transfer available in {methods.name} — continue below
                                 </p>
                             </div>
@@ -300,7 +300,7 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                                             className={field(isLight) + ` text-sm font-black ${source === 'trading' && sessionBal != null && Number(amount) > sessionBal ? 'border-red-500/60' : ''}`} />
                                         {source === 'trading' && sessionBal > 0 && (
                                             <button onClick={() => setAmount(String(sessionBal))}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black uppercase tracking-widest text-[#1A6140]">
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black uppercase tracking-widest text-[#0E4D30]">
                                                 Max
                                             </button>
                                         )}
@@ -312,16 +312,16 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                             </div>
 
                             {/* Confirm summary */}
-                            <div className="mt-4 p-3 rounded-2xl border border-dashed border-[#1A6140]/30 flex items-center gap-3">
-                                <ShieldCheck size={15} className="text-[#1A6140] shrink-0" />
+                            <div className="mt-4 p-3 rounded-2xl border border-dashed border-[#0E4D30]/30 flex items-center gap-3">
+                                <ShieldCheck size={15} className="text-[#0E4D30] shrink-0" />
                                 <div className="min-w-0">
                                     <p className={`text-[9px] font-bold leading-relaxed ${chipText(isLight)}`}>
-                                        Confirming moves <b className="text-[#1A6140]">{fmt(amt || 0)}</b> from your <b className="text-[#1A6140]">{source} wallet</b> to the platform vault on-chain, then files the request with the team for a {methods.name} bank transfer{selectedBank ? ` to ${selectedBank.name}` : ''}.
+                                        Confirming moves <b className="text-[#0E4D30]">{fmt(amt || 0)}</b> from your <b className="text-[#0E4D30]">{source} wallet</b> to the platform vault on-chain, then files the request with the team for a {methods.name} bank transfer{selectedBank ? ` to ${selectedBank.name}` : ''}.
                                     </p>
                                 </div>
                             </div>
                             <button onClick={submit} disabled={!canSubmit || submitBusy}
-                                className="w-full mt-4 py-4 bg-[#1A6140] text-white rounded-[20px] font-black uppercase tracking-[0.2em] text-[9px] shadow-xl shadow-[#1A6140]/25 hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-40">
+                                className="w-full mt-4 py-4 bg-[#0E4D30] text-white rounded-[20px] font-black uppercase tracking-[0.2em] text-[9px] shadow-xl shadow-[#0E4D30]/25 hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-40">
                                 {submitBusy ? (busyLabel || 'Processing…') : 'Confirm & send request'}
                             </button>
                         </motion.div>
@@ -336,7 +336,7 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                                     const chip = statusChip[r.status] || statusChip.pending;
                                     return (
                                         <div key={r.id} className="flex items-center gap-3 p-3 rounded-2xl border border-black/5 bg-black/[0.02]">
-                                            <chip.icon size={14} className="shrink-0 text-[#1A6140]" />
+                                            <chip.icon size={14} className="shrink-0 text-[#0E4D30]" />
                                             <div className="min-w-0 flex-1">
                                                 <p className={`text-[10px] font-black ${isLight ? 'text-black' : 'text-white'}`}>{fmt(r.amount)} · {r.bankName} ••{r.accountNumber.slice(-4)}</p>
                                                 <p className={`text-[8px] font-bold ${chipText(isLight)}`}>{r.source} wallet · {new Date(r.createdAt).toLocaleString()}</p>

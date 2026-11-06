@@ -197,7 +197,7 @@ function MobileSteppedChart({
   const symbolRef = useRef(symbol);
   symbolRef.current = symbol;
   const isLight = theme === 'light';
-  const GREEN = '#1A6140';
+  const GREEN = '#0E4D30';
 
   useEffect(() => { activeTradesRef.current = activeTrades; }, [activeTrades]);
 
@@ -504,9 +504,9 @@ function MobileSteppedChart({
       fillPath.closePath();
 
       const fillGrad = ctx.createLinearGradient(0, liveY, 0, H);
-      fillGrad.addColorStop(0, isLight ? 'rgba(26, 97, 64, 0.22)' : 'rgba(26, 97, 64, 0.28)');
-      fillGrad.addColorStop(0.55, isLight ? 'rgba(26, 97, 64, 0.08)' : 'rgba(26, 97, 64, 0.10)');
-      fillGrad.addColorStop(1, 'rgba(26, 97, 64, 0.0)');
+      fillGrad.addColorStop(0, isLight ? 'rgba(14,77,48, 0.22)' : 'rgba(14,77,48, 0.28)');
+      fillGrad.addColorStop(0.55, isLight ? 'rgba(14,77,48, 0.08)' : 'rgba(14,77,48, 0.10)');
+      fillGrad.addColorStop(1, 'rgba(14,77,48, 0.0)');
       ctx.fillStyle = fillGrad;
       ctx.fill(fillPath);
       ctx.restore();
@@ -708,13 +708,13 @@ function MobileSteppedChart({
 
           let badgeColor, badgeGlow, resultText, resultColor;
           if (isSettled) {
-            badgeColor = isWon ? 'rgba(26, 97, 64,0.95)' : 'rgba(240,76,76,0.95)';
-            badgeGlow = isWon ? 'rgba(26, 97, 64,0.5)' : 'rgba(240,76,76,0.5)';
+            badgeColor = isWon ? 'rgba(14,77,48,0.95)' : 'rgba(240,76,76,0.95)';
+            badgeGlow = isWon ? 'rgba(14,77,48,0.5)' : 'rgba(240,76,76,0.5)';
             resultText = isWon ? 'WON' : 'LOST';
-            resultColor = isWon ? '#1A6140' : '#FF7F50';
+            resultColor = isWon ? '#0E4D30' : '#FF7F50';
           } else {
-            badgeColor = isLight ? 'rgba(26, 97, 64,0.92)' : 'rgba(20,71,44,0.92)';
-            badgeGlow = 'rgba(26, 97, 64,0.35)';
+            badgeColor = isLight ? 'rgba(14,77,48,0.92)' : 'rgba(20,71,44,0.92)';
+            badgeGlow = 'rgba(14,77,48,0.35)';
           }
 
           // Soft glow behind vertical line
@@ -722,8 +722,8 @@ function MobileSteppedChart({
             const lineGlow = ctx.createLinearGradient(entryX - 10, 0, entryX + 10, 0);
             lineGlow.addColorStop(0, 'transparent');
             lineGlow.addColorStop(0.5, isSettled
-              ? (isWon ? 'rgba(26, 97, 64,0.08)' : 'rgba(240,76,76,0.06)')
-              : (isLight ? 'rgba(26, 97, 64,0.06)' : 'rgba(26, 97, 64,0.04)'));
+              ? (isWon ? 'rgba(14,77,48,0.08)' : 'rgba(240,76,76,0.06)')
+              : (isLight ? 'rgba(14,77,48,0.06)' : 'rgba(14,77,48,0.04)'));
             lineGlow.addColorStop(1, 'transparent');
             ctx.fillStyle = lineGlow;
             ctx.fillRect(entryX - 10, lineTop, 20, lineBottom - lineTop);
@@ -734,8 +734,8 @@ function MobileSteppedChart({
             ctx.save();
             ctx.setLineDash([3, 4]);
             ctx.strokeStyle = isSettled
-              ? (isWon ? 'rgba(26, 97, 64,0.5)' : 'rgba(240,76,76,0.4)')
-              : (isLight ? 'rgba(26, 97, 64,0.45)' : 'rgba(26, 97, 64,0.35)');
+              ? (isWon ? 'rgba(14,77,48,0.5)' : 'rgba(240,76,76,0.4)')
+              : (isLight ? 'rgba(14,77,48,0.45)' : 'rgba(14,77,48,0.35)');
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(entryX, lineTop);
@@ -758,8 +758,8 @@ function MobileSteppedChart({
           ctx.fillStyle = isSettled ? (isWon ? GREEN : '#F04C4C') : GREEN;
           ctx.shadowBlur = 8;
           ctx.shadowColor = isSettled
-            ? (isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(240,76,76,0.6)')
-            : 'rgba(26, 97, 64,0.5)';
+            ? (isWon ? 'rgba(14,77,48,0.6)' : 'rgba(240,76,76,0.6)')
+            : 'rgba(14,77,48,0.5)';
           ctx.beginPath();
           ctx.arc(entryX, entryY, 3.2, 0, Math.PI * 2);
           ctx.fill();
@@ -777,7 +777,7 @@ function MobileSteppedChart({
 
           if (!isSettled) {
             const pulsePhase = Math.sin(now / 600) * 0.5 + 0.5;
-            ctx.strokeStyle = `rgba(26, 97, 64,${0.15 + pulsePhase * 0.15})`;
+            ctx.strokeStyle = `rgba(14,77,48,${0.15 + pulsePhase * 0.15})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.roundRect(badgeX2 - 2, badgeY2 - 2, badgeW2 + 4, badgeH2 + 4, 10);
@@ -799,8 +799,8 @@ function MobileSteppedChart({
           ctx.fill();
 
           ctx.strokeStyle = isSettled
-            ? (isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(240,76,76,0.5)')
-            : 'rgba(26, 97, 64,0.5)';
+            ? (isWon ? 'rgba(14,77,48,0.6)' : 'rgba(240,76,76,0.5)')
+            : 'rgba(14,77,48,0.5)';
           ctx.lineWidth = 0.5;
           ctx.beginPath();
           ctx.roundRect(badgeX2, badgeY2, badgeW2, badgeH2, 8);
@@ -818,7 +818,7 @@ function MobileSteppedChart({
             ctx.globalAlpha = 1;
             ctx.translate(entryX, badgeY2 + badgeH2 / 2);
             ctx.shadowBlur = 14 * pulse;
-            ctx.shadowColor = isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(255,127,80,0.5)';
+            ctx.shadowColor = isWon ? 'rgba(14,77,48,0.6)' : 'rgba(255,127,80,0.5)';
             ctx.fillStyle = resultColor;
             ctx.font = '900 11px Inter, system-ui, sans-serif';
             ctx.textAlign = 'center';
@@ -852,7 +852,7 @@ function MobileSteppedChart({
 
             const progress = 1 - (remainingMs / (duration * 1000));
             const handAngle = -Math.PI / 2 + (progress * Math.PI * 2);
-            ctx.strokeStyle = '#1A6140';
+            ctx.strokeStyle = '#0E4D30';
             ctx.lineWidth = 1.4;
             ctx.beginPath();
             ctx.moveTo(iconCenterX, iconCenterY);
@@ -870,7 +870,7 @@ function MobileSteppedChart({
 
             // LIVE text
             const textStartX = iconCenterX + iconR + 3;
-            ctx.fillStyle = '#1A6140';
+            ctx.fillStyle = '#0E4D30';
             ctx.font = '900 7px Inter, system-ui, sans-serif';
             ctx.textBaseline = 'top';
             ctx.fillText('LIVE', textStartX, badgeY2 + 5);
@@ -1408,7 +1408,7 @@ export default function MobileTradeView({
                 animate={{ opacity: 1, y: 0 }}
                 onClick={(e) => e.stopPropagation()}
                 className={`mx-6 mb-4 px-4 py-3 rounded-2xl text-center text-[12px] font-bold leading-snug ${
-                  isLight ? 'bg-[#0a261a] text-white' : 'bg-[#1A6140] text-white'
+                  isLight ? 'bg-[#0a261a] text-white' : 'bg-[#0E4D30] text-white'
                 }`}
               >
                 <span className="block text-[13px] tracking-widest">{unavailableNotice} COMING SOON</span>
@@ -1516,8 +1516,8 @@ export default function MobileTradeView({
             className="shrink-0 relative flex flex-col items-center justify-center gap-2 px-4 py-3 min-h-[56px] w-full overflow-visible"
           >
             {isExecuting && !currentActiveTrade && !(showOutcome && settledTrade) ? (
-              <div className="flex items-center gap-2 text-[#1A6140] animate-pulse text-[14px] font-black tracking-widest">
-                <div className="w-4 h-4 rounded-full border-2 border-[#1A6140] border-t-transparent animate-spin" />
+              <div className="flex items-center gap-2 text-[#0E4D30] animate-pulse text-[14px] font-black tracking-widest">
+                <div className="w-4 h-4 rounded-full border-2 border-[#0E4D30] border-t-transparent animate-spin" />
                 PLACING TRADE...
               </div>
             ) : currentActiveTrade && currentActiveTrade.status === 'PENDING' && remainingSec > 0 ? (
@@ -1572,7 +1572,7 @@ export default function MobileTradeView({
                   onClick={() => setSelectedDuration(d)}
                   className={`py-1 px-5 rounded-full text-[14px] font-black transition-all active:scale-95 ${
                     selectedDuration === d
-                      ? 'bg-[#1A6140] text-white shadow-sm'
+                      ? 'bg-[#0E4D30] text-white shadow-sm'
                       : isLight
                       ? 'text-[#0a261a]/60 hover:text-[#0a261a]'
                       : 'text-white/60 hover:text-white'
@@ -1586,11 +1586,11 @@ export default function MobileTradeView({
             {/* ─── 4. STAKE INPUT PILL ─── */}
             <div className="shrink-0 px-4 py-1 select-none">
               <div
-                className={`w-full rounded-full border-2 border-[#1A6140] px-4 py-1.5 flex items-center shadow-sm ${
+                className={`w-full rounded-full border-2 border-[#0E4D30] px-4 py-1.5 flex items-center shadow-sm ${
                   isLight ? 'bg-white/80' : 'bg-black/30'
                 }`}
               >
-                <span className="text-[#1A6140] font-black text-[15px] select-none pl-1 mr-2">
+                <span className="text-[#0E4D30] font-black text-[15px] select-none pl-1 mr-2">
                   $
                 </span>
                 <input
@@ -1602,8 +1602,8 @@ export default function MobileTradeView({
                   step="0.01"
                   className={`w-full text-center font-black text-[14px] uppercase tracking-wider outline-none bg-transparent ${
                     isLight
-                      ? 'text-[#1A6140] placeholder:text-[#1A6140]'
-                      : 'text-[#1A6140] placeholder:text-[#1A6140]'
+                      ? 'text-[#0E4D30] placeholder:text-[#0E4D30]'
+                      : 'text-[#0E4D30] placeholder:text-[#0E4D30]'
                   }`}
                 />
                 <span className={`text-[11px] font-bold whitespace-nowrap ml-1 ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>
@@ -1630,7 +1630,7 @@ export default function MobileTradeView({
                     />
                   ))}
                   <div
-                    className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-[3px] border-[#1A6140] transition-all -ml-2 pointer-events-none ${
+                    className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-[3px] border-[#0E4D30] transition-all -ml-2 pointer-events-none ${
                       isLight ? 'bg-white' : 'bg-black'
                     }`}
                     style={{ left: `${sliderPct}%` }}
@@ -1655,7 +1655,7 @@ export default function MobileTradeView({
               <button
                 onClick={() => handleTrade('UP')}
                 disabled={currentStake <= 0 || isExecuting}
-                className={`flex-1 h-[52px] rounded-full bg-[#1A6140] text-white flex flex-col items-center justify-center gap-0 font-black text-[16px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
+                className={`flex-1 h-[52px] rounded-full bg-[#0E4D30] text-white flex flex-col items-center justify-center gap-0 font-black text-[16px] tracking-wide active:scale-[0.98] transition-all shadow-lg ${
                   currentStake <= 0 || isExecuting ? 'opacity-85' : 'hover:brightness-105'
                 }`}
               >
@@ -1692,7 +1692,7 @@ export default function MobileTradeView({
       <div className="shrink-0 mt-auto select-none">
         <button
           onClick={() => setShowFullHistory?.(!showFullHistory)}
-          className="w-full bg-[#1A6140] text-white rounded-t-[28px] pt-2 pb-3.5 px-4 flex flex-col items-center justify-center shadow-lg active:brightness-95 transition-all"
+          className="w-full bg-[#0E4D30] text-white rounded-t-[28px] pt-2 pb-3.5 px-4 flex flex-col items-center justify-center shadow-lg active:brightness-95 transition-all"
         >
           {/* Horizontal Grab Bar */}
           <div className="w-12 h-1 bg-white/40 rounded-full mb-2" />
@@ -1726,7 +1726,7 @@ export default function MobileTradeView({
             {/* Header bar of drawer — Only carry TRADE HISTORY label, no counter */}
             <div
               onClick={() => setShowFullHistory(false)}
-              className="w-full bg-[#1A6140] text-white pt-2.5 pb-2 px-4 flex flex-col items-center justify-center cursor-pointer"
+              className="w-full bg-[#0E4D30] text-white pt-2.5 pb-2 px-4 flex flex-col items-center justify-center cursor-pointer"
             >
               <div className="w-12 h-1 bg-white/40 rounded-full mb-1.5" />
               <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest">
@@ -1767,7 +1767,7 @@ export default function MobileTradeView({
                       <div className="flex items-center gap-2.5">
                         <div
                           className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-[11px] text-white ${
-                            isUp ? 'bg-[#1A6140]' : 'bg-[#EF5350]'
+                            isUp ? 'bg-[#0E4D30]' : 'bg-[#EF5350]'
                           }`}
                         >
                           {isUp ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
@@ -1799,7 +1799,7 @@ export default function MobileTradeView({
                           <>
                             <div
                               className={`text-[12px] font-black ${
-                                isWin ? 'text-[#1A6140]' : 'text-[#EF5350]'
+                                isWin ? 'text-[#0E4D30]' : 'text-[#EF5350]'
                               }`}
                             >
                               {isWin ? `+$${parseFloat(trade.payout || 0).toFixed(2)}` : 'LOST'}

@@ -79,7 +79,7 @@ class ErrorBoundary extends Component {
           </div>
           <h1 className="text-2xl font-black uppercase tracking-tighter mb-2">Platform Interrupted</h1>
           <p className="text-xs text-white/40 mb-8 max-w-xs">{this.state.error?.message || "An unexpected error occurred in the UI layer."}</p>
-          <button onClick={() => window.location.reload()} className="px-8 py-3 bg-[#1A6140] rounded-xl font-black uppercase text-xs tracking-widest">Restart Terminal</button>
+          <button onClick={() => window.location.reload()} className="px-8 py-3 bg-[#0E4D30] rounded-xl font-black uppercase text-xs tracking-widest">Restart Terminal</button>
         </div>
       );
     }
@@ -109,7 +109,7 @@ const MobileBottomHistoryPane = ({ isOpen, onToggle, tradeHistory, theme, onView
         flex flex-col overflow-hidden
         ${isDark
           ? 'bg-[#0D2B1D]/80 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] border-white/10'
-          : 'bg-white/80 shadow-2xl border-t-[2px] border-[#1A6140]'}
+          : 'bg-white/80 shadow-2xl border-t-[2px] border-[#0E4D30]'}
       `}>
         {/* Horizontal Toggle Handle Bar */}
         <div
@@ -119,11 +119,11 @@ const MobileBottomHistoryPane = ({ isOpen, onToggle, tradeHistory, theme, onView
             transition-all duration-300 relative shrink-0
             ${isDark
               ? 'bg-white/5 border-b border-white/5'
-              : 'bg-[#1A6140] border-b border-[#1A6140]/20'}
+              : 'bg-[#0E4D30] border-b border-[#0E4D30]/20'}
           `}
         >
           {/* Branded "Glow Line" at the top edge */}
-          {isDark && <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#1A6140] to-transparent opacity-90" />}
+          {isDark && <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#0E4D30] to-transparent opacity-90" />}
 
           <div className="flex items-center justify-center gap-3 w-full">
             <History size={14} className={isDark ? "text-white" : "text-white"} style={isDark ? { filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.8))' } : {}} />
@@ -152,14 +152,14 @@ const MobileBottomHistoryPane = ({ isOpen, onToggle, tradeHistory, theme, onView
                   key={trade.id}
                   className={`
                     p-4 rounded-2xl border transition-all active:scale-[0.98]
-                    ${isDark ? 'bg-white/5 border-white/5' : 'bg-white/40 border-[#1A6140]/20 shadow-sm'}
+                    ${isDark ? 'bg-white/5 border-white/5' : 'bg-white/40 border-[#0E4D30]/20 shadow-sm'}
                   `}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className={`
                         text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-tighter
-                        ${trade.direction === 'UP' ? 'bg-[#1A6140]/20 text-[#1A6140]' : 'bg-[#EF5350]/20 text-[#EF5350]'}
+                        ${trade.direction === 'UP' ? 'bg-[#0E4D30]/20 text-[#0E4D30]' : 'bg-[#EF5350]/20 text-[#EF5350]'}
                       `}>
                         {trade.direction === 'UP' ? 'LONG' : (trade.direction === 'DOWN' ? 'SHORT' : trade.direction)}
                       </div>
@@ -168,7 +168,7 @@ const MobileBottomHistoryPane = ({ isOpen, onToggle, tradeHistory, theme, onView
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
-                      <span className={`text-xs font-black uppercase ${isWin ? 'text-[#1A6140]' : isLoss ? 'text-[#EF5350]' : (isDark ? 'text-white/40' : 'text-[#0a261a]/40')}`}>
+                      <span className={`text-xs font-black uppercase ${isWin ? 'text-[#0E4D30]' : isLoss ? 'text-[#EF5350]' : (isDark ? 'text-white/40' : 'text-[#0a261a]/40')}`}>
                         {isWin ? `+$${Number(trade.payout || 0).toFixed(2)}` : trade.status}
                       </span>
                       {isWin && (trade.payoutSettled || trade.status === 'PAID') && (
@@ -187,7 +187,7 @@ const MobileBottomHistoryPane = ({ isOpen, onToggle, tradeHistory, theme, onView
                         {isTradeSettled(trade) && (
                         <button
                           onClick={() => onViewReceipt(trade)}
-                          className={`p-1.5 rounded-full border transition-all ${isDark ? 'bg-white/5 border-transparent text-white/40 hover:text-white' : 'bg-transparent border-[#1A6140]/20 text-[#0a261a]/40 hover:text-[#0a261a]/60 hover:bg-[#1A6140]/5'}`}
+                          className={`p-1.5 rounded-full border transition-all ${isDark ? 'bg-white/5 border-transparent text-white/40 hover:text-white' : 'bg-transparent border-[#0E4D30]/20 text-[#0a261a]/40 hover:text-[#0a261a]/60 hover:bg-[#0E4D30]/5'}`}
                         >
                           <Share2 size={12} />
                         </button>
@@ -196,7 +196,7 @@ const MobileBottomHistoryPane = ({ isOpen, onToggle, tradeHistory, theme, onView
                         href={`https://testnet.arcscan.app/tx/${trade.tx}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`p-1.5 rounded-full border transition-all ${isDark ? 'bg-white/5 border-transparent text-white/40 hover:text-white' : 'bg-transparent border-[#1A6140]/20 text-[#0a261a]/40 hover:text-[#0a261a]/60 hover:bg-[#1A6140]/5'}`}
+                        className={`p-1.5 rounded-full border transition-all ${isDark ? 'bg-white/5 border-transparent text-white/40 hover:text-white' : 'bg-transparent border-[#0E4D30]/20 text-[#0a261a]/40 hover:text-[#0a261a]/60 hover:bg-[#0E4D30]/5'}`}
                       >
                         <ExternalLink size={12} />
                       </a>
@@ -1525,7 +1525,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     return null;
   }, [isConnected, address]);
 
-  const GREEN = "#1A6140";
+  const GREEN = "#0E4D30";
   const CORAL = "#FF4444";
 
   useEffect(() => {
@@ -3261,7 +3261,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
 
   return (
-    <div className={`min-h-screen ${!isSmallScreen ? 'h-screen' : 'h-screen h-[100dvh]'} w-full text-current selection:bg-[#1A6140]/30 selection:text-white transition-colors duration-500 overflow-hidden font-sans relative ${isLight ? 'bg-[#F4F7F5]' : 'bg-black'}`}>
+    <div className={`min-h-screen ${!isSmallScreen ? 'h-screen' : 'h-screen h-[100dvh]'} w-full text-current selection:bg-[#0E4D30]/30 selection:text-white transition-colors duration-500 overflow-hidden font-sans relative ${isLight ? 'bg-[#F4F7F5]' : 'bg-black'}`}>
       <div className={`fixed inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] ${isLight ? 'hidden' : ''}`} />
 
       {/* Landscape Blocker — branded fullscreen gate for mobile devices in landscape */}
@@ -3277,8 +3277,8 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
             style={{ fontFamily: '"Comfortaa", cursive' }}
           >
             {/* Subtle background glow */}
-            <div className={`absolute top-[30%] left-1/2 -translate-x-1/2 w-80 h-80 ${isLight ? 'bg-[#1A6140]/8' : 'bg-[#1A6140]/10'} rounded-full blur-[120px]`} />
-            <div className={`absolute bottom-[20%] right-[20%] w-60 h-60 ${isLight ? 'bg-[#1A6140]/5' : 'bg-[#1A6140]/5'} rounded-full blur-[100px]`} />
+            <div className={`absolute top-[30%] left-1/2 -translate-x-1/2 w-80 h-80 ${isLight ? 'bg-[#0E4D30]/8' : 'bg-[#0E4D30]/10'} rounded-full blur-[120px]`} />
+            <div className={`absolute bottom-[20%] right-[20%] w-60 h-60 ${isLight ? 'bg-[#0E4D30]/5' : 'bg-[#0E4D30]/5'} rounded-full blur-[100px]`} />
 
             {/* Logo */}
             <img src={isLight ? '/goblogo.png' : '/gowlogo.png'} alt="15market" className="h-16 w-auto mb-8 opacity-80" />
@@ -3287,18 +3287,18 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
             <div className="relative mb-6">
               <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
                 {/* Landscape phone (faded, the "from" state) */}
-                <rect x="6" y="22" width="36" height="24" rx="4" stroke="#1A6140" strokeWidth="1.5" opacity="0.25" />
-                <line x1="10" y1="34" x2="10.01" y2="34" stroke="#1A6140" strokeWidth="2" strokeLinecap="round" opacity="0.25" />
+                <rect x="6" y="22" width="36" height="24" rx="4" stroke="#0E4D30" strokeWidth="1.5" opacity="0.25" />
+                <line x1="10" y1="34" x2="10.01" y2="34" stroke="#0E4D30" strokeWidth="2" strokeLinecap="round" opacity="0.25" />
 
                 {/* Portrait phone (bright, the "to" state) */}
                 <g className="animate-pulse">
-                  <rect x="40" y="10" width="24" height="36" rx="4" stroke="#1A6140" strokeWidth="2" fill="none" />
-                  <line x1="52" y1="40" x2="52.01" y2="40" stroke="#1A6140" strokeWidth="2.5" strokeLinecap="round" />
+                  <rect x="40" y="10" width="24" height="36" rx="4" stroke="#0E4D30" strokeWidth="2" fill="none" />
+                  <line x1="52" y1="40" x2="52.01" y2="40" stroke="#0E4D30" strokeWidth="2.5" strokeLinecap="round" />
                 </g>
 
                 {/* Curved arrow from landscape to portrait */}
-                <path d="M30 50 C30 60, 45 62, 48 50" stroke="#1A6140" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-                <polyline points="45,53 48,50 51,53" stroke="#1A6140" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M30 50 C30 60, 45 62, 48 50" stroke="#0E4D30" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                <polyline points="45,53 48,50 51,53" stroke="#0E4D30" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
 
@@ -3311,7 +3311,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
             </p>
 
             {/* Subtle brand accent line */}
-            <div className="mt-8 w-16 h-[2px] bg-gradient-to-r from-transparent via-[#1A6140]/40 to-transparent rounded-full" />
+            <div className="mt-8 w-16 h-[2px] bg-gradient-to-r from-transparent via-[#0E4D30]/40 to-transparent rounded-full" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -3472,7 +3472,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                             style={{ fontFamily: '"Comfortaa", cursive' }}
                             className={`h-[26px] px-3 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center ${
                               key === (view === 'ladders' ? 'ladders' : 'classic')
-                                ? 'bg-[#1A6140] text-white shadow-sm'
+                                ? 'bg-[#0E4D30] text-white shadow-sm'
                                 : (theme === 'light' ? 'text-gray-400 hover:text-gray-600' : 'text-white/40 hover:text-white/60')
                             }`}>
                             {label}
@@ -3482,10 +3482,10 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
                       {/* Theme toggle - pill switch */}
                       <div className={`flex items-center gap-0.5 p-[3px] rounded-full border transition-all duration-500 ${theme === 'light' ? 'bg-white border-[#E5E7EB]' : 'bg-white/5 border-white/10'}`}>
-                        <button onClick={toggleTheme} className={`w-[26px] h-[26px] rounded-full flex items-center justify-center transition-all duration-300 ${theme === 'light' ? 'bg-[#1A6140] text-white shadow-sm' : 'bg-transparent text-white/40 hover:text-white/60'}`}>
+                        <button onClick={toggleTheme} className={`w-[26px] h-[26px] rounded-full flex items-center justify-center transition-all duration-300 ${theme === 'light' ? 'bg-[#0E4D30] text-white shadow-sm' : 'bg-transparent text-white/40 hover:text-white/60'}`}>
                           <Sun size={12} className={theme === 'light' ? 'text-white' : ''} />
                         </button>
-                        <button onClick={toggleTheme} className={`w-[26px] h-[26px] rounded-full flex items-center justify-center transition-all duration-300 ${theme === 'dark' ? 'bg-[#1A6140] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-600'}`}>
+                        <button onClick={toggleTheme} className={`w-[26px] h-[26px] rounded-full flex items-center justify-center transition-all duration-300 ${theme === 'dark' ? 'bg-[#0E4D30] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-600'}`}>
                           <Moon size={12} className={theme === 'dark' ? 'text-white' : ''} />
                         </button>
                       </div>
@@ -3585,7 +3585,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               // 2-COLUMN LAYOUT
 <div className="flex-1 w-full grid grid-cols-[minmax(180px,220px)_1fr] min-h-0 overflow-hidden px-4 pt-0 pb-2 gap-4">
                 {/* LEFT SIDEBAR */}
-                <div className="h-full border-r border-[#1A6140] pr-4 overflow-y-auto scrollbar-none">
+                <div className="h-full border-r border-[#0E4D30] pr-4 overflow-y-auto scrollbar-none">
                   <LeftSidebar
                     sessionBalance={sessionBalance}
                     evmBalance={evmBalance}
@@ -3757,7 +3757,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               >
                 <div className="absolute top-0 left-0 w-full h-full"
                   style={{
-                    background: 'linear-gradient(180deg, rgba(26, 97, 64,0.4) 0%, rgba(26, 97, 64,0.15) 40%, rgba(26, 97, 64,0.05) 70%, transparent 100%)',
+                    background: 'linear-gradient(180deg, rgba(14,77,48,0.4) 0%, rgba(14,77,48,0.15) 40%, rgba(14,77,48,0.05) 70%, transparent 100%)',
                   }}
                 />
               </motion.div>
@@ -3875,8 +3875,8 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
           {/* OVERLAY: Maintenance Mode */}
           {platformSettings.maintenanceMode && (
             <div className={`fixed inset-0 z-[3000] flex flex-col items-center justify-center p-8 text-center ${isLight ? 'bg-[#f0f9f4]' : 'bg-[#050505]'}`}>
-              <div className="w-24 h-24 bg-[#1A6140]/10 rounded-[32px] flex items-center justify-center mb-8 border border-[#1A6140]/20">
-                <Settings className="text-[#1A6140] w-12 h-12 animate-spin-slow" />
+              <div className="w-24 h-24 bg-[#0E4D30]/10 rounded-[32px] flex items-center justify-center mb-8 border border-[#0E4D30]/20">
+                <Settings className="text-[#0E4D30] w-12 h-12 animate-spin-slow" />
               </div>
               <h1 className={`text-4xl font-black uppercase tracking-tighter mb-4 ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>
                 Under Maintenance
@@ -3904,7 +3904,7 @@ function SuspensionGate({ note, at }) {
             style={{ fontFamily: '"Comfortaa", cursive', backgroundColor: '#050505' }}>
             {/* Platform dressing � green radiance + carbon weave */}
             <div className="absolute inset-0"
-                style={{ background: 'radial-gradient(circle at 50% 38%, rgba(26,97,64,0.42) 0%, rgba(5,5,5,0) 58%), radial-gradient(circle at 50% 115%, rgba(26,97,64,0.28) 0%, rgba(5,5,5,0) 60%)' }} />
+                style={{ background: 'radial-gradient(circle at 50% 38%, rgba(14,77,48,0.42) 0%, rgba(5,5,5,0) 58%), radial-gradient(circle at 50% 115%, rgba(14,77,48,0.28) 0%, rgba(5,5,5,0) 60%)' }} />
             <div className="absolute inset-0 opacity-[0.13] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
             <div className="relative flex flex-col items-center text-center gap-6 px-10">
                 <motion.div

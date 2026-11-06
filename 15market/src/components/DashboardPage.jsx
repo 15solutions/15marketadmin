@@ -602,7 +602,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] group text-white cursor-pointer"
             style={{
                 fontFamily: '"Comfortaa", cursive',
-                background: 'linear-gradient(145deg, #1a6140 0%, #123f28 55%, #0b3220 100%)',
+                background: 'linear-gradient(145deg, #0e4d30 0%, #123f28 55%, #0b3220 100%)',
                 border: '1.5px solid rgba(99,194,141,0.45)',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), inset 0 0 46px rgba(0,0,0,0.28)'
             }}
@@ -748,12 +748,12 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 style={{ width: '448px', height: '260px', transform: `translateX(${deckOffsetX}px) scale(${deckScale})`, transformOrigin: 'top left', transition: 'transform 0.25s ease' }}>
                 {/* Carousel chevrons — outside the card, desktop only */}
                 <button onClick={() => showCard(walletCardSide === 'trading' ? 'main' : 'trading')} title="Main Wallet card"
-                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
+                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
                     style={{ left: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}>
                     <ChevronLeft size={18} />
                 </button>
                 <button onClick={() => showCard(walletCardSide === 'trading' ? 'main' : 'trading')} title="Trading Wallet card"
-                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
+                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
                     style={{ right: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}>
                     <ChevronRight size={18} />
                 </button>
@@ -780,7 +780,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 // the light one — light mode gets a tight green-
                                 // tinted shadow instead.
                                 boxShadow: isLight
-                                    ? '0 10px 24px rgba(26,97,64,0.16), 0 16px 36px rgba(11,50,32,0.12)'
+                                    ? '0 10px 24px rgba(14,77,48,0.16), 0 16px 36px rgba(11,50,32,0.12)'
                                     : '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20,241,149,0.13)' }}
                             className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
                         >
@@ -807,18 +807,18 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 @media (min-width: 768px) {
                     .tx-scroll::-webkit-scrollbar { width: 4px; }
                     .tx-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; transition: background 0.2s; }
-                    .tx-scroll:hover::-webkit-scrollbar-thumb { background: rgba(26, 97, 64, 0.55); }
+                    .tx-scroll:hover::-webkit-scrollbar-thumb { background: rgba(14,77,48, 0.55); }
                     .tx-scroll::-webkit-scrollbar-track { background: transparent; }
                     .tx-scroll { scrollbar-width: none; scrollbar-color: transparent transparent; }
-                    .tx-scroll:hover { scrollbar-width: thin; scrollbar-color: rgba(26, 97, 64, 0.55) transparent; }
+                    .tx-scroll:hover { scrollbar-width: thin; scrollbar-color: rgba(14,77,48, 0.55) transparent; }
                 }
                 @media (max-width: 767px) {
                     .tx-scroll { scrollbar-width: none; -ms-overflow-style: none; }
                     .tx-scroll::-webkit-scrollbar { display: none; }
                 }
-                .db-card { background: ${isLight ? 'rgba(255,255,255,0.7)' : 'rgba(10,10,10,0.8)'}; border: 1px solid ${isLight ? 'rgba(26, 97, 64,0.15)' : 'rgba(255,255,255,0.06)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
-                .db-card-alt { background: ${isLight ? 'rgba(255,255,255,0.65)' : 'rgba(10,10,10,0.75)'}; border: 1px solid ${isLight ? 'rgba(26, 97, 64,0.12)' : 'rgba(255,255,255,0.05)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
-                @keyframes breathe { 0%,100%{box-shadow:0 0 20px rgba(26, 97, 64,0.3)} 50%{box-shadow:0 0 40px rgba(26, 97, 64,0.6)} }
+                .db-card { background: ${isLight ? 'rgba(255,255,255,0.7)' : 'rgba(10,10,10,0.8)'}; border: 1px solid ${isLight ? 'rgba(14,77,48,0.15)' : 'rgba(255,255,255,0.06)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
+                .db-card-alt { background: ${isLight ? 'rgba(255,255,255,0.65)' : 'rgba(10,10,10,0.75)'}; border: 1px solid ${isLight ? 'rgba(14,77,48,0.12)' : 'rgba(255,255,255,0.05)'}; border-radius: 24px; margin: 0 2px; filter: drop-shadow(${isLight ? '0 2px 4px rgba(0,0,0,0.10)' : '0 2px 4px rgba(0,0,0,0.4)'}); }
+                @keyframes breathe { 0%,100%{box-shadow:0 0 20px rgba(14,77,48,0.3)} 50%{box-shadow:0 0 40px rgba(14,77,48,0.6)} }
                 /* Border beam — soft glow segment travelling along the card outline */
                 @keyframes aurora-slide { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
                 .aurora-dash { animation: aurora-slide 5.5s linear infinite; }
@@ -842,7 +842,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
                             <Menu size={16} className={isLight ? 'text-black/80' : 'text-white/80'} />
                             <motion.span
-                                className="absolute top-2 right-2 w-2 h-2 bg-[#1A6140] rounded-full"
+                                className="absolute top-2 right-2 w-2 h-2 bg-[#0E4D30] rounded-full"
                                 animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
                                 transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                             />
@@ -852,18 +852,18 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 ) : (
                     <div className="flex items-center gap-3">
                         <button onClick={onHelp} title="Help &amp; How to Trade" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
-                            <LifeBuoy size={16} className="text-[#1A6140]"/>
+                            <LifeBuoy size={16} className="text-[#0E4D30]"/>
                         </button>
                         <button onClick={onTransferHub || (() => onOpenCircleWallet?.(null))} title="Transfer Hub" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
                             <AnimatedSend size={15} className={isLight ? 'text-black/80' : 'text-white/80'}/>
                         </button>
                         <button onClick={onReferral} title="Referral Program" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
-                            <Gift size={16} className="text-[#1A6140]"/>
+                            <Gift size={16} className="text-[#0E4D30]"/>
                         </button>
                         <button onClick={() => setIsNotificationsOpen(true)} className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`} title="Notifications">
                             <AnimatedBell size={16} className={isLight ? 'text-black/80' : 'text-white/80'}/>
                             <motion.span
-                                className="absolute top-2 right-2 w-2 h-2 bg-[#1A6140] rounded-full"
+                                className="absolute top-2 right-2 w-2 h-2 bg-[#0E4D30] rounded-full"
                                 animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
                                 transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                             />
@@ -891,7 +891,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
 
                     {/* LINE UNDER WALLET */}
                     <div className="flex-none relative">
-                        <div className="w-full h-px bg-gradient-to-r from-transparent via-[#1A6140]/40 to-transparent"/>
+                        <div className="w-full h-px bg-gradient-to-r from-transparent via-[#0E4D30]/40 to-transparent"/>
                     </div>
 
                     {/* USER METRICS (Rearranged 2x2 Grid) */}
@@ -900,19 +900,19 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             {/* 24H Volume */}
                             <div className="db-card p-3.5 flex flex-col justify-between min-h-[72px] relative overflow-hidden">
                                 <div className="flex items-center gap-1.5">
-                                    <BarChart2 size={12} className="text-[#1A6140] flex-none"/>
+                                    <BarChart2 size={12} className="text-[#0E4D30] flex-none"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest truncate`}>Volume</span>
                                 </div>
                                 <div className="flex items-baseline justify-between mt-1">
                                     <div className={`text-sm font-black ${isLight ? 'text-black' : 'text-white'} tracking-tight truncate`}>{animVolume.toFixed(2)}</div>
-                                    <div className="text-[8px] font-bold text-[#1A6140] truncate">+12.4%</div>
+                                    <div className="text-[8px] font-bold text-[#0E4D30] truncate">+12.4%</div>
                                 </div>
                             </div>
 
                             {/* Win Rate */}
                             <div className="db-card p-3.5 flex flex-col justify-between min-h-[72px] relative overflow-hidden">
                                 <div className="flex items-center gap-1.5">
-                                    <AnimatedZap size={12} className="text-[#1A6140] flex-none"/>
+                                    <AnimatedZap size={12} className="text-[#0E4D30] flex-none"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest truncate`}>Win Rate</span>
                                 </div>
                                 <div className="flex items-baseline justify-between mt-1">
@@ -928,10 +928,10 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <div className="db-card p-4 flex flex-col h-[160px] relative overflow-hidden">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
-                                    <AnimatedTrendingUp size={12} className="text-[#1A6140]"/>
+                                    <AnimatedTrendingUp size={12} className="text-[#0E4D30]"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>P&amp;L</span>
                                 </div>
-                                <span className={`text-xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#1A6140]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
+                                <span className={`text-xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#0E4D30]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
                                     {pnlStats.netPnl >= 0 ? '+' : ''}{animNetPnl.toFixed(2)}
                                     <span className="text-[10px] font-bold ml-1 opacity-60">USDC</span>
                                 </span>
@@ -941,8 +941,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     <AreaChart data={pnlStats.chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                                         <defs>
                                             <linearGradient id="pnlLineStrokeMobile" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#1A6140" />
-                                                <stop offset={strokeOffsetPercent} stopColor="#1A6140" />
+                                                <stop offset="0%" stopColor="#0E4D30" />
+                                                <stop offset={strokeOffsetPercent} stopColor="#0E4D30" />
                                                 <stop offset={strokeOffsetPercent} stopColor="#FF6B6B" />
                                                 <stop offset="100%" stopColor="#FF6B6B" />
                                             </linearGradient>
@@ -955,7 +955,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             labelFormatter={() => ''}
                                         />
                                         <ReferenceLine y={0} stroke={isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)'} strokeWidth={1} strokeDasharray="3 3"/>
-                                        <Area type="monotone" dataKey="pnl" stroke="url(#pnlLineStrokeMobile)" strokeWidth={1.25} fill="none" dot={false} activeDot={{ r: 2.5, strokeWidth: 0, fill: pnlStats.netPnl >= 0 ? '#1A6140' : '#FF6B6B' }} baseValue={0}/>
+                                        <Area type="monotone" dataKey="pnl" stroke="url(#pnlLineStrokeMobile)" strokeWidth={1.25} fill="none" dot={false} activeDot={{ r: 2.5, strokeWidth: 0, fill: pnlStats.netPnl >= 0 ? '#0E4D30' : '#FF6B6B' }} baseValue={0}/>
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
@@ -968,7 +968,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <div className="db-card-alt p-4 flex flex-col flex-1 min-h-0">
                             <div className="flex items-center justify-between mb-3 flex-none">
                                 <div className="flex items-center gap-2">
-                                    <AnimatedRefresh size={12} className="text-[#1A6140]"/>
+                                    <AnimatedRefresh size={12} className="text-[#0E4D30]"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Transactions</span>
                                 </div>
                                 <button className={`text-[8px] font-bold ${isLight ? 'text-black/50 hover:text-black' : 'text-white/40 hover:text-white'} flex items-center gap-1 uppercase tracking-widest transition-colors`}>View all<ChevronRight size={10}/></button>
@@ -982,7 +982,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 ) : transactionHistory.slice(0, 10).map((tx,i) => (
                                     <div key={tx.id||i} className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${tx.type==="DEPOSIT"?"bg-[#1A6140]/15 text-[#1A6140]":"bg-[#FF7F50]/15 text-[#FF7F50]"}`}>
+                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${tx.type==="DEPOSIT"?"bg-[#0E4D30]/15 text-[#0E4D30]":"bg-[#FF7F50]/15 text-[#FF7F50]"}`}>
                                                 {tx.type==="DEPOSIT"?<ArrowUp size={10}/>:<ArrowDown size={10}/>}
                                             </div>
                                             <div>
@@ -991,8 +991,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             </div>
                                         </div>
                                         <div className="flex flex-col items-end gap-0.5">
-                                            <div className="px-1.5 py-0.5 bg-[#1A6140]/10 text-[#1A6140] text-[6px] font-black tracking-widest rounded-md uppercase">COMPLETED</div>
-                                            <div className={`text-[10px] font-bold tabular-nums ${tx.type==="DEPOSIT"?"text-[#1A6140]":"text-[#FF7F50]"}`}>{tx.type==="DEPOSIT"?"+":"-"}{parseFloat(tx.amount).toFixed(2)}</div>
+                                            <div className="px-1.5 py-0.5 bg-[#0E4D30]/10 text-[#0E4D30] text-[6px] font-black tracking-widest rounded-md uppercase">COMPLETED</div>
+                                            <div className={`text-[10px] font-bold tabular-nums ${tx.type==="DEPOSIT"?"text-[#0E4D30]":"text-[#FF7F50]"}`}>{tx.type==="DEPOSIT"?"+":"-"}{parseFloat(tx.amount).toFixed(2)}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -1015,8 +1015,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
 
                     {/* DIVIDER */}
                     <div className="w-px mx-4 flex-none self-stretch relative">
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1A6140]/20 to-transparent"/>
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[2px] h-12 bg-[#1A6140] rounded-full" style={{animation:'breathe 2s ease-in-out infinite'}}/>
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0E4D30]/20 to-transparent"/>
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[2px] h-12 bg-[#0E4D30] rounded-full" style={{animation:'breathe 2s ease-in-out infinite'}}/>
                     </div>
 
                     {/* RIGHT: Stats & Panels */}
@@ -1026,28 +1026,28 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             {/* 24H Volume */}
                             <div className="db-card p-5 relative overflow-hidden group flex flex-col justify-between">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <AnimatedBarChart size={14} className="text-[#1A6140] flex-none"/>
+                                    <AnimatedBarChart size={14} className="text-[#0E4D30] flex-none"/>
                                     <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>24H Volume</span>
                                 </div>
                                 <div className={`text-3xl font-bold ${isLight ? 'text-black' : 'text-white'} mb-1.5 tracking-tight tabular-nums`}>{animVolume.toFixed(2)}</div>
-                                <div className="flex items-center gap-1.5 text-[9px] font-bold"><span className="text-[#1A6140] flex items-center gap-0.5"><ChevronUp size={10}/>+12.4%</span><span className={isLight ? 'text-black/30' : 'text-white/20'}>vs yesterday</span></div>
+                                <div className="flex items-center gap-1.5 text-[9px] font-bold"><span className="text-[#0E4D30] flex items-center gap-0.5"><ChevronUp size={10}/>+12.4%</span><span className={isLight ? 'text-black/30' : 'text-white/20'}>vs yesterday</span></div>
                                 <div className="absolute right-0 bottom-3 w-[110px] h-[45px] opacity-20">
-                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L15,38 L30,42 L45,22 L60,28 L75,8 L90,12 L100,0 L100,50 Z" fill="#1A6140" opacity="0.3"/><path d="M0,50 L15,38 L30,42 L45,22 L60,28 L75,8 L90,12 L100,0" fill="none" stroke="#1A6140" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L15,38 L30,42 L45,22 L60,28 L75,8 L90,12 L100,0 L100,50 Z" fill="#0E4D30" opacity="0.3"/><path d="M0,50 L15,38 L30,42 L45,22 L60,28 L75,8 L90,12 L100,0" fill="none" stroke="#0E4D30" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                 </div>
                             </div>
 
                             {/* Sentiment */}
                             <div className="db-card p-5 relative overflow-hidden flex flex-col justify-between">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <AnimatedSmile size={14} className="text-[#1A6140] flex-none"/>
+                                    <AnimatedSmile size={14} className="text-[#0E4D30] flex-none"/>
                                     <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Sentiment</span>
                                 </div>
                                 <div className={`text-3xl font-bold ${isLight ? 'text-black' : 'text-white'} mb-1.5 tracking-tight tabular-nums`}>{animSentiment.toFixed(0)}%</div>
-                                <div className="text-[9px] font-bold text-[#1A6140] uppercase tracking-widest">{derivedStats.sentimentText}</div>
+                                <div className="text-[9px] font-bold text-[#0E4D30] uppercase tracking-widest">{derivedStats.sentimentText}</div>
                                 <div className="absolute right-6 top-1/2 -translate-y-1/2 w-[60px] h-[60px]">
                                     <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
                                         <circle cx="32" cy="32" r="26" fill="none" stroke={isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'} strokeWidth="6"/>
-                                        <circle cx="32" cy="32" r="26" fill="none" stroke="#1A6140" strokeWidth="6" strokeLinecap="round" strokeDasharray="163.4" strokeDashoffset={163.4-(163.4*Math.min(animSentiment,100)/100)}/>
+                                        <circle cx="32" cy="32" r="26" fill="none" stroke="#0E4D30" strokeWidth="6" strokeLinecap="round" strokeDasharray="163.4" strokeDashoffset={163.4-(163.4*Math.min(animSentiment,100)/100)}/>
                                     </svg>
                                     <div className={`absolute inset-0 flex items-center justify-center text-[11px] font-bold ${isLight ? 'text-black' : 'text-white'}`} style={{transform:'rotate(0deg)'}}>{animSentiment.toFixed(0)}%</div>
                                 </div>
@@ -1056,26 +1056,26 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             {/* Win Rate */}
                             <div className="db-card p-5 relative overflow-hidden group flex flex-col justify-between">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <AnimatedZap size={14} className="text-[#1A6140] flex-none"/>
+                                    <AnimatedZap size={14} className="text-[#0E4D30] flex-none"/>
                                     <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Win Rate</span>
                                 </div>
                                 <div className={`text-3xl font-bold ${isLight ? 'text-black' : 'text-white'} mb-1.5 tracking-tight tabular-nums`}>{animWinRate.toFixed(1)}%</div>
                                 <div className="flex items-center gap-1.5 text-[9px] font-bold"><div className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-black/20' : 'bg-white/30'}`}/><span className={isLight ? 'text-black/40' : 'text-white/40'}>Neutral</span></div>
                                 <div className="absolute right-0 bottom-3 w-[110px] h-[45px] opacity-20">
-                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L20,38 L40,44 L60,22 L80,28 L100,10 L100,50 Z" fill="#1A6140" opacity="0.3"/><path d="M0,50 L20,38 L40,44 L60,22 L80,28 L100,10" fill="none" stroke="#1A6140" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L20,38 L40,44 L60,22 L80,28 L100,10 L100,50 Z" fill="#0E4D30" opacity="0.3"/><path d="M0,50 L20,38 L40,44 L60,22 L80,28 L100,10" fill="none" stroke="#0E4D30" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                 </div>
                             </div>
 
                             {/* Avg Stake */}
                             <div className="db-card p-5 relative overflow-hidden group flex flex-col justify-between">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <AnimatedCoins size={14} className="text-[#1A6140] flex-none"/>
+                                    <AnimatedCoins size={14} className="text-[#0E4D30] flex-none"/>
                                     <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Avg Stake</span>
                                 </div>
                                 <div className={`text-3xl font-bold ${isLight ? 'text-black' : 'text-white'} mb-1.5 tracking-tight tabular-nums`}>{animAvgStake.toFixed(2)}</div>
-                                <div className="flex items-center gap-1.5 text-[9px] font-bold"><span className="text-[#1A6140] flex items-center gap-0.5"><ChevronUp size={10}/>+8.1%</span><span className={isLight ? 'text-black/30' : 'text-white/20'}>vs yesterday</span></div>
+                                <div className="flex items-center gap-1.5 text-[9px] font-bold"><span className="text-[#0E4D30] flex items-center gap-0.5"><ChevronUp size={10}/>+8.1%</span><span className={isLight ? 'text-black/30' : 'text-white/20'}>vs yesterday</span></div>
                                 <div className="absolute right-0 bottom-3 w-[110px] h-[45px] opacity-20">
-                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L15,44 L30,32 L45,28 L60,38 L75,14 L90,18 L100,0 L100,50 Z" fill="#1A6140" opacity="0.3"/><path d="M0,50 L15,44 L30,32 L45,28 L60,38 L75,14 L90,18 L100,0" fill="none" stroke="#1A6140" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <svg viewBox="0 0 100 50" className="w-full h-full"><path d="M0,50 L15,44 L30,32 L45,28 L60,38 L75,14 L90,18 L100,0 L100,50 Z" fill="#0E4D30" opacity="0.3"/><path d="M0,50 L15,44 L30,32 L45,28 L60,38 L75,14 L90,18 L100,0" fill="none" stroke="#0E4D30" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                                 </div>
                             </div>
                         </div>
@@ -1086,7 +1086,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             <div className="db-card p-5 flex flex-col min-h-0">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
-                                        <AnimatedTrendingUp size={14} className="text-[#1A6140]"/>
+                                        <AnimatedTrendingUp size={14} className="text-[#0E4D30]"/>
                                         <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>P&amp;L</span>
                                     </div>
                                 </div>
@@ -1097,8 +1097,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <AreaChart data={pnlStats.chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="pnlLineStroke" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#1A6140" />
-                                                    <stop offset={strokeOffsetPercent} stopColor="#1A6140" />
+                                                    <stop offset="0%" stopColor="#0E4D30" />
+                                                    <stop offset={strokeOffsetPercent} stopColor="#0E4D30" />
                                                     <stop offset={strokeOffsetPercent} stopColor="#FF6B6B" />
                                                     <stop offset="100%" stopColor="#FF6B6B" />
                                                 </linearGradient>
@@ -1112,14 +1112,14 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             />
                                             <ReferenceLine y={0} stroke={isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)'} strokeWidth={1.5} strokeDasharray="3 3"/>
                                             {/* Stroke line only, colored by gradient based on top/bottom half */}
-                                            <Area type="monotone" dataKey="pnl" stroke="url(#pnlLineStroke)" strokeWidth={1.25} fill="none" dot={false} activeDot={{ r: 3, strokeWidth: 0, fill: pnlStats.netPnl >= 0 ? '#1A6140' : '#FF6B6B' }} baseValue={0}/>
+                                            <Area type="monotone" dataKey="pnl" stroke="url(#pnlLineStroke)" strokeWidth={1.25} fill="none" dot={false} activeDot={{ r: 3, strokeWidth: 0, fill: pnlStats.netPnl >= 0 ? '#0E4D30' : '#FF6B6B' }} baseValue={0}/>
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
                                 {/* Big bold P&L value positioned in the lower right */}
                                 <div className="flex items-center justify-between mt-1">
                                     <div />
-                                    <span className={`text-3xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#1A6140]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
+                                    <span className={`text-3xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#0E4D30]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
                                         {pnlStats.netPnl >= 0 ? '+' : ''}{animNetPnl.toFixed(2)}
                                         <span className="text-xs font-bold ml-1 opacity-60">USDC</span>
                                     </span>
@@ -1130,7 +1130,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             <div className="db-card-alt p-5 flex flex-col min-h-0">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2">
-                                        <AnimatedRefresh size={14} className="text-[#1A6140]"/>
+                                        <AnimatedRefresh size={14} className="text-[#0E4D30]"/>
                                         <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Transactions</span>
                                     </div>
                                     <button className={`text-[9px] font-bold ${isLight ? 'text-black/50 hover:text-black' : 'text-white/40 hover:text-white'} flex items-center gap-1 uppercase tracking-widest transition-colors`}>View all<ChevronRight size={12}/></button>
@@ -1144,7 +1144,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     ) : transactionHistory.slice(0,5).map((tx,i) => (
                                         <div key={tx.id||i} className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${tx.type==="DEPOSIT"?"bg-[#1A6140]/15 text-[#1A6140]":"bg-[#FF7F50]/15 text-[#FF7F50]"}`}>
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${tx.type==="DEPOSIT"?"bg-[#0E4D30]/15 text-[#0E4D30]":"bg-[#FF7F50]/15 text-[#FF7F50]"}`}>
                                                     {tx.type==="DEPOSIT"?<ArrowUp size={12}/>:<ArrowDown size={12}/>}
                                                 </div>
                                                 <div>
@@ -1153,8 +1153,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-1">
-                                                <div className="px-2 py-0.5 bg-[#1A6140]/10 text-[#1A6140] text-[7px] font-black tracking-widest rounded-md uppercase">COMPLETED</div>
-                                                <div className={`text-[11px] font-bold tabular-nums ${tx.type==="DEPOSIT"?"text-[#1A6140]":"text-[#FF7F50]"}`}>{tx.type==="DEPOSIT"?"+":"-"}{parseFloat(tx.amount).toFixed(2)}</div>
+                                                <div className="px-2 py-0.5 bg-[#0E4D30]/10 text-[#0E4D30] text-[7px] font-black tracking-widest rounded-md uppercase">COMPLETED</div>
+                                                <div className={`text-[11px] font-bold tabular-nums ${tx.type==="DEPOSIT"?"text-[#0E4D30]":"text-[#FF7F50]"}`}>{tx.type==="DEPOSIT"?"+":"-"}{parseFloat(tx.amount).toFixed(2)}</div>
                                             </div>
                                         </div>
                                     ))}
@@ -1172,7 +1172,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <motion.div initial={{opacity:0,scale:0.9,y:20}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:0.9,y:20}}
                             className={`w-full max-w-md ${isLight ? 'bg-white border-[#e2ece5]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8 flex flex-col`}>
                             <div className="flex flex-col items-center text-center mb-4">
-                                <div className={`w-14 h-14 rounded-2xl ${isLight ? 'bg-[#eef5f1]' : 'bg-white/5'} flex items-center justify-center mb-4`}><AnimatedBell size={28} className="text-[#1A6140]"/></div>
+                                <div className={`w-14 h-14 rounded-2xl ${isLight ? 'bg-[#eef5f1]' : 'bg-white/5'} flex items-center justify-center mb-4`}><AnimatedBell size={28} className="text-[#0E4D30]"/></div>
                                 <h3 className={`text-2xl font-black ${isLight ? 'text-[#133a2a]' : 'text-white'} uppercase font-comfortaa`}>Notifications</h3>
                             </div>
                             
@@ -1186,7 +1186,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 ) : (
                                     notifications.map((notif) => {
                                         const typeColors = {
-                                            success: 'border-[#1A6140]/20 bg-[#1A6140]/5 text-[#1A6140]',
+                                            success: 'border-[#0E4D30]/20 bg-[#0E4D30]/5 text-[#0E4D30]',
                                             warning: 'border-amber-500/20 bg-amber-500/5 text-amber-500',
                                             info: 'border-sky-500/20 bg-sky-500/5 text-sky-500',
                                             error: 'border-rose-500/20 bg-rose-500/5 text-rose-500'
@@ -1196,7 +1196,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         return (
                                             <div key={notif.id} className={`p-4 rounded-2xl border ${isLight ? 'bg-[#f8fbf9] border-[#e2ece5]' : 'bg-white/[0.02] border-white/5'} flex gap-3 items-start transition-all`}>
                                                 <div className={`p-2 rounded-xl border ${colorClass.split(' ').slice(0, 2).join(' ')} flex-shrink-0 mt-0.5`}>
-                                                    {notif.type === 'success' && <Check size={14} className="text-[#1A6140]"/>}
+                                                    {notif.type === 'success' && <Check size={14} className="text-[#0E4D30]"/>}
                                                     {notif.type === 'warning' && <AlertCircle size={14} className="text-amber-500"/>}
                                                     {notif.type === 'info' && <Bell size={14} className="text-sky-500"/>}
                                                     {notif.type === 'error' && <AlertCircle size={14} className="text-rose-500"/>}
@@ -1222,7 +1222,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         Clear All
                                     </button>
                                 )}
-                                <button onClick={() => setIsNotificationsOpen(false)} className="w-full py-4 bg-[#1A6140] text-white text-xs font-black uppercase tracking-widest rounded-full hover:brightness-110 transition-all shadow-[0_4px_16px_rgba(26, 97, 64,0.25)]">
+                                <button onClick={() => setIsNotificationsOpen(false)} className="w-full py-4 bg-[#0E4D30] text-white text-xs font-black uppercase tracking-widest rounded-full hover:brightness-110 transition-all shadow-[0_4px_16px_rgba(14,77,48,0.25)]">
                                     Close
                                 </button>
                             </div>
@@ -1234,11 +1234,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             {isSettingsOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-black/30 backdrop-blur-sm">
                     <motion.div initial={{opacity:0,scale:0.9,y:20}} animate={{opacity:1,scale:1,y:0}}
-                        className={`w-full max-w-md ${isLight ? 'bg-white border-[#1A6140]/20' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-5 max-h-[90vh] overflow-y-auto no-scrollbar relative overflow-hidden`}>
+                        className={`w-full max-w-md ${isLight ? 'bg-white border-[#0E4D30]/20' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-5 max-h-[90vh] overflow-y-auto no-scrollbar relative overflow-hidden`}>
                         {isLight && (
                             <div className="absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
                         )}
-                        <button onClick={() => setIsSettingsOpen(false)} className={`absolute top-5 right-5 z-20 p-2 rounded-xl border ${isLight ? 'bg-white/50 border-[#1A6140]/20 text-[#0a261a] hover:bg-white shadow-sm' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
+                        <button onClick={() => setIsSettingsOpen(false)} className={`absolute top-5 right-5 z-20 p-2 rounded-xl border ${isLight ? 'bg-white/50 border-[#0E4D30]/20 text-[#0a261a] hover:bg-white shadow-sm' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
                             <X size={14} />
                         </button>
                         <div className="flex flex-col relative z-10">
@@ -1248,11 +1248,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <label className={`text-[9px] font-bold uppercase tracking-widest ${isLight ? 'text-[#133a2a]/50' : 'text-white/50'} mb-2 block`}>Username</label>
                                 {!isEditingUsername ? (
                                     <div className="flex flex-col gap-2">
-                                        <div className={`w-full ${isLight ? 'bg-white/40 text-[#133a2a] border border-[#1A6140]/10' : 'bg-white/5 text-white'} rounded-2xl py-3 px-6 font-bold text-center`}>
+                                        <div className={`w-full ${isLight ? 'bg-white/40 text-[#133a2a] border border-[#0E4D30]/10' : 'bg-white/5 text-white'} rounded-2xl py-3 px-6 font-bold text-center`}>
                                             {userProfile?.username || 'Trader'}
                                         </div>
                                         <button onClick={() => setIsEditingUsername(true)}
-                                            className={`w-full py-2.5 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
+                                            className={`w-full py-2.5 bg-[#0E4D30] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(14,77,48,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
                                             Change
                                         </button>
                                     </div>
@@ -1260,10 +1260,10 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     <div className="flex flex-col gap-2">
                                         <input type="text" autoFocus placeholder="Enter username" value={newUsername}
                                             onChange={(e) => setNewUsername(e.target.value)}
-                                            className={`w-full ${isLight ? 'bg-white/60 border-[#1A6140]/20 text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-3 px-6 font-bold text-center focus:border-[#1A6140] outline-none transition-all`}/>
+                                            className={`w-full ${isLight ? 'bg-white/60 border-[#0E4D30]/20 text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-3 px-6 font-bold text-center focus:border-[#0E4D30] outline-none transition-all`}/>
                                         <div className="flex gap-2">
                                             <button onClick={() => setIsEditingUsername(false)}
-                                                className={`flex-1 py-2.5 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
+                                                className={`flex-1 py-2.5 bg-[#0E4D30] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(14,77,48,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
                                                 Cancel
                                             </button>
                                             <button onClick={async () => {
@@ -1285,7 +1285,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                 } catch (e) {
                                                     setToast("Update Failed");
                                                 }
-                                            }} className={`flex-1 py-2.5 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
+                                            }} className={`flex-1 py-2.5 bg-[#0E4D30] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(14,77,48,0.4)] text-[9px] font-black uppercase tracking-widest rounded-full transition-all`}>
                                                 Save
                                             </button>
                                         </div>
@@ -1314,7 +1314,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     } catch (e) {
                                         setToast("Failed to regenerate wallet");
                                     }
-                                }} className={`w-full py-3 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[10px] font-black uppercase tracking-widest rounded-full transition-all`}>
+                                }} className={`w-full py-3 bg-[#0E4D30] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(14,77,48,0.4)] text-[10px] font-black uppercase tracking-widest rounded-full transition-all`}>
                                     Regenerate Wallet
                                 </button>
                             </div>
@@ -1328,7 +1328,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <input type="email" placeholder="you@email.com" value={linkedEmail}
                                     onChange={(e) => setLinkedEmail(e.target.value)}
                                     disabled={!!userProfile?.email}
-                                    className={`w-full ${isLight ? 'bg-white/60 border-[#1A6140]/20 text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-3 px-6 font-bold text-center focus:border-[#1A6140] outline-none transition-all mb-2 disabled:opacity-70 disabled:cursor-not-allowed`}/>
+                                    className={`w-full ${isLight ? 'bg-white/60 border-[#0E4D30]/20 text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-3 px-6 font-bold text-center focus:border-[#0E4D30] outline-none transition-all mb-2 disabled:opacity-70 disabled:cursor-not-allowed`}/>
                                 <button onClick={async () => {
                                     if (!linkedEmail.trim() || !address) return;
                                     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linkedEmail.trim())) {
@@ -1355,7 +1355,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         setIsSavingEmail(false);
                                     }
                                 }} disabled={isSavingEmail || !!userProfile?.email}
-                                    className={`w-full py-3 bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(26, 97, 64,0.4)] text-[10px] font-black uppercase tracking-widest rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed`}>
+                                    className={`w-full py-3 bg-[#0E4D30] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110 hover:shadow-[0_4px_16px_rgba(14,77,48,0.4)] text-[10px] font-black uppercase tracking-widest rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed`}>
                                     {isSavingEmail ? 'Linking...' : (userProfile?.email ? 'Email Linked' : 'Link Email')}
                                 </button>
                             </div>
@@ -1366,7 +1366,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <label className={`text-[9px] font-bold uppercase tracking-widest ${isLight ? 'text-[#133a2a]/50' : 'text-white/50'} mb-1.5 block flex items-center gap-1.5`}>
                                     <Globe size={10}/> Social Accounts
                                 </label>
-                                <div className={`w-full rounded-2xl p-4 flex items-center justify-between ${isLight ? 'bg-white/40 border border-[#1A6140]/10' : 'bg-white/5 border border-white/5'}`}>
+                                <div className={`w-full rounded-2xl p-4 flex items-center justify-between ${isLight ? 'bg-white/40 border border-[#0E4D30]/10' : 'bg-white/5 border border-white/5'}`}>
                                     <div className="flex items-center gap-3">
                                         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" className={isLight ? 'text-[#133a2a]' : 'text-white'}>
                                             <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
@@ -1374,7 +1374,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <div>
                                             <div className={`text-[10px] font-bold ${isLight ? 'text-[#133a2a]' : 'text-white'}`}>Discord</div>
                                             {userProfile?.discord ? (
-                                                <div className="text-[8px] font-mono text-[#1A6140] font-bold">@{userProfile.discord.username}</div>
+                                                <div className="text-[8px] font-mono text-[#0E4D30] font-bold">@{userProfile.discord.username}</div>
                                             ) : (
                                                 <div className={`text-[8px] font-medium ${isLight ? 'text-[#133a2a]/40' : 'text-white/40'}`}>Not Linked</div>
                                             )}
@@ -1383,7 +1383,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     {!userProfile?.discord ? (
                                         <button onClick={() => {
                                             window.location.href = "https://discord.com/oauth2/authorize?client_id=1509759894348369980&response_type=code&redirect_uri=https%3A%2F%2F15market.online&scope=connections+identify";
-                                        }} className={`py-2 px-4 rounded-full text-[9px] font-black uppercase tracking-widest transition-all bg-[#1A6140] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110`}>
+                                        }} className={`py-2 px-4 rounded-full text-[9px] font-black uppercase tracking-widest transition-all bg-[#0E4D30] text-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] hover:brightness-110`}>
                                             Link
                                         </button>
                                     ) : (
@@ -1396,7 +1396,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                 });
                                                 window.location.reload();
                                             } catch (e) {}
-                                        }} className={`py-2 px-4 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${isLight ? 'bg-white/40 border-[#1A6140]/20 text-[#133a2a] hover:bg-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
+                                        }} className={`py-2 px-4 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${isLight ? 'bg-white/40 border-[#0E4D30]/20 text-[#133a2a] hover:bg-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
                                             Unlink
                                         </button>
                                     )}
@@ -1424,19 +1424,19 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
                                      style={{ backgroundImage: `url(${isLight ? '/goblogo.png' : '/gowlogo.png'})`, backgroundSize: '30px 30px', backgroundRepeat: 'repeat', transform: 'rotate(-15deg) scale(1.6)' }} />
                                 {/* Gradient glow top-right */}
-                                <div className="absolute top-0 right-0 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26, 97, 64,0.15) 0%, transparent 70%)' }} />
+                                <div className="absolute top-0 right-0 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(14,77,48,0.15) 0%, transparent 70%)' }} />
                                 {/* Gradient glow bottom-left */}
-                                <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26, 97, 64,0.08) 0%, transparent 70%)' }} />
+                                <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(14,77,48,0.08) 0%, transparent 70%)' }} />
 
                                 <div className="relative z-10 flex flex-row items-stretch p-6 gap-5">
                                     {/* LEFT: Avatar + Identity */}
                                     <div className="flex flex-col items-center justify-center gap-3 min-w-[120px]">
-                                        <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden border-[3px] border-[#1A6140]/60 shadow-[0_0_20px_rgba(26, 97, 64,0.3)]">
+                                        <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden border-[3px] border-[#0E4D30]/60 shadow-[0_0_20px_rgba(14,77,48,0.3)]">
                                             {(userProfile?.avatar || userProfile?.xProfileImage) ? (
                                                 <img src={userProfile?.avatar || userProfile?.xProfileImage} alt="avatar" className="w-full h-full object-cover" />
                                             ) : (
-                                                <div className="w-full h-full bg-[#1A6140]/15 flex items-center justify-center">
-                                                    <User size={30} className="text-[#1A6140]/60" />
+                                                <div className="w-full h-full bg-[#0E4D30]/15 flex items-center justify-center">
+                                                    <User size={30} className="text-[#0E4D30]/60" />
                                                 </div>
                                             )}
                                         </div>
@@ -1451,7 +1451,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     </div>
 
                                     {/* Vertical divider */}
-                                    <div className="w-px self-stretch bg-gradient-to-b from-transparent via-[#1A6140]/30 to-transparent flex-none" />
+                                    <div className="w-px self-stretch bg-gradient-to-b from-transparent via-[#0E4D30]/30 to-transparent flex-none" />
 
                                     {/* RIGHT: Stats */}
                                     <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0">
@@ -1459,7 +1459,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <div className="flex gap-2.5">
                                             <div className={`flex-1 rounded-2xl p-3 ${isLight ? 'bg-black/[0.02] border border-black/[0.05]' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
                                                 <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>Win Rate</div>
-                                                <div className="text-xl font-black text-[#1A6140] leading-none">{derivedStats.winRate.toFixed(1)}%</div>
+                                                <div className="text-xl font-black text-[#0E4D30] leading-none">{derivedStats.winRate.toFixed(1)}%</div>
                                             </div>
                                             <div className={`flex-1 rounded-2xl p-3 ${isLight ? 'bg-black/[0.02] border border-black/[0.05]' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
                                                 <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>Trades</div>
@@ -1470,11 +1470,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <div className="flex gap-2.5">
                                             <div className={`flex-1 rounded-2xl p-3 ${isLight ? 'bg-black/[0.02] border border-black/[0.05]' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
                                                 <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>Wins</div>
-                                                <div className="text-xl font-black text-[#1A6140] leading-none">{derivedStats.totalWins}</div>
+                                                <div className="text-xl font-black text-[#0E4D30] leading-none">{derivedStats.totalWins}</div>
                                             </div>
                                             <div className={`flex-1 rounded-2xl p-3 ${isLight ? 'bg-black/[0.02] border border-black/[0.05]' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
                                                 <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>All-Time PnL</div>
-                                                <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#1A6140]' : 'text-[#FF6B6B]'}`}>
+                                                <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#0E4D30]' : 'text-[#FF6B6B]'}`}>
                                                     {pnlStats.netPnl >= 0 ? '+' : ''}{pnlStats.netPnl.toFixed(2)}
                                                 </div>
                                             </div>
@@ -1483,7 +1483,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <div className="flex items-center justify-between mt-1">
                                             <img src={isLight ? '/goblogo.png' : '/gowlogo.png'} alt="15market" className="h-5 w-auto opacity-60" />
                                             <div className="flex items-center gap-1.5">
-                                                <div className="w-1 h-1 rounded-full bg-[#1A6140] animate-pulse" />
+                                                <div className="w-1 h-1 rounded-full bg-[#0E4D30] animate-pulse" />
                                                 <span className={`text-[7px] font-black uppercase tracking-[0.15em] ${isLight ? 'text-[#133a2a]/40' : 'text-white/25'}`}>ARC TESTNET</span>
                                             </div>
                                         </div>
@@ -1498,19 +1498,19 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
                                          style={{ backgroundImage: `url('/gowlogo.png')`, backgroundSize: '30px 30px', backgroundRepeat: 'repeat', transform: 'rotate(-15deg) scale(1.6)' }} />
                                     {/* Gradient glow top-right */}
-                                    <div className="absolute top-0 right-0 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26, 97, 64,0.15) 0%, transparent 70%)' }} />
+                                    <div className="absolute top-0 right-0 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(14,77,48,0.15) 0%, transparent 70%)' }} />
                                     {/* Gradient glow bottom-left */}
-                                    <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26, 97, 64,0.08) 0%, transparent 70%)' }} />
+                                    <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(14,77,48,0.08) 0%, transparent 70%)' }} />
 
                                     <div className="relative z-10 flex flex-row items-stretch p-6 gap-5">
                                         {/* LEFT: Avatar + Identity */}
                                         <div className="flex flex-col items-center justify-center gap-3 min-w-[120px]">
-                                            <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden border-[3px] border-[#1A6140]/60 shadow-[0_0_20px_rgba(26, 97, 64,0.3)]">
+                                            <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center overflow-hidden border-[3px] border-[#0E4D30]/60 shadow-[0_0_20px_rgba(14,77,48,0.3)]">
                                                 {(userProfile?.avatar || userProfile?.xProfileImage) ? (
                                                     <img src={userProfile?.avatar || userProfile?.xProfileImage} alt="avatar" className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full bg-[#1A6140]/15 flex items-center justify-center">
-                                                        <User size={30} className="text-[#1A6140]/60" />
+                                                    <div className="w-full h-full bg-[#0E4D30]/15 flex items-center justify-center">
+                                                        <User size={30} className="text-[#0E4D30]/60" />
                                                     </div>
                                                 )}
                                             </div>
@@ -1525,7 +1525,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         </div>
 
                                         {/* Vertical divider */}
-                                        <div className="w-px self-stretch bg-gradient-to-b from-transparent via-[#1A6140]/30 to-transparent flex-none" />
+                                        <div className="w-px self-stretch bg-gradient-to-b from-transparent via-[#0E4D30]/30 to-transparent flex-none" />
 
                                         {/* RIGHT: Stats */}
                                         <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0">
@@ -1533,7 +1533,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             <div className="flex gap-2.5">
                                                 <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3">
                                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">Win Rate</div>
-                                                    <div className="text-xl font-black text-[#1A6140] leading-none">{derivedStats.winRate.toFixed(1)}%</div>
+                                                    <div className="text-xl font-black text-[#0E4D30] leading-none">{derivedStats.winRate.toFixed(1)}%</div>
                                                 </div>
                                                 <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3">
                                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">Trades</div>
@@ -1544,11 +1544,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             <div className="flex gap-2.5">
                                                 <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3">
                                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">Wins</div>
-                                                    <div className="text-xl font-black text-[#1A6140] leading-none">{derivedStats.totalWins}</div>
+                                                    <div className="text-xl font-black text-[#0E4D30] leading-none">{derivedStats.totalWins}</div>
                                                 </div>
                                                 <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3">
                                                     <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">All-Time PnL</div>
-                                                    <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#1A6140]' : 'text-[#FF6B6B]'}`}>
+                                                    <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#0E4D30]' : 'text-[#FF6B6B]'}`}>
                                                         {pnlStats.netPnl >= 0 ? '+' : ''}{pnlStats.netPnl.toFixed(2)}
                                                     </div>
                                                 </div>
@@ -1557,7 +1557,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             <div className="flex items-center justify-between mt-1">
                                                 <img src="/gowlogo.png" alt="15market" className="h-5 w-auto opacity-60" />
                                                 <div className="flex items-center gap-1.5">
-                                                    <div className="w-1 h-1 rounded-full bg-[#1A6140] animate-pulse" />
+                                                    <div className="w-1 h-1 rounded-full bg-[#0E4D30] animate-pulse" />
                                                     <span className="text-[7px] font-black uppercase tracking-[0.15em] text-white/25">ARC TESTNET</span>
                                                 </div>
                                             </div>
@@ -1588,7 +1588,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                             setToast('Save Failed');
                                         }
                                     }}
-                                    className="flex-1 py-3.5 bg-[#1A6140] text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_4px_20px_rgba(26, 97, 64,0.3)] flex items-center justify-center gap-2"
+                                    className="flex-1 py-3.5 bg-[#0E4D30] text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_4px_20px_rgba(14,77,48,0.3)] flex items-center justify-center gap-2"
                                 >
                                     <Download size={14} /> Save Card
                                 </button>
@@ -1610,7 +1610,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         className={`w-full max-w-md ${isLight ? 'bg-white border-[#e2ece5]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8`}>
                         <div className="flex flex-col items-center text-center">
                             <div className={`w-16 h-16 rounded-2xl ${isLight ? 'bg-[#eef5f1]' : 'bg-white/5'} flex items-center justify-center mb-6`}>
-                                {modalConfig.type==='alert'?<AlertCircle size={32} className="text-[#1A6140]"/>:<Zap size={32} className="text-[#1A6140]"/>}
+                                {modalConfig.type==='alert'?<AlertCircle size={32} className="text-[#0E4D30]"/>:<Zap size={32} className="text-[#0E4D30]"/>}
                             </div>
                             <h3 className={`text-2xl font-black ${isLight ? 'text-[#133a2a]' : 'text-white'} mb-2 uppercase`}>{modalConfig.title}</h3>
                             <p className={`text-sm font-medium ${isLight ? 'text-[#133a2a]/50' : 'text-white/50'} mb-8 whitespace-pre-line`}>{modalConfig.message}</p>
@@ -1637,7 +1637,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             <h3 className={`text-2xl font-black ${isLight ? 'text-[#133a2a]' : 'text-white'} mb-6 uppercase text-center`}>{promptConfig.title}</h3>
                             <input type={promptConfig.inputType||"text"} autoFocus placeholder={promptConfig.placeholder} value={promptValue}
                                 onChange={(e) => setPromptValue(e.target.value)}
-                                className={`w-full ${isLight ? 'bg-[#f0f6f2] border-[#e2ece5] text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-4 px-6 font-bold text-center focus:border-[#1A6140]/50 outline-none transition-all mb-6`}
+                                className={`w-full ${isLight ? 'bg-[#f0f6f2] border-[#e2ece5] text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-4 px-6 font-bold text-center focus:border-[#0E4D30]/50 outline-none transition-all mb-6`}
                                 onKeyDown={(e) => { if(e.key==='Enter'){promptConfig.onConfirm(promptValue);setPromptConfig(null);} }}/>
                             <div className="grid grid-cols-2 gap-4 w-full">
                                 <button onClick={() => {setPromptConfig(null);setPromptValue("");}} className={`py-4 ${isLight ? 'bg-[#eef5f1] text-[#133a2a] hover:bg-[#e2ece5]' : 'bg-white/10 text-white hover:bg-white/20'} text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Cancel</button>
@@ -1666,8 +1666,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className={`fixed top-0 right-0 w-[65%] max-w-[300px] h-full z-[9999] rounded-l-[32px] flex flex-col gap-3 p-6 pt-24 ${isLight ? 'bg-white border-l border-[#1A6140]/20' : 'bg-[#0a0a0a] border-l border-white/10'} overflow-hidden`}
-                            style={{ boxShadow: isLight ? '0 0 50px rgba(0, 0, 0, 0.18), 0 0 80px rgba(26, 97, 64, 0.20)' : '0 0 60px rgba(0, 0, 0, 0.65), 0 0 90px rgba(26, 97, 64, 0.35)' }}
+                            className={`fixed top-0 right-0 w-[65%] max-w-[300px] h-full z-[9999] rounded-l-[32px] flex flex-col gap-3 p-6 pt-24 ${isLight ? 'bg-white border-l border-[#0E4D30]/20' : 'bg-[#0a0a0a] border-l border-white/10'} overflow-hidden`}
+                            style={{ boxShadow: isLight ? '0 0 50px rgba(0, 0, 0, 0.18), 0 0 80px rgba(14,77,48, 0.20)' : '0 0 60px rgba(0, 0, 0, 0.65), 0 0 90px rgba(14,77,48, 0.35)' }}
                         >
                             {isLight && (
                                 <div className="absolute inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
@@ -1682,19 +1682,19 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 <X size={20} />
                             </button>
 
-                            <button onClick={() => { setIsMobileMenuOpen(false); onHelp(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
-                                <LifeBuoy size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Help</span>
+                            <button onClick={() => { setIsMobileMenuOpen(false); onHelp(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(14,77,48,0.15)] border border-[#0E4D30]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                                <LifeBuoy size={16} className="text-[#0E4D30]"/> <span className="text-[10px] font-black uppercase tracking-widest">Help</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); onTransferHub?.() || onOpenCircleWallet?.(null); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                            <button onClick={() => { setIsMobileMenuOpen(false); onTransferHub?.() || onOpenCircleWallet?.(null); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(14,77,48,0.15)] border border-[#0E4D30]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Send size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Transfer Hub</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); onReferral?.(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
-                                <Gift size={16} className="text-[#1A6140]"/> <span className="text-[10px] font-black uppercase tracking-widest">Referral Program</span>
+                            <button onClick={() => { setIsMobileMenuOpen(false); onReferral?.(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(14,77,48,0.15)] border border-[#0E4D30]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                                <Gift size={16} className="text-[#0E4D30]"/> <span className="text-[10px] font-black uppercase tracking-widest">Referral Program</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); setIsNotificationsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                            <button onClick={() => { setIsMobileMenuOpen(false); setIsNotificationsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(14,77,48,0.15)] border border-[#0E4D30]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Bell size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Notifications</span>
                             </button>
-                            <button onClick={() => { setIsMobileMenuOpen(false); setNewUsername(userProfile?.username || ''); setLinkedEmail(userProfile?.email || ''); setIsSettingsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(26, 97, 64,0.15)] border border-[#1A6140]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
+                            <button onClick={() => { setIsMobileMenuOpen(false); setNewUsername(userProfile?.username || ''); setLinkedEmail(userProfile?.email || ''); setIsSettingsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(14,77,48,0.15)] border border-[#0E4D30]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Settings size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Settings</span>
                             </button>
                         </motion.div>

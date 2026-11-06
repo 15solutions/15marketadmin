@@ -717,7 +717,7 @@ export function CircleWalletPage({
                     const r = eyeSize * 0.45;
 
                     // 1. Draw Outer Eye (Green)
-                    ctx.fillStyle = '#1A6140';
+                    ctx.fillStyle = '#0E4D30';
                     ctx.beginPath();
                     if (corner === 'tl') ctx.moveTo(startX, startY);
                     else ctx.moveTo(startX + r, startY);
@@ -880,7 +880,7 @@ export function CircleWalletPage({
                     ctx.textBaseline = 'middle';
                     
                     // "15" in green, "market" in black
-                    ctx.fillStyle = '#1A6140';
+                    ctx.fillStyle = '#0E4D30';
                     ctx.fillText('15', midX - 32, midY);
                     ctx.fillStyle = '#0F0F0F';
                     ctx.fillText('market', midX + 24, midY);
@@ -954,8 +954,8 @@ export function CircleWalletPage({
             // ── GREEN GLOWS (card-style radial accents) ────
             const glow = (cx, cy, r, a) => {
                 const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-                g.addColorStop(0, `rgba(26, 97, 64, ${a})`);
-                g.addColorStop(1, 'rgba(26, 97, 64, 0)');
+                g.addColorStop(0, `rgba(14,77,48, ${a})`);
+                g.addColorStop(1, 'rgba(14,77,48, 0)');
                 ctx.fillStyle = g;
                 ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
             };
@@ -974,7 +974,7 @@ export function CircleWalletPage({
             ctx.drawImage(logoImg, (W - logoW) / 2, 74, logoW, logoH);
 
             // Subtle divider line
-            ctx.strokeStyle = 'rgba(26, 97, 64, 0.18)';
+            ctx.strokeStyle = 'rgba(14,77,48, 0.18)';
             ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(70, 214); ctx.lineTo(W - 70, 214); ctx.stroke();
 
@@ -988,7 +988,7 @@ export function CircleWalletPage({
             const qrR = 28;
 
             // Rounded container with a soft glowing green border/shadow for QR
-            ctx.strokeStyle = 'rgba(26, 97, 64, 0.30)';
+            ctx.strokeStyle = 'rgba(14,77,48, 0.30)';
             ctx.lineWidth = 3;
             drawRoundRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, qrR + 6);
             ctx.stroke();
@@ -1020,11 +1020,11 @@ export function CircleWalletPage({
 
             // ── FOOTER (15MARKET URL) ─────────────────────────────
             const footerY = H - 96;
-            ctx.strokeStyle = 'rgba(26, 97, 64, 0.18)';
+            ctx.strokeStyle = 'rgba(14,77,48, 0.18)';
             ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(70, footerY); ctx.lineTo(W - 70, footerY); ctx.stroke();
 
-            ctx.fillStyle = '#1A6140';
+            ctx.fillStyle = '#0E4D30';
             ctx.font = 'bold 26px "Comfortaa", "Courier New", monospace';
             ctx.fillText('15market.com', W / 2, footerY + 44);
 
@@ -1744,10 +1744,10 @@ export function CircleWalletPage({
                 alt="Logo"
             />
             <div className="flex flex-col gap-3 w-32">
-                <div className={`h-[1px] w-full ${isLight ? 'bg-black/10' : 'bg-[#1A6140]/30'}`} />
-                <div className={`h-[1px] w-full ${isLight ? 'bg-black/10' : 'bg-[#1A6140]/30'}`} />
+                <div className={`h-[1px] w-full ${isLight ? 'bg-black/10' : 'bg-[#0E4D30]/30'}`} />
+                <div className={`h-[1px] w-full ${isLight ? 'bg-black/10' : 'bg-[#0E4D30]/30'}`} />
             </div>
-            <div className="w-8 h-8 border-2 border-[#1A6140]/20 border-t-[#1A6140] rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[#0E4D30]/20 border-t-[#0E4D30] rounded-full animate-spin" />
         </div>
     );
 
@@ -1774,8 +1774,8 @@ export function CircleWalletPage({
 
                 {/* Immersive Ambiance (Global Glows) */}
                 <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-                    <div className={`absolute top-[-10%] left-[-10%] w-[40%] h-[40%] ${isLight ? 'bg-[#1A6140]/5' : 'bg-[#1A6140]/10'} blur-[120px] rounded-full`} />
-                    <div className={`absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] ${isLight ? 'bg-[#1A6140]/5' : 'bg-[#1A6140]/10'} blur-[120px] rounded-full`} />
+                    <div className={`absolute top-[-10%] left-[-10%] w-[40%] h-[40%] ${isLight ? 'bg-[#0E4D30]/5' : 'bg-[#0E4D30]/10'} blur-[120px] rounded-full`} />
+                    <div className={`absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] ${isLight ? 'bg-[#0E4D30]/5' : 'bg-[#0E4D30]/10'} blur-[120px] rounded-full`} />
                 </div>
 
                 {/* Sticky Header - Full Width */}
@@ -1826,7 +1826,7 @@ export function CircleWalletPage({
                                 <button
                                     onClick={() => handleSwipeWallet('right')}
                                     title="Previous card"
-                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
+                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
                                     style={{ left: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}
                                 >
                                     <ChevronLeft size={18} />
@@ -1834,7 +1834,7 @@ export function CircleWalletPage({
                                 <button
                                     onClick={() => handleSwipeWallet('left')}
                                     title="Next card"
-                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#1A6140]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
+                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
                                     style={{ right: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}
                                 >
                                     <ChevronRight size={18} />
@@ -1862,7 +1862,7 @@ export function CircleWalletPage({
                                                 // tight green-tinted shadow (see the
                                                 // Dashboard card host comment).
                                                 boxShadow: isLight
-                                                    ? '0 10px 24px rgba(26,97,64,0.16), 0 16px 36px rgba(11,50,32,0.12)'
+                                                    ? '0 10px 24px rgba(14,77,48,0.16), 0 16px 36px rgba(11,50,32,0.12)'
                                                     : '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20,241,149,0.13)' }}
                                             className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
                                         >
@@ -1871,7 +1871,7 @@ export function CircleWalletPage({
                                                 className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] text-white cursor-pointer"
                                                 style={{
                                                     fontFamily: '"Comfortaa", cursive',
-                                                    background: 'linear-gradient(145deg, #1a6140 0%, #123f28 55%, #0b3220 100%)',
+                                                    background: 'linear-gradient(145deg, #0e4d30 0%, #123f28 55%, #0b3220 100%)',
                                                     border: '1.5px solid rgba(99,194,141,0.45)',
                                                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), inset 0 0 46px rgba(0,0,0,0.28)'
                                                 }}
@@ -2021,30 +2021,30 @@ export function CircleWalletPage({
                                 <>
                                     <button
                                         onClick={() => { setTransferAmount(''); setTransferModal('deposit'); }}
-                                        className="flex items-center justify-center gap-2 md:gap-3 bg-[#1A6140] text-white font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-2xl shadow-[#1A6140]/20"
+                                        className="flex items-center justify-center gap-2 md:gap-3 bg-[#0E4D30] text-white font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-2xl shadow-[#0E4D30]/20"
                                     >
                                         <ArrowDownLeft size={16} /> Deposit
                                     </button>
                                     <button
                                         onClick={() => { setTransferAmount(''); setTransferModal('withdraw'); }}
-                                        className={`flex items-center justify-center gap-2 md:gap-3 ${isLight ? 'bg-black' : 'bg-white/10 border border-white/10'} text-[#1A6140] font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest active:scale-[0.95] transition-all shadow-2xl shadow-black/20`}
+                                        className={`flex items-center justify-center gap-2 md:gap-3 ${isLight ? 'bg-black' : 'bg-white/10 border border-white/10'} text-[#0E4D30] font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest active:scale-[0.95] transition-all shadow-2xl shadow-black/20`}
                                     >
-                                        <ArrowUpRight size={16} className="text-[#1A6140]" /> Withdraw
+                                        <ArrowUpRight size={16} className="text-[#0E4D30]" /> Withdraw
                                     </button>
                                 </>
                             ) : (
                                 <>
                                     <button
                                         onClick={() => setShowSendModal(true)}
-                                        className="flex items-center justify-center gap-2 md:gap-3 bg-[#1A6140] text-white font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-2xl shadow-[#1A6140]/20"
+                                        className="flex items-center justify-center gap-2 md:gap-3 bg-[#0E4D30] text-white font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-2xl shadow-[#0E4D30]/20"
                                     >
                                         <Send size={16} /> Send
                                     </button>
                                     <button
                                         onClick={() => setShowReceiveModal(true)}
-                                        className={`flex items-center justify-center gap-2 md:gap-3 ${isLight ? 'bg-black' : 'bg-white/10 border border-white/10'} text-[#1A6140] font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest active:scale-[0.95] transition-all shadow-2xl shadow-black/20`}
+                                        className={`flex items-center justify-center gap-2 md:gap-3 ${isLight ? 'bg-black' : 'bg-white/10 border border-white/10'} text-[#0E4D30] font-black py-4 md:py-6 rounded-[20px] md:rounded-[28px] text-[10px] md:text-sm uppercase tracking-widest active:scale-[0.95] transition-all shadow-2xl shadow-black/20`}
                                     >
-                                        <ArrowDownLeft size={16} className="text-[#1A6140]" /> Receive
+                                        <ArrowDownLeft size={16} className="text-[#0E4D30]" /> Receive
                                     </button>
                                 </>
                             )}
@@ -2055,7 +2055,7 @@ export function CircleWalletPage({
                     <motion.div
                         initial={{ opacity: 0, scaleY: 0 }}
                         animate={{ opacity: 1, scaleY: 1 }}
-                        className={`hidden lg:block w-[2px] rounded-full self-stretch my-4 bg-[#1A6140]/40`}
+                        className={`hidden lg:block w-[2px] rounded-full self-stretch my-4 bg-[#0E4D30]/40`}
                     />
 
                     {/* RIGHT SIDE: ASSETS & FUNDING (Visible on Mobile & Desktop) */}
@@ -2107,7 +2107,7 @@ export function CircleWalletPage({
                                             <div className="flex flex-col items-center justify-center flex-1 pt-6 pb-16 md:py-10 gap-6 relative z-10 w-full h-full md:min-h-[300px] md:pb-0">
                                                 <button
                                                     onClick={() => onFiatWithdraw?.()}
-                                                    className="w-full max-w-[280px] py-4 md:py-5 rounded-[20px] bg-[#1A6140] text-white font-black uppercase text-[9px] tracking-[0.2em] shadow-xl shadow-[#1A6140]/20 hover:brightness-110 active:scale-[0.97] transition-all"
+                                                    className="w-full max-w-[280px] py-4 md:py-5 rounded-[20px] bg-[#0E4D30] text-white font-black uppercase text-[9px] tracking-[0.2em] shadow-xl shadow-[#0E4D30]/20 hover:brightness-110 active:scale-[0.97] transition-all"
                                                 >
                                                     Fiat Withdrawal Request
                                                 </button>
@@ -2130,9 +2130,9 @@ export function CircleWalletPage({
                                                                 onClick={() => setFundingType('native')}
                                                                 className="flex flex-col items-center gap-4 md:gap-6 transition-all hover:scale-110 active:scale-95 group"
                                                             >
-                                                                <Globe size={24} className={`md:!w-8 md:!h-8 transition-all ${isLight ? 'text-black/60' : 'text-white/60'} group-hover:text-[#1A6140]`} strokeWidth={1.5} />
+                                                                <Globe size={24} className={`md:!w-8 md:!h-8 transition-all ${isLight ? 'text-black/60' : 'text-white/60'} group-hover:text-[#0E4D30]`} strokeWidth={1.5} />
                                                                 <div className="text-center">
-                                                                    <p className={`text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all ${isLight ? 'text-black/60 group-hover:text-[#1A6140]' : 'text-white/60 group-hover:text-[#1A6140]'}`}>Native Tokens</p>
+                                                                    <p className={`text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all ${isLight ? 'text-black/60 group-hover:text-[#0E4D30]' : 'text-white/60 group-hover:text-[#0E4D30]'}`}>Native Tokens</p>
                                                                 </div>
                                                             </button>
                                                             {/* The USDC rail is CCTP burn & mint — external
@@ -2140,7 +2140,7 @@ export function CircleWalletPage({
                                                                 (email/Discord/...) never see it. */}
                                                             <>
                                                                 {/* Divider Line */}
-                                                                <div className={`w-[2px] h-16 md:h-24 bg-[#1A6140]/40 mx-2 md:mx-12 rounded-full`}></div>
+                                                                <div className={`w-[2px] h-16 md:h-24 bg-[#0E4D30]/40 mx-2 md:mx-12 rounded-full`}></div>
 
                                                                 <button
                                                                     onClick={() => setFundingType('usdc')}
@@ -2152,7 +2152,7 @@ export function CircleWalletPage({
                                                                             alt="USDC Logo"
                                                                             className={`w-[3.3rem] h-[3.3rem] md:w-[4.95rem] md:h-[4.95rem] object-contain transition-all opacity-70 group-hover:opacity-100 -translate-y-[2vh] ${isLight ? 'brightness-0' : 'brightness-0 invert'} group-hover:[filter:brightness(0)_saturate(100%)_invert(64%)_sepia(26%)_saturate(1028%)_hue-rotate(101deg)_brightness(88%)_contrast(82%)]`}
                                                                         />
-                                                                        <p className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap ${isLight ? 'text-black/60 group-hover:text-[#1A6140]' : 'text-white/60 group-hover:text-[#1A6140]'}`}>USDC</p>
+                                                                        <p className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] md:text-sm font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap ${isLight ? 'text-black/60 group-hover:text-[#0E4D30]' : 'text-white/60 group-hover:text-[#0E4D30]'}`}>USDC</p>
                                                                     </div>
                                                                 </button>
                                                             </>
@@ -2194,7 +2194,7 @@ export function CircleWalletPage({
                                                             <img
                                                                 src="/circle.png"
                                                                 alt="Circle"
-                                                                className="h-5 md:h-10 object-contain drop-shadow-[0_0_10px_rgba(26, 97, 64,0.3)] relative z-30"
+                                                                className="h-5 md:h-10 object-contain drop-shadow-[0_0_10px_rgba(14,77,48,0.3)] relative z-30"
                                                                 style={{ filter: 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)' }}
                                                             />
                                                             {/* The CCTP label only on external-wallet rails —
@@ -2206,7 +2206,7 @@ export function CircleWalletPage({
                                                                         <path d="M11 1L1 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 3" />
                                                                     </svg>
                                                                 </div>
-                                                                <span className="relative z-30 text-[9px] md:text-xs font-black tracking-widest text-[#1A6140]">CCTP</span>
+                                                                <span className="relative z-30 text-[9px] md:text-xs font-black tracking-widest text-[#0E4D30]">CCTP</span>
                                                             </>)}
                                                             <div className={`relative z-30 text-white opacity-40 scale-75 md:scale-100`}>
                                                                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
@@ -2234,7 +2234,7 @@ export function CircleWalletPage({
                                                         </h3>
                                                         <div className="flex gap-1.5">
                                                             {SUPPORTED_TOKENS.map((_, i) => (
-                                                                <div key={i} className={`w-1.5 h-1.5 rounded-full ${activeTokenIdx === i ? 'bg-[#1A6140]' : 'bg-white/10'}`} />
+                                                                <div key={i} className={`w-1.5 h-1.5 rounded-full ${activeTokenIdx === i ? 'bg-[#0E4D30]' : 'bg-white/10'}`} />
                                                             ))}
                                                         </div>
                                                     </div>
@@ -2252,8 +2252,8 @@ export function CircleWalletPage({
                                                                 <div className="flex md:hidden flex-row flex-nowrap items-center justify-between w-full h-[280px] -mt-12 gap-0 relative overflow-visible">
                                                                     {/* Big Swipeable Logo Area (60%) */}
                                                                     <div className="relative w-[60%] h-full flex items-center justify-center overflow-visible group/token z-10">
-                                                                        <button onClick={() => handleSwipeToken('right')} className="absolute left-1 top-[22%] -translate-y-1/2 z-20 p-1.5 text-[#1A6140]"><ChevronLeft size={20} /></button>
-                                                                        <button onClick={() => handleSwipeToken('left')} className="absolute right-1 top-[22%] -translate-y-1/2 z-20 p-1.5 text-[#1A6140]"><ChevronRight size={20} /></button>
+                                                                        <button onClick={() => handleSwipeToken('right')} className="absolute left-1 top-[22%] -translate-y-1/2 z-20 p-1.5 text-[#0E4D30]"><ChevronLeft size={20} /></button>
+                                                                        <button onClick={() => handleSwipeToken('left')} className="absolute right-1 top-[22%] -translate-y-1/2 z-20 p-1.5 text-[#0E4D30]"><ChevronRight size={20} /></button>
 
                                                                         <AnimatePresence mode="wait">
                                                                             <motion.div
@@ -2273,7 +2273,7 @@ export function CircleWalletPage({
                                                                                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[95%] w-36 h-36 pointer-events-none z-0">
                                                                                         <img
                                                                                             src={selectedToken.icon}
-                                                                                            className={`w-full h-full object-contain ${isLight ? 'drop-shadow-[0_0_40px_rgba(0,0,0,0.1)]' : 'drop-shadow-[0_0_40px_rgba(26, 97, 64,0.3)]'}`}
+                                                                                            className={`w-full h-full object-contain ${isLight ? 'drop-shadow-[0_0_40px_rgba(0,0,0,0.1)]' : 'drop-shadow-[0_0_40px_rgba(14,77,48,0.3)]'}`}
                                                                                             style={{ filter: isLight ? 'brightness(0) opacity(40%)' : 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)' }}
                                                                                             alt={selectedToken.symbol}
                                                                                         />
@@ -2301,7 +2301,7 @@ export function CircleWalletPage({
                                                                         </AnimatePresence>
                                                                     </div>
 
-                                                                    <div className="w-[1.5px] h-24 bg-[#1A6140]/40 rounded-full shrink-0 relative z-30 -translate-y-[10vh]" />
+                                                                    <div className="w-[1.5px] h-24 bg-[#0E4D30]/40 rounded-full shrink-0 relative z-30 -translate-y-[10vh]" />
 
                                                                     <div className="w-[38%] flex flex-col gap-1.5 items-center justify-center px-2 relative z-30 -translate-y-[8vh]">
                                                                         {selectedToken.id === 'sol' && !hasSolWallet ? (
@@ -2354,7 +2354,7 @@ export function CircleWalletPage({
                                                                                 </div>
                                                                                 <button
                                                                                     onClick={startFundingFlow}
-                                                                                    className="w-full py-3.5 rounded-full bg-[#1A6140] text-white font-black uppercase text-[9px] tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-xl shadow-[#1A6140]/20 flex items-center justify-center text-center"
+                                                                                    className="w-full py-3.5 rounded-full bg-[#0E4D30] text-white font-black uppercase text-[9px] tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-xl shadow-[#0E4D30]/20 flex items-center justify-center text-center"
                                                                                 >
                                                                                     Fund {selectedToken.symbol}
                                                                                 </button>
@@ -2365,8 +2365,8 @@ export function CircleWalletPage({
 
                                                                 {/* DESKTOP CAROUSEL */}
                                                                 <div className="hidden md:flex relative h-[280px] w-full items-center justify-center overflow-hidden group/token">
-                                                                    <button onClick={() => handleSwipeToken('right')} className="absolute left-[-20px] top-1/2 -translate-y-1/2 z-20 p-2 transition-all active:scale-90 text-[#1A6140]"><ChevronLeft size={36} strokeWidth={2.5} /></button>
-                                                                    <button onClick={() => handleSwipeToken('left')} className="absolute right-[-20px] top-1/2 -translate-y-1/2 z-20 p-2 transition-all active:scale-90 text-[#1A6140]"><ChevronRight size={36} strokeWidth={2.5} /></button>
+                                                                    <button onClick={() => handleSwipeToken('right')} className="absolute left-[-20px] top-1/2 -translate-y-1/2 z-20 p-2 transition-all active:scale-90 text-[#0E4D30]"><ChevronLeft size={36} strokeWidth={2.5} /></button>
+                                                                    <button onClick={() => handleSwipeToken('left')} className="absolute right-[-20px] top-1/2 -translate-y-1/2 z-20 p-2 transition-all active:scale-90 text-[#0E4D30]"><ChevronRight size={36} strokeWidth={2.5} /></button>
 
                                                                     <AnimatePresence mode="wait">
                                                                         <motion.div
@@ -2380,7 +2380,7 @@ export function CircleWalletPage({
                                                                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[70%] w-64 h-64 pointer-events-none z-0">
                                                                                     <img
                                                                                         src={selectedToken.icon}
-                                                                                        className="w-full h-full object-contain drop-shadow-[0_0_80px_rgba(26, 97, 64,0.5)]"
+                                                                                        className="w-full h-full object-contain drop-shadow-[0_0_80px_rgba(14,77,48,0.5)]"
                                                                                         style={{ filter: isLight ? 'brightness(0) opacity(40%)' : 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)' }}
                                                                                         alt={selectedToken.symbol}
                                                                                     />
@@ -2449,7 +2449,7 @@ export function CircleWalletPage({
                                                                             </div>
                                                                             <button
                                                                                 onClick={startFundingFlow}
-                                                                                className="w-auto px-10 py-4 rounded-[20px] bg-[#1A6140] text-white font-black uppercase text-[11px] tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-2xl shadow-[#1A6140]/20 -translate-y-[5.5vh]"
+                                                                                className="w-auto px-10 py-4 rounded-[20px] bg-[#0E4D30] text-white font-black uppercase text-[11px] tracking-widest hover:scale-[1.02] active:scale-[0.95] transition-all shadow-2xl shadow-[#0E4D30]/20 -translate-y-[5.5vh]"
                                                                             >
                                                                                 Fund {fundingType === 'native' ? selectedToken.name : `${selectedToken.name} USDC`}
                                                                             </button>
@@ -2481,17 +2481,17 @@ export function CircleWalletPage({
                                                                         <React.Fragment key={n}>
                                                                             <div className="flex flex-col items-center gap-1 flex-shrink-0">
                                                                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-500 ${
-                                                                                    cctpStep > n ? 'bg-[#1A6140] text-white scale-105' :
-                                                                                    cctpStep === n ? 'bg-[#1A6140] text-white ring-2 ring-[#1A6140]/40 animate-pulse' :
+                                                                                    cctpStep > n ? 'bg-[#0E4D30] text-white scale-105' :
+                                                                                    cctpStep === n ? 'bg-[#0E4D30] text-white ring-2 ring-[#0E4D30]/40 animate-pulse' :
                                                                                     'bg-white/10 text-white/30'
                                                                                 }`}>{n}</div>
                                                                                 <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${
-                                                                                    cctpStep >= n ? 'text-[#1A6140]' : 'text-white/30'
+                                                                                    cctpStep >= n ? 'text-[#0E4D30]' : 'text-white/30'
                                                                                 }`}>{label}</span>
                                                                             </div>
                                                                             {i < arr.length - 1 && (
                                                                                 <div className={`flex-1 h-[1.5px] mb-4 transition-all duration-700 ${
-                                                                                    cctpStep > n ? 'bg-[#1A6140]' : 'bg-white/10'
+                                                                                    cctpStep > n ? 'bg-[#0E4D30]' : 'bg-white/10'
                                                                                 }`} />
                                                                             )}
                                                                         </React.Fragment>
@@ -2523,15 +2523,15 @@ export function CircleWalletPage({
                                                                             placeholder="0.00"
                                                                             value={fundingAmount}
                                                                             onChange={(e) => setFundingAmount(e.target.value)}
-                                                                            className={`w-48 bg-transparent border-b-2 border-[#1A6140]/20 focus:border-[#1A6140] transition-all text-center text-4xl font-black py-4 outline-none text-white`}
+                                                                            className={`w-48 bg-transparent border-b-2 border-[#0E4D30]/20 focus:border-[#0E4D30] transition-all text-center text-4xl font-black py-4 outline-none text-white`}
                                                                         />
-                                                                        <span className="absolute right-0 bottom-4 text-[10px] font-black text-[#1A6140] uppercase">{fundingType === 'usdc' ? 'USDC' : selectedToken.symbol}</span>
+                                                                        <span className="absolute right-0 bottom-4 text-[10px] font-black text-[#0E4D30] uppercase">{fundingType === 'usdc' ? 'USDC' : selectedToken.symbol}</span>
                                                                     </div>
                                                                 </div>
                                                                 <button
                                                                     onClick={handleConfirmFunding}
                                                                     disabled={!fundingAmount}
-                                                                    className={`px-12 py-5 rounded-[24px] font-black uppercase tracking-widest text-xs transition-all ${!fundingAmount ? 'bg-white/5 text-white/20' : 'bg-[#1A6140] text-white shadow-xl shadow-[#1A6140]/20 hover:scale-105 active:scale-95'}`}
+                                                                    className={`px-12 py-5 rounded-[24px] font-black uppercase tracking-widest text-xs transition-all ${!fundingAmount ? 'bg-white/5 text-white/20' : 'bg-[#0E4D30] text-white shadow-xl shadow-[#0E4D30]/20 hover:scale-105 active:scale-95'}`}
                                                                 >
                                                                     Confirm Deposit
                                                                 </button>
@@ -2549,8 +2549,8 @@ export function CircleWalletPage({
                                                                 animate={{ opacity: 1, scale: 1 }}
                                                                 className="w-full h-full flex flex-col items-center justify-center gap-6 py-12"
                                                             >
-                                                                <div className="w-20 h-20 rounded-full bg-[#1A6140]/20 flex items-center justify-center">
-                                                                    <Check size={40} className="text-[#1A6140]" />
+                                                                <div className="w-20 h-20 rounded-full bg-[#0E4D30]/20 flex items-center justify-center">
+                                                                    <Check size={40} className="text-[#0E4D30]" />
                                                                 </div>
                                                                 <div className="text-center">
                                                                     <h3 className="text-2xl font-black uppercase tracking-tighter text-white">Congratulations!</h3>
@@ -2569,7 +2569,7 @@ export function CircleWalletPage({
                                     {walletInfo?.transactions?.map((tx, i) => (
                                         <div key={i} className={`p-8 rounded-[40px] border ${isLight ? 'bg-[#C2D1C9] border-black/5 shadow-sm' : 'bg-[#111] border-white/5'} flex items-center justify-between transition-all hover:scale-[1.01]`}>
                                             <div className="flex items-center gap-5">
-                                                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${tx.type === 'OUTGOING' ? 'bg-orange-500/10 text-orange-500' : 'bg-[#1A6140]/10 text-[#1A6140]'}`}>
+                                                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${tx.type === 'OUTGOING' ? 'bg-orange-500/10 text-orange-500' : 'bg-[#0E4D30]/10 text-[#0E4D30]'}`}>
                                                     {tx.type === 'OUTGOING' ? <Send size={24} /> : <ArrowDownLeft size={24} />}
                                                 </div>
                                                 <div>
@@ -2600,25 +2600,25 @@ export function CircleWalletPage({
                                 </div>
 
                                 <div className="flex flex-col gap-6">
-                                    <div className={`p-4 rounded-2xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border-2 border-[#1A6140]/20`}>
+                                    <div className={`p-4 rounded-2xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border-2 border-[#0E4D30]/20`}>
                                         <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1">Source Wallet</p>
-                                        <p className={`text-sm font-black uppercase ${isLight ? 'text-[#1A6140]' : 'text-white'}`}>{currentWallet.label}</p>
+                                        <p className={`text-sm font-black uppercase ${isLight ? 'text-[#0E4D30]' : 'text-white'}`}>{currentWallet.label}</p>
                                     </div>
 
                                     <div>
                                         <label className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'} block mb-2`}>Recipient Address</label>
-                                        <input type="text" placeholder="0x..." value={destAddress} onChange={(e) => setDestAddress(e.target.value)} className={`w-full py-5 px-6 rounded-2xl ${isLight ? 'bg-black/5 text-black' : 'bg-white/5 text-white'} border-2 border-transparent focus:border-[#1A6140]/30 outline-none text-sm font-bold transition-all`} />
+                                        <input type="text" placeholder="0x..." value={destAddress} onChange={(e) => setDestAddress(e.target.value)} className={`w-full py-5 px-6 rounded-2xl ${isLight ? 'bg-black/5 text-black' : 'bg-white/5 text-white'} border-2 border-transparent focus:border-[#0E4D30]/30 outline-none text-sm font-bold transition-all`} />
                                     </div>
 
                                     <div>
                                         <div className="flex items-center justify-between mb-2">
                                             <label className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>Amount (USDC)</label>
-                                            <button onClick={() => setSendAmount(currentWallet.bal.toFixed(4))} className="text-[10px] font-black text-[#1A6140] uppercase hover:underline">Max Available</button>
+                                            <button onClick={() => setSendAmount(currentWallet.bal.toFixed(4))} className="text-[10px] font-black text-[#0E4D30] uppercase hover:underline">Max Available</button>
                                         </div>
-                                        <input type="number" placeholder="0.00" value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} className={`w-full py-5 px-6 rounded-2xl ${isLight ? 'bg-black/5 text-black' : 'bg-white/5 text-white'} border-2 border-transparent focus:border-[#1A6140]/30 outline-none text-3xl font-black transition-all`} />
+                                        <input type="number" placeholder="0.00" value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} className={`w-full py-5 px-6 rounded-2xl ${isLight ? 'bg-black/5 text-black' : 'bg-white/5 text-white'} border-2 border-transparent focus:border-[#0E4D30]/30 outline-none text-3xl font-black transition-all`} />
                                     </div>
 
-                                    <button onClick={handleSend} disabled={isSending} className="w-full bg-[#1A6140] text-black font-black py-6 rounded-[28px] uppercase tracking-widest mt-2 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-[#1A6140]/20">
+                                    <button onClick={handleSend} disabled={isSending} className="w-full bg-[#0E4D30] text-black font-black py-6 rounded-[28px] uppercase tracking-widest mt-2 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-[#0E4D30]/20">
                                         {isSending ? 'Processing...' : 'Confirm Transfer'}
                                     </button>
                                 </div>
@@ -2636,15 +2636,15 @@ export function CircleWalletPage({
                                 </div>
 
                                 {/* Route: source -> destination */}
-                                <div className={`flex items-center gap-3 mb-7 p-4 rounded-3xl border border-[#1A6140]/25 bg-[#1A6140]/10`}>
+                                <div className={`flex items-center gap-3 mb-7 p-4 rounded-3xl border border-[#0E4D30]/25 bg-[#0E4D30]/10`}>
                                     <div className="flex-1 flex flex-col items-center gap-1.5 text-center">
                                         <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black/60' : 'text-white'}`}>From</span>
-                                        <span className={`text-[11px] font-black uppercase tracking-wider ${isLight ? 'text-[#1A6140]' : 'text-white'}`}>{transferModal === 'deposit' ? 'Main Wallet' : 'Trading Wallet'}</span>
+                                        <span className={`text-[11px] font-black uppercase tracking-wider ${isLight ? 'text-[#0E4D30]' : 'text-white'}`}>{transferModal === 'deposit' ? 'Main Wallet' : 'Trading Wallet'}</span>
                                     </div>
-                                    <Send size={16} className="text-[#1A6140] rotate-[-45deg] shrink-0" />
+                                    <Send size={16} className="text-[#0E4D30] rotate-[-45deg] shrink-0" />
                                     <div className="flex-1 flex flex-col items-center gap-1.5 text-center">
                                         <span className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black/60' : 'text-white'}`}>To</span>
-                                        <span className={`text-[11px] font-black uppercase tracking-wider ${isLight ? 'text-[#1A6140]' : 'text-white'}`}>{transferModal === 'deposit' ? 'Trading Wallet' : 'Main Wallet'}</span>
+                                        <span className={`text-[11px] font-black uppercase tracking-wider ${isLight ? 'text-[#0E4D30]' : 'text-white'}`}>{transferModal === 'deposit' ? 'Trading Wallet' : 'Main Wallet'}</span>
                                     </div>
                                 </div>
 
@@ -2656,11 +2656,11 @@ export function CircleWalletPage({
                                         placeholder="0.00"
                                         value={transferAmount}
                                         onChange={(e) => setTransferAmount(e.target.value)}
-                                        className={`w-full py-5 px-6 rounded-2xl border-2 border-transparent focus:border-[#1A6140]/30 outline-none text-3xl font-black transition-all ${isLight ? 'bg-black/5 text-black placeholder-black/25' : 'bg-white/5 text-white placeholder-white/25'}`}
+                                        className={`w-full py-5 px-6 rounded-2xl border-2 border-transparent focus:border-[#0E4D30]/30 outline-none text-3xl font-black transition-all ${isLight ? 'bg-black/5 text-black placeholder-black/25' : 'bg-white/5 text-white placeholder-white/25'}`}
                                     />
                                     <button
                                         onClick={() => setTransferAmount(String(transferModal === 'deposit' ? (parseFloat(evmBalance || 0) || 0) : (parseFloat(sessionBalance || 0) || 0)))}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-[#1A6140] text-white text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-all"
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-[#0E4D30] text-white text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-all"
                                     >
                                         Max
                                     </button>
@@ -2674,7 +2674,7 @@ export function CircleWalletPage({
                                 <button
                                     onClick={handleInternalTransfer}
                                     disabled={isTransferring}
-                                    className="flex items-center justify-center gap-3 bg-[#1A6140] text-white font-black py-5 rounded-[24px] text-[11px] uppercase tracking-widest transition-all hover:opacity-90 active:scale-[0.97] disabled:opacity-50"
+                                    className="flex items-center justify-center gap-3 bg-[#0E4D30] text-white font-black py-5 rounded-[24px] text-[11px] uppercase tracking-widest transition-all hover:opacity-90 active:scale-[0.97] disabled:opacity-50"
                                 >
                                     {isTransferring ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
                                     {isTransferring ? (transferModal === 'deposit' ? 'Depositing...' : 'Withdrawing...') : (transferModal === 'deposit' ? 'Confirm Deposit' : 'Confirm Withdrawal')}
@@ -2702,7 +2702,7 @@ export function CircleWalletPage({
                                         <>
                                             <img src={qrCodeData} alt="QR Code" className="w-56 h-56 block" />
                                             <button onClick={handleDownloadQR} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all backdrop-blur-[2px]">
-                                                <Download size={32} className="text-[#1A6140] mb-2" />
+                                                <Download size={32} className="text-[#0E4D30] mb-2" />
                                                 <span className="text-[10px] font-black uppercase text-white tracking-widest">Download QR</span>
                                             </button>
                                         </>
@@ -2719,7 +2719,7 @@ export function CircleWalletPage({
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3 w-full">
-                                    <button onClick={() => { navigator.clipboard.writeText(currentWallet.key === 'trading' ? walletInfo?.wallet?.address : address); notify("Copied!", "success"); }} className={`flex items-center justify-center gap-3 bg-[#1A6140] text-white font-black py-5 rounded-[24px] text-[11px] uppercase tracking-widest transition-all`}>
+                                    <button onClick={() => { navigator.clipboard.writeText(currentWallet.key === 'trading' ? walletInfo?.wallet?.address : address); notify("Copied!", "success"); }} className={`flex items-center justify-center gap-3 bg-[#0E4D30] text-white font-black py-5 rounded-[24px] text-[11px] uppercase tracking-widest transition-all`}>
                                         <Copy size={16} /> Copy
                                     </button>
                                     <button onClick={handleDownloadQR} className={`flex items-center justify-center gap-3 ${isLight ? 'bg-black/5' : 'bg-white/5'} border ${isLight ? 'border-black/10' : 'border-white/10'} font-black py-5 rounded-[24px] text-[11px] uppercase tracking-widest transition-all`}>
@@ -2738,8 +2738,8 @@ export function CircleWalletPage({
                                     <ChevronDown size={13} className={`transition-transform ${showChainGuide ? 'rotate-180' : ''}`} />
                                 </button>
                                 {showChainGuide && (
-                                    <div className={`w-full mt-3 p-5 rounded-3xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border border-[#1A6140]/25 text-left`}>
-                                        <p className={`text-[9px] font-black uppercase tracking-widest text-[#1A6140] mb-3`}>Step by step</p>
+                                    <div className={`w-full mt-3 p-5 rounded-3xl ${isLight ? 'bg-black/5' : 'bg-white/5'} border border-[#0E4D30]/25 text-left`}>
+                                        <p className={`text-[9px] font-black uppercase tracking-widest text-[#0E4D30] mb-3`}>Step by step</p>
                                         <ol className="flex flex-col gap-3">
                                             {[
                                                 <>Open a cross-chain swap/bridge that supports <b>USDC</b> — native Circle <b>CCTP-enabled</b> bridges (e.g. Circle's own tools) or any DEX aggregator with a CCTP route are safest, since the USDC moves as native value with no wrapped middle hop.</>,
@@ -2749,7 +2749,7 @@ export function CircleWalletPage({
                                                 <>If your funds sit on a chain without USDC support, swap to USDC first on that chain, then bridge — never send non-USDC tokens to this address.</>
                                             ].map((step, i) => (
                                                 <li key={i} className="flex gap-3">
-                                                    <span className="shrink-0 w-5 h-5 rounded-full bg-[#1A6140] text-white text-[9px] font-black flex items-center justify-center mt-0.5">{i + 1}</span>
+                                                    <span className="shrink-0 w-5 h-5 rounded-full bg-[#0E4D30] text-white text-[9px] font-black flex items-center justify-center mt-0.5">{i + 1}</span>
                                                     <span className={`text-[10px] font-bold leading-relaxed ${isLight ? 'text-black/60' : 'text-white/50'}`}>{step}</span>
                                                 </li>
                                             ))}
@@ -2780,7 +2780,7 @@ export function CircleWalletPage({
                 <div id="qr-capture-container" className="fixed left-[-9999px] top-[-9999px] w-[400px] p-10 flex flex-col items-center justify-center gap-6"
                     style={{ backgroundColor: isLight ? '#ffffff' : '#0a0a0a' }}>
                     <img src={isLight ? "https://15market.com/goblogo.png" : "https://15market.com/gowlogo.png"} className="h-12 w-auto mb-2" alt="Logo" />
-                    <p className={`text-sm italic font-black uppercase tracking-widest ${isLight ? 'text-black' : 'text-[#1A6140]'}`}>15market.com</p>
+                    <p className={`text-sm italic font-black uppercase tracking-widest ${isLight ? 'text-black' : 'text-[#0E4D30]'}`}>15market.com</p>
                     <div className={`p-4 rounded-3xl bg-white shadow-xl`}>
                         <img src={qrCodeData} alt="QR" className="w-64 h-64" />
                     </div>

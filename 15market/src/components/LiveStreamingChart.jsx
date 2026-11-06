@@ -45,7 +45,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
     useEffect(() => { activeTradesRef.current = activeTrades; }, [activeTrades]);
 
     const isLight = theme === 'light';
-    const GREEN = '#1A6140';
+    const GREEN = '#0E4D30';
 
     useEffect(() => {
         const handlePrice = (data) => {
@@ -351,9 +351,9 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.clip();
 
             const fillGrad = ctx.createLinearGradient(0, liveY, 0, H);
-            fillGrad.addColorStop(0.00, isLight ? 'rgba(26, 97, 64, 0.38)' : `${GREEN}60`);
-            fillGrad.addColorStop(0.35, isLight ? 'rgba(26, 97, 64, 0.18)' : `${GREEN}2A`);
-            fillGrad.addColorStop(0.70, isLight ? 'rgba(26, 97, 64, 0.06)' : `${GREEN}0F`);
+            fillGrad.addColorStop(0.00, isLight ? 'rgba(14,77,48, 0.38)' : `${GREEN}60`);
+            fillGrad.addColorStop(0.35, isLight ? 'rgba(14,77,48, 0.18)' : `${GREEN}2A`);
+            fillGrad.addColorStop(0.70, isLight ? 'rgba(14,77,48, 0.06)' : `${GREEN}0F`);
             fillGrad.addColorStop(1.00, isLight ? 'rgba(238, 247, 242, 0)' : 'rgba(13, 30, 21, 0)');
             ctx.fillStyle = fillGrad;
             ctx.fillRect(startX, 0, W + 180 - startX, H + 20);
@@ -365,7 +365,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.lineWidth = 1.5;
             ctx.strokeStyle = isLight ? '#123F28' : GREEN;
             ctx.shadowBlur = 15;
-            ctx.shadowColor = isLight ? 'rgba(30,90,56,0.5)' : 'rgba(26, 97, 64,0.6)';
+            ctx.shadowColor = isLight ? 'rgba(30,90,56,0.5)' : 'rgba(14,77,48,0.6)';
             ctx.moveTo(startX, startY);
             for (let i = firstIdx + 1; i <= lastIdx; i++) {
                 ctx.lineTo(getX(history[i].t), toY(history[i].p));
@@ -422,21 +422,21 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
                     let badgeColor, badgeGlow, resultText, resultColor;
                     if (isSettled) {
-                        badgeColor = isWon ? 'rgba(26, 97, 64,0.95)' : 'rgba(240,76,76,0.95)';
-                        badgeGlow = isWon ? 'rgba(26, 97, 64,0.5)' : 'rgba(240,76,76,0.5)';
+                        badgeColor = isWon ? 'rgba(14,77,48,0.95)' : 'rgba(240,76,76,0.95)';
+                        badgeGlow = isWon ? 'rgba(14,77,48,0.5)' : 'rgba(240,76,76,0.5)';
                         resultText = isWon ? 'WON' : 'LOST';
-                        resultColor = isWon ? '#1A6140' : '#FF7F50';
+                        resultColor = isWon ? '#0E4D30' : '#FF7F50';
                     } else {
-                        badgeColor = isLight ? 'rgba(26, 97, 64,0.92)' : 'rgba(20,71,44,0.92)';
-                        badgeGlow = 'rgba(26, 97, 64,0.35)';
+                        badgeColor = isLight ? 'rgba(14,77,48,0.92)' : 'rgba(20,71,44,0.92)';
+                        badgeGlow = 'rgba(14,77,48,0.35)';
                     }
 
                     if (lineBottom > lineTop) {
                         const lineGlow = ctx.createLinearGradient(entryX - 10, 0, entryX + 10, 0);
                         lineGlow.addColorStop(0, 'transparent');
                         lineGlow.addColorStop(0.5, isSettled
-                            ? (isWon ? 'rgba(26, 97, 64,0.08)' : 'rgba(240,76,76,0.06)')
-                            : (isLight ? 'rgba(26, 97, 64,0.06)' : 'rgba(26, 97, 64,0.04)'));
+                            ? (isWon ? 'rgba(14,77,48,0.08)' : 'rgba(240,76,76,0.06)')
+                            : (isLight ? 'rgba(14,77,48,0.06)' : 'rgba(14,77,48,0.04)'));
                         lineGlow.addColorStop(1, 'transparent');
                         ctx.fillStyle = lineGlow;
                         ctx.fillRect(entryX - 10, lineTop, 20, lineBottom - lineTop);
@@ -446,8 +446,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                         ctx.save();
                         ctx.setLineDash([3, 4]);
                         ctx.strokeStyle = isSettled
-                            ? (isWon ? 'rgba(26, 97, 64,0.5)' : 'rgba(240,76,76,0.4)')
-                            : (isLight ? 'rgba(26, 97, 64,0.45)' : 'rgba(26, 97, 64,0.35)');
+                            ? (isWon ? 'rgba(14,77,48,0.5)' : 'rgba(240,76,76,0.4)')
+                            : (isLight ? 'rgba(14,77,48,0.45)' : 'rgba(14,77,48,0.35)');
                         ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.moveTo(entryX, lineTop);
@@ -469,8 +469,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                     ctx.fillStyle = isSettled ? (isWon ? GREEN : '#F04C4C') : GREEN;
                     ctx.shadowBlur = 8;
                     ctx.shadowColor = isSettled
-                        ? (isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(240,76,76,0.6)')
-                        : 'rgba(26, 97, 64,0.5)';
+                        ? (isWon ? 'rgba(14,77,48,0.6)' : 'rgba(240,76,76,0.6)')
+                        : 'rgba(14,77,48,0.5)';
                     ctx.beginPath();
                     ctx.arc(entryX, entryY, 3.2, 0, Math.PI * 2);
                     ctx.fill();
@@ -487,7 +487,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
                     if (!isSettled) {
                         const pulsePhase = Math.sin(nowPx / 600) * 0.5 + 0.5;
-                        ctx.strokeStyle = `rgba(26, 97, 64,${0.15 + pulsePhase * 0.15})`;
+                        ctx.strokeStyle = `rgba(14,77,48,${0.15 + pulsePhase * 0.15})`;
                         ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.roundRect(badgeX - 2, badgeY - 2, badgeW + 4, badgeH + 4, 10);
@@ -509,8 +509,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                     ctx.fill();
 
                     ctx.strokeStyle = isSettled
-                        ? (isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(240,76,76,0.5)')
-                        : 'rgba(26, 97, 64,0.5)';
+                        ? (isWon ? 'rgba(14,77,48,0.6)' : 'rgba(240,76,76,0.5)')
+                        : 'rgba(14,77,48,0.5)';
                     ctx.lineWidth = 0.5;
                     ctx.beginPath();
                     ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8);
@@ -528,7 +528,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                         ctx.globalAlpha = 1;
                         ctx.translate(entryX, badgeY + badgeH / 2);
                         ctx.shadowBlur = 14 * pulse;
-                        ctx.shadowColor = isWon ? 'rgba(26, 97, 64,0.6)' : 'rgba(255,127,80,0.5)';
+                        ctx.shadowColor = isWon ? 'rgba(14,77,48,0.6)' : 'rgba(255,127,80,0.5)';
                         ctx.fillStyle = resultColor;
                         ctx.font = `900 ${isMobile ? 11 : 13}px Inter, system-ui, sans-serif`;
                         ctx.textAlign = 'center';
@@ -561,7 +561,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
                         const progress = 1 - (remainingMs / (duration * 1000));
                         const handAngle = -Math.PI / 2 + (progress * Math.PI * 2);
-                        ctx.strokeStyle = '#1A6140';
+                        ctx.strokeStyle = '#0E4D30';
                         ctx.lineWidth = 1.4;
                         ctx.beginPath();
                         ctx.moveTo(iconCenterX, iconCenterY);
@@ -578,7 +578,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
                         ctx.restore();
 
                         const textStartX = iconCenterX + iconR + (isMobile ? 3 : 4);
-                        ctx.fillStyle = '#1A6140';
+                        ctx.fillStyle = '#0E4D30';
                         ctx.font = `900 ${isMobile ? 7 : 8}px Inter, system-ui, sans-serif`;
                         ctx.textBaseline = 'top';
                         ctx.fillText('LIVE', textStartX, badgeY + (isMobile ? 5 : 6));
@@ -675,7 +675,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
             ctx.save();
             ctx.setLineDash([2, 4]);
-            ctx.strokeStyle = isLight ? 'rgba(26, 97, 64, 0.25)' : 'rgba(26, 97, 64, 0.35)';
+            ctx.strokeStyle = isLight ? 'rgba(14,77,48, 0.25)' : 'rgba(14,77,48, 0.35)';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, liveY);
@@ -699,8 +699,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.fillText(latestPriceValStr, liveXBoundary + 12, liveY);
 
             const ambientGlow = ctx.createRadialGradient(liveX, liveY, 0, liveX, liveY, isMobile ? 30 : 40);
-            ambientGlow.addColorStop(0, isLight ? 'rgba(26, 97, 64, 0.20)' : 'rgba(26, 97, 64, 0.25)');
-            ambientGlow.addColorStop(0.6, isLight ? 'rgba(26, 97, 64, 0.06)' : 'rgba(26, 97, 64, 0.10)');
+            ambientGlow.addColorStop(0, isLight ? 'rgba(14,77,48, 0.20)' : 'rgba(14,77,48, 0.25)');
+            ambientGlow.addColorStop(0.6, isLight ? 'rgba(14,77,48, 0.06)' : 'rgba(14,77,48, 0.10)');
             ambientGlow.addColorStop(1, 'transparent');
             ctx.fillStyle = ambientGlow;
             ctx.globalCompositeOperation = 'screen';
@@ -711,8 +711,8 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             const glowSize = 10 + pulseSize;
 
             const signalGlow = ctx.createRadialGradient(liveX, liveY, 1, liveX, liveY, glowSize);
-            signalGlow.addColorStop(0, isLight ? 'rgba(26, 97, 64, 0.9)' : `${GREEN}bb`);
-            signalGlow.addColorStop(0.5, isLight ? 'rgba(26, 97, 64, 0.3)' : `${GREEN}30`);
+            signalGlow.addColorStop(0, isLight ? 'rgba(14,77,48, 0.9)' : `${GREEN}bb`);
+            signalGlow.addColorStop(0.5, isLight ? 'rgba(14,77,48, 0.3)' : `${GREEN}30`);
             signalGlow.addColorStop(1, 'transparent');
 
             ctx.beginPath();
@@ -727,7 +727,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
 
             ctx.beginPath();
             ctx.arc(liveX, liveY, 6.5 + (pulseSize * 0.3), 0, Math.PI * 2);
-            ctx.strokeStyle = isLight ? 'rgba(26, 97, 64, 0.25)' : `${GREEN}35`;
+            ctx.strokeStyle = isLight ? 'rgba(14,77,48, 0.25)' : `${GREEN}35`;
             ctx.lineWidth = 1;
             ctx.stroke();
 

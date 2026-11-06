@@ -17,12 +17,12 @@ export default function HelpPage({ onBack, theme, isSmallScreen }) {
     const [openStep, setOpenStep] = useState(0);
     // Desktop: thin green scrollbar visible only while hovering the pane
     const scrollbarCss = `
-        .help-scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(26,97,64,0.45) transparent; }
+        .help-scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(14,77,48,0.45) transparent; }
         .help-scroll::-webkit-scrollbar { width: 10px; }
         .help-scroll::-webkit-scrollbar-track { background: transparent; }
         .help-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 8px; }
-        .help-scroll:hover::-webkit-scrollbar-thumb { background: rgba(26,97,64,0.45); }
-        .help-scroll:hover { scrollbar-color: rgba(26,97,64,0.45) transparent; }
+        .help-scroll:hover::-webkit-scrollbar-thumb { background: rgba(14,77,48,0.45); }
+        .help-scroll:hover { scrollbar-color: rgba(14,77,48,0.45) transparent; }
         .help-scroll::-webkit-scrollbar-corner { background: transparent; }
     `;
 
@@ -101,8 +101,8 @@ export default function HelpPage({ onBack, theme, isSmallScreen }) {
 
             {/* Backdrop */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-                <div className="absolute top-[15%] left-[15%] w-[500px] h-[500px] bg-[#1A6140]/10 rounded-full blur-[130px] opacity-40" />
-                <div className="absolute bottom-[10%] right-[10%] w-[400px] h-[400px] bg-[#1A6140]/10 rounded-full blur-[110px] opacity-30" />
+                <div className="absolute top-[15%] left-[15%] w-[500px] h-[500px] bg-[#0E4D30]/10 rounded-full blur-[130px] opacity-40" />
+                <div className="absolute bottom-[10%] right-[10%] w-[400px] h-[400px] bg-[#0E4D30]/10 rounded-full blur-[110px] opacity-30" />
             </div>
 
             {/* Top bar — aligned with the dashboard header */}
@@ -127,7 +127,7 @@ export default function HelpPage({ onBack, theme, isSmallScreen }) {
                     <img src={isLight ? '/goblogo.png' : '/gowlogo.png'} alt="15market" className="h-10 w-auto" />
                 </div>
                 <div className="w-11 h-11 flex-none flex items-center justify-center">
-                    <LifeBuoy size={17} className="text-[#1A6140]" />
+                    <LifeBuoy size={17} className="text-[#0E4D30]" />
                 </div>
             </header>
 
@@ -143,26 +143,26 @@ export default function HelpPage({ onBack, theme, isSmallScreen }) {
 
                     {/* Heading */}
                     <div className="text-center py-1">
-                        <div className="w-16 h-16 mx-auto rounded-full bg-[#1A6140]/15 border border-[#1A6140]/30 flex items-center justify-center mb-3">
-                            <HelpCircle size={28} className="text-[#1A6140]" />
+                        <div className="w-16 h-16 mx-auto rounded-full bg-[#0E4D30]/15 border border-[#0E4D30]/30 flex items-center justify-center mb-3">
+                            <HelpCircle size={28} className="text-[#0E4D30]" />
                         </div>
                         <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Help &amp; Trading Guide</h1>
                         <p className={`text-[11px] font-bold mt-1 ${faint}`}>How to trade on 15market in four steps — and the answers to the questions everyone asks.</p>
                     </div>
 
                     {/* GUIDE */}
-                    <h2 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#1A6140] px-1">How to trade</h2>
+                    <h2 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0E4D30] px-1">How to trade</h2>
                     {steps.map((s, i) => (
                         <div key={s.n}>
                             <button
                                 onClick={() => setOpenStep(openStep === i ? -1 : i)}
-                                className={`${card} w-full text-left p-4 flex items-center justify-between gap-3 hover:border-[#1A6140]/40 transition-all`}
+                                className={`${card} w-full text-left p-4 flex items-center justify-between gap-3 hover:border-[#0E4D30]/40 transition-all`}
                             >
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <span className="w-7 h-7 rounded-full bg-[#1A6140] text-white text-[11px] font-black flex items-center justify-center flex-none">{s.n}</span>
+                                    <span className="w-7 h-7 rounded-full bg-[#0E4D30] text-white text-[11px] font-black flex items-center justify-center flex-none">{s.n}</span>
                                     <span className="font-black text-[14px] leading-tight min-w-0">{s.title}</span>
                                 </div>
-                                <span className="flex items-center gap-2 flex-none text-[#1A6140]">
+                                <span className="flex items-center gap-2 flex-none text-[#0E4D30]">
                                     {s.icon}
                                     <ChevronDown size={15} className={`transition-transform duration-300 ${openStep === i ? 'rotate-180' : ''}`} />
                                 </span>
@@ -188,16 +188,16 @@ export default function HelpPage({ onBack, theme, isSmallScreen }) {
                     ))}
 
                     {/* FAQ */}
-                    <h2 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#1A6140] px-1 pt-2">Frequently asked</h2>
+                    <h2 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0E4D30] px-1 pt-2">Frequently asked</h2>
                     <div className={`${card} overflow-hidden`}>
                         {faqs.map((f, i) => (
                             <div key={f.q} className={`${i > 0 ? (isLight ? 'border-t border-black/5' : 'border-t border-white/10') : ''}`}>
                                 <button
                                     onClick={() => setOpenFaq(openFaq === i ? -1 : i)}
-                                    className="w-full text-left p-4 flex items-center justify-between gap-3 hover:bg-[#1A6140]/5 transition-colors"
+                                    className="w-full text-left p-4 flex items-center justify-between gap-3 hover:bg-[#0E4D30]/5 transition-colors"
                                 >
                                     <span className="font-black text-[13px] leading-tight pr-2">{f.q}</span>
-                                    <ChevronDown size={15} className={`text-[#1A6140] flex-none transition-transform duration-300 ${openFaq === i ? 'rotate-180' : ''}`} />
+                                    <ChevronDown size={15} className={`text-[#0E4D30] flex-none transition-transform duration-300 ${openFaq === i ? 'rotate-180' : ''}`} />
                                 </button>
                                 <AnimatePresence initial={false}>
                                     {openFaq === i && (
@@ -218,7 +218,7 @@ export default function HelpPage({ onBack, theme, isSmallScreen }) {
 
                     {/* Trust footer */}
                     <div className={`${card} p-4 flex items-center gap-3`}>
-                        <ShieldCheck size={18} className="text-[#1A6140] flex-none" />
+                        <ShieldCheck size={18} className="text-[#0E4D30] flex-none" />
                         <p className={`text-[11px] font-bold leading-relaxed ${faint}`}>
                             Every trade is committed on-chain and settles automatically against the price feed it was opened on. No manual intervention, no hidden rules.
                         </p>

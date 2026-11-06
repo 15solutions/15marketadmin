@@ -32,16 +32,16 @@ import { CountrySelect } from './CountrySelect';
  */
 const inputCls = (isLight) => `w-full py-4 px-6 rounded-2xl border outline-none text-lg font-black transition-all placeholder:opacity-30 ${
     isLight
-        ? 'bg-gray-50 border-gray-200 text-black focus:border-[#1A6140]'
-        : 'bg-white/5 border-white/10 text-white focus:border-[#1A6140]'
+        ? 'bg-gray-50 border-gray-200 text-black focus:border-[#0E4D30]'
+        : 'bg-white/5 border-white/10 text-white focus:border-[#0E4D30]'
 }`;
 
-const btnPrimary = 'w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#1A6140] text-white shadow-xl hover:brightness-110 active:scale-[0.98] disabled:opacity-40';
+const btnPrimary = 'w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#0E4D30] text-white shadow-xl hover:brightness-110 active:scale-[0.98] disabled:opacity-40';
 
 const btnGhost = (isLight) => `w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 border active:scale-[0.98] disabled:opacity-40 ${
     isLight
-        ? 'bg-white border-gray-200 text-[#0a261a] hover:border-[#1A6140] shadow-sm'
-        : 'bg-white/5 border-white/10 text-white hover:border-[#1A6140]/60'
+        ? 'bg-white border-gray-200 text-[#0a261a] hover:border-[#0E4D30] shadow-sm'
+        : 'bg-white/5 border-white/10 text-white hover:border-[#0E4D30]/60'
 }`;
 
 const stepAnim = {
@@ -72,7 +72,7 @@ function UsernameStatus({ value, check, isLight }) {
         return <div className={`${base} text-[#EF5350]`}>That username is taken.</div>;
     }
     if (check.state === 'free') {
-        return <div className={`${base} text-[#1A6140]`}>Available ✓</div>;
+        return <div className={`${base} text-[#0E4D30]`}>Available ✓</div>;
     }
     return <div className={`${base} ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>6–20 letters or numbers — no special characters.</div>;
 }
@@ -609,9 +609,9 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                     key={i}
                                     className={`h-2 rounded-full transition-all duration-300 ${
                                         i < markers.index
-                                            ? 'w-2 bg-[#1A6140]'
+                                            ? 'w-2 bg-[#0E4D30]'
                                             : i === markers.index
-                                              ? 'w-6 bg-[#1A6140]'
+                                              ? 'w-6 bg-[#0E4D30]'
                                               : `w-2 ${isLight ? 'bg-black/15' : 'bg-white/15'}`
                                     }`}
                                 />
@@ -702,7 +702,7 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                         aria-checked={acceptedPolicies}
                                         className="w-full flex items-start gap-3 text-left mt-1 px-1"
                                     >
-                                        <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${acceptedPolicies ? 'bg-[#1A6140] border-[#1A6140]' : (isLight ? 'border-gray-300' : 'border-white/20')}`}>
+                                        <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${acceptedPolicies ? 'bg-[#0E4D30] border-[#0E4D30]' : (isLight ? 'border-gray-300' : 'border-white/20')}`}>
                                             {acceptedPolicies && <Check size={14} className="text-white" strokeWidth={3.5} />}
                                         </span>
                                         <span className={`text-[11px] font-bold leading-relaxed ${isLight ? 'text-[#0a261a]/60' : 'text-white/50'}`}>
@@ -733,9 +733,9 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                             aria-label={`Digit ${i + 1}`}
                                             className={`w-11 h-14 text-center text-xl font-black rounded-2xl border outline-none transition-all ${
                                                 isLight
-                                                    ? 'bg-gray-50 border-gray-200 text-black focus:border-[#1A6140]'
-                                                    : 'bg-white/5 border-white/10 text-white focus:border-[#1A6140]'
-                                            } ${code[i] ? (isLight ? 'border-[#1A6140]/60' : 'border-[#1A6140]/60') : ''}`}
+                                                    ? 'bg-gray-50 border-gray-200 text-black focus:border-[#0E4D30]'
+                                                    : 'bg-white/5 border-white/10 text-white focus:border-[#0E4D30]'
+                                            } ${code[i] ? (isLight ? 'border-[#0E4D30]/60' : 'border-[#0E4D30]/60') : ''}`}
                                         />
                                     ))}
                                 </div>
@@ -750,7 +750,7 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                                     } else {
                                         handleSendCode();
                                     }
-                                }} disabled={busy !== null} className="text-[11px] font-black uppercase tracking-widest text-[#1A6140] mt-3">Resend code</button>
+                                }} disabled={busy !== null} className="text-[11px] font-black uppercase tracking-widest text-[#0E4D30] mt-3">Resend code</button>
                             </motion.div>
                         )}
 
@@ -847,15 +847,15 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                         {/* ── Finale: trading wallet assigned ── */}
                         {step === 'finale' && (
                             <motion.div key="finale" {...stepAnim} className="w-full flex flex-col items-center">
-                                <div className="w-14 h-14 rounded-full bg-[#1A6140]/15 border border-[#1A6140]/30 flex items-center justify-center mb-4">
-                                    <Check size={26} className="text-[#1A6140]" strokeWidth={3} />
+                                <div className="w-14 h-14 rounded-full bg-[#0E4D30]/15 border border-[#0E4D30]/30 flex items-center justify-center mb-4">
+                                    <Check size={26} className="text-[#0E4D30]" strokeWidth={3} />
                                 </div>
                                 <h1 className={`text-2xl font-black uppercase tracking-tighter text-center ${isLight ? 'text-[#0a261a]' : 'text-white'}`}>Trading wallet assigned</h1>
                                 <p className={`text-xs font-bold uppercase tracking-widest mt-2 mb-4 text-center ${isLight ? 'text-[#0a261a]/50' : 'text-white/40'}`}>
                                     {method === 'wallet' ? 'Main + trading wallets ready' : 'Your only wallet — fund it to play'}
                                 </p>
                                 {assignedWallet && (
-                                    <div className={`w-full p-4 rounded-2xl border text-center mb-4 ${isLight ? 'bg-black/5 border-[#1A6140]/20' : 'bg-white/5 border-white/10'}`}>
+                                    <div className={`w-full p-4 rounded-2xl border text-center mb-4 ${isLight ? 'bg-black/5 border-[#0E4D30]/20' : 'bg-white/5 border-white/10'}`}>
                                         <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>Trading wallet</div>
                                         <div className={`text-sm font-mono font-bold break-all ${isLight ? 'text-[#0a261a]' : 'text-white/90'}`}>{assignedWallet}</div>
                                     </div>
@@ -866,7 +866,7 @@ export function BrandedAuthPage({ theme, onClose, onAuthenticated, initialStep }
                     </AnimatePresence>
 
                     {notice && step === 'login' && (
-                        <div className={`w-full mt-4 px-4 py-3 rounded-2xl border text-xs font-bold text-center ${isLight ? 'bg-[#1A6140]/10 border-[#1A6140]/30 text-[#0a261a]' : 'bg-[#1A6140]/10 border-[#1A6140]/30 text-white/80'}`}>
+                        <div className={`w-full mt-4 px-4 py-3 rounded-2xl border text-xs font-bold text-center ${isLight ? 'bg-[#0E4D30]/10 border-[#0E4D30]/30 text-[#0a261a]' : 'bg-[#0E4D30]/10 border-[#0E4D30]/30 text-white/80'}`}>
                             {notice}
                         </div>
                     )}

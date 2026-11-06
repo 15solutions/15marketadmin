@@ -21,7 +21,7 @@ export function ThemeToggle({ theme, onToggle, compact = false }) {
                 relative rounded-full overflow-hidden border transition-all duration-500 ${track}
                 ${isDark
                     ? 'bg-black/40 border-white/10 shadow-[inner_0_2px_10px_rgba(0,0,0,0.5)]'
-                    : 'bg-[#e6f4ed] border-[#1A6140]/20 shadow-[inner_0_2px_10px_rgba(26, 97, 64,0.1)]'}
+                    : 'bg-[#e6f4ed] border-[#0E4D30]/20 shadow-[inner_0_2px_10px_rgba(14,77,48,0.1)]'}
             `}
             whileHover={{ scale: compact ? 1.06 : 1.02 }}
             whileTap={{ scale: 0.94 }}
@@ -37,14 +37,14 @@ export function ThemeToggle({ theme, onToggle, compact = false }) {
                     transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
                     style={{ display: 'inline-flex' }}
                 >
-                    <Sun size={iconSize} className={`${isDark ? 'text-white/20' : 'text-[#1A6140]'} transition-colors duration-500`} />
+                    <Sun size={iconSize} className={`${isDark ? 'text-white/20' : 'text-[#0E4D30]'} transition-colors duration-500`} />
                 </motion.div>
                 <motion.div
                     animate={{ y: [0, -2, 0, 1, 0], rotate: [-5, 5, -3, 3, 0] }}
                     transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
                     style={{ display: 'inline-flex' }}
                 >
-                    <Moon size={iconSize} className={`${isDark ? 'text-[#1A6140]' : 'text-black/10'} transition-colors duration-500`} />
+                    <Moon size={iconSize} className={`${isDark ? 'text-[#0E4D30]' : 'text-black/10'} transition-colors duration-500`} />
                 </motion.div>
             </div>
 
@@ -52,13 +52,13 @@ export function ThemeToggle({ theme, onToggle, compact = false }) {
             <motion.div
                 className={`
                     absolute rounded-full shadow-lg flex items-center justify-center ${thumb}
-                    ${isDark ? 'bg-[#1A6140]' : 'bg-[#1A6140]'}
+                    ${isDark ? 'bg-[#0E4D30]' : 'bg-[#0E4D30]'}
                 `}
                 animate={{
                     x: isDark ? travel : 0,
                     boxShadow: isDark
-                        ? '0 0 15px rgba(26, 97, 64, 0.5), inset 0 0 10px rgba(255,255,255,0.4)'
-                        : '0 0 10px rgba(26, 97, 64, 0.3), inset 0 0 10px rgba(255,255,255,0.4)'
+                        ? '0 0 15px rgba(14,77,48, 0.5), inset 0 0 10px rgba(255,255,255,0.4)'
+                        : '0 0 10px rgba(14,77,48, 0.3), inset 0 0 10px rgba(255,255,255,0.4)'
                 }}
                 transition={{
                     type: "spring",
@@ -81,7 +81,7 @@ export function ThemeToggle({ theme, onToggle, compact = false }) {
             {/* Neon Pulse Line (Hidden in Light Mode) */}
             {isDark && (
                 <motion.div
-                    className="absolute bottom-0 left-0 h-[1px] bg-[#1A6140] opacity-50"
+                    className="absolute bottom-0 left-0 h-[1px] bg-[#0E4D30] opacity-50"
                     initial={{ width: 0 }}
                     animate={{ width: '100%' }}
                     transition={{ duration: 2, repeat: Infinity }}

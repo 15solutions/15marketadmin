@@ -22,7 +22,7 @@ export function ModeSwitch({ theme, mode = 'classic', onChange }) {
             aria-label="Game mode"
             className={`relative h-10 w-20 rounded-full overflow-hidden border transition-all duration-500 ${
                 isLight
-                    ? 'bg-[#e6f4ed] border-[#1A6140]/20'
+                    ? 'bg-[#e6f4ed] border-[#0E4D30]/20'
                     : 'bg-black/40 border-white/10'
             }`}
         >
@@ -30,10 +30,10 @@ export function ModeSwitch({ theme, mode = 'classic', onChange }) {
 
             {/* Green pill under the active side */}
             <motion.div
-                className="absolute top-1 left-1 bottom-1 w-8 rounded-full bg-[#1A6140] pointer-events-none"
+                className="absolute top-1 left-1 bottom-1 w-8 rounded-full bg-[#0E4D30] pointer-events-none"
                 animate={{
                     x: isLadders ? 40 : 0,
-                    boxShadow: '0 0 12px rgba(26, 97, 64, 0.45), inset 0 0 10px rgba(255,255,255,0.35)',
+                    boxShadow: '0 0 12px rgba(14,77,48, 0.45), inset 0 0 10px rgba(255,255,255,0.35)',
                 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             />
@@ -55,7 +55,7 @@ export function ModeSwitch({ theme, mode = 'classic', onChange }) {
                                 className={`transition-colors duration-300 ${
                                     active
                                         ? 'text-white'
-                                        : (isLight ? 'text-[#1A6140]/45' : 'text-white/30')
+                                        : (isLight ? 'text-[#0E4D30]/45' : 'text-white/30')
                                 }`}
                             />
                         </button>

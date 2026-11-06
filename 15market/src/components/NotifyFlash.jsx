@@ -116,7 +116,7 @@ export default function NotifyFlash({ message, kind = 'success', onClick, onClos
             <div
                 onClick={dismiss}
                 className="md:hidden absolute inset-0 flex items-center justify-center"
-                style={{ backgroundColor: isLight ? '#1A6140' : '#050505' }}
+                style={{ backgroundColor: isLight ? '#0E4D30' : '#050505' }}
             >
                 {/* Branded background texture — the same carbon-fibre weave
                     the loading modal wears, same opacity, both modes. */}

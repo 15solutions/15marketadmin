@@ -12,10 +12,10 @@ function Toast({ message, type = 'success', onClose, onClick, isSmallScreen }) {
     }, [onClose]);
 
     const palette = {
-        success: { bg: '#1A6140' },
+        success: { bg: '#0E4D30' },
         error: { bg: '#FF4D4D' },
-        pending: { bg: '#1A6140' },
-        info: { bg: '#1A6140' },
+        pending: { bg: '#0E4D30' },
+        info: { bg: '#0E4D30' },
     };
     const config = palette[type] || palette.success;
     const isSuccess = type === 'success';

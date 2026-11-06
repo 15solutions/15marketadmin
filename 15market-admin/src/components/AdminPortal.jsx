@@ -261,8 +261,8 @@ export function AdminPortal({ onBack, notify }) {
     const ink = isLight ? 'text-[#0a261a]' : 'text-white';
     const inkSoft = isLight ? 'text-[#0a261a]/50' : 'text-white/40';
     const inputCls = `w-full py-4 px-6 rounded-2xl border outline-none text-lg font-black transition-all placeholder:opacity-30 tracking-normal ${
-        isLight ? 'bg-gray-50 border-gray-200 text-[#0a261a] focus:border-[#1A6140] focus:shadow-[0_0_20px_-6px_rgba(26,97,64,0.4)]'
-                : 'bg-white/5 border-white/10 text-white focus:border-[#1A6140] focus:shadow-[0_0_20px_-6px_rgba(26,97,64,0.45)]'
+        isLight ? 'bg-gray-50 border-gray-200 text-[#0a261a] focus:border-[#0E4D30] focus:shadow-[0_0_20px_-6px_rgba(14,77,48,0.4)]'
+                : 'bg-white/5 border-white/10 text-white focus:border-[#0E4D30] focus:shadow-[0_0_20px_-6px_rgba(14,77,48,0.45)]'
     }`;
     const stepAnim = { initial: { opacity: 0, x: 24 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -24 }, transition: { duration: 0.2 } };
 
@@ -281,8 +281,8 @@ export function AdminPortal({ onBack, notify }) {
 
             {/* Ambient green glow — mirrors the user app's background flair */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className={`absolute top-[-12%] right-[-8%] w-[520px] h-[520px] rounded-full blur-[130px] ${isLight ? 'bg-[#1A6140]/10' : 'bg-[#1A6140]/8'}`} />
-                <div className={`absolute bottom-[-12%] left-[-8%] w-[520px] h-[520px] rounded-full blur-[130px] ${isLight ? 'bg-[#1A6140]/6' : 'bg-[#1A6140]/5'}`} />
+                <div className={`absolute top-[-12%] right-[-8%] w-[520px] h-[520px] rounded-full blur-[130px] ${isLight ? 'bg-[#0E4D30]/10' : 'bg-[#0E4D30]/8'}`} />
+                <div className={`absolute bottom-[-12%] left-[-8%] w-[520px] h-[520px] rounded-full blur-[130px] ${isLight ? 'bg-[#0E4D30]/6' : 'bg-[#0E4D30]/5'}`} />
             </div>
 
             {/* Top bar — spacer only; back button removed from auth page */}
@@ -305,17 +305,17 @@ export function AdminPortal({ onBack, notify }) {
                                     src={isLight ? '/goblogo.png' : '/gowlogo.png'}
                                     alt="15market"
                                     className="h-[40px] w-[140px] object-cover object-center flex-none md:h-[46px] md:w-[160px]"
-                                    style={{ filter: 'drop-shadow(0 0 26px rgba(26,97,64,0.45))' }}
+                                    style={{ filter: 'drop-shadow(0 0 26px rgba(14,77,48,0.45))' }}
                                 />
                                 <span className={`w-px h-10 flex-none ${isLight ? 'bg-black/15' : 'bg-white/20'}`} />
-                                <span className="text-[11px] font-black uppercase tracking-[0.35em] text-[#1A6140] flex-none">Admin</span>
+                                <span className="text-[11px] font-black uppercase tracking-[0.35em] text-[#0E4D30] flex-none">Admin</span>
                             </div>
 
                             <div className="w-full flex flex-col gap-3">
                                 {needsBootstrap ? (
                                     <>
                                         {bootMsg && (
-                                            <div className={`w-full flex items-start gap-2 p-3 rounded-2xl text-xs font-bold ${bootMsg.type === 'ok' ? 'bg-[#1A6140]/10 text-[#1A6140]' : 'bg-red-500/10 text-red-400'} shadow-[0_0_25px_-12px_rgba(0,0,0,0.5)]`}>
+                                            <div className={`w-full flex items-start gap-2 p-3 rounded-2xl text-xs font-bold ${bootMsg.type === 'ok' ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-red-500/10 text-red-400'} shadow-[0_0_25px_-12px_rgba(0,0,0,0.5)]`}>
                                                 {bootMsg.type === 'ok' ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" /> : <AlertTriangle size={14} className="mt-0.5 shrink-0" />}
                                                 {bootMsg.text}
                                             </div>
@@ -340,7 +340,7 @@ export function AdminPortal({ onBack, notify }) {
                                         <button
                                             onClick={handleBootstrap}
                                             disabled={busy === 'bootstrap' || !bootEmail.trim() || bootPassword.length < 8 || !(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/.test(bootPassword))}
-                                            className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#1A6140] text-white shadow-[0_0_35px_-8px_rgba(26,97,64,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
+                                            className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#0E4D30] text-white shadow-[0_0_35px_-8px_rgba(14,77,48,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
                                         >
                                             {busy === 'bootstrap' ? <Loader2 size={18} className="animate-spin" /> : <><UserPlus size={18} /> Continue</>}
                                         </button>
@@ -355,13 +355,13 @@ export function AdminPortal({ onBack, notify }) {
                                             target, one spaced code input,
                                             verify primary, resend cooldown. */}
                                         <div className="flex items-center justify-center mb-1">
-                                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${isLight ? 'bg-[#1A6140]/10' : 'bg-[#1A6140]/25'}`}>
-                                                <Shield size={22} className="text-[#1A6140]" />
+                                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${isLight ? 'bg-[#0E4D30]/10' : 'bg-[#0E4D30]/25'}`}>
+                                                <Shield size={22} className="text-[#0E4D30]" />
                                             </div>
                                         </div>
                                         <p className="text-lg font-black text-center">Two-Step Verification</p>
                                         <p className={`text-[11px] font-bold text-center leading-relaxed -mt-2 ${inkSoft}`}>
-                                            A 6-digit code was emailed to <span className="text-[#1A6140]">{otpStage.maskedEmail}</span>. It expires in 10 minutes.
+                                            A 6-digit code was emailed to <span className="text-[#0E4D30]">{otpStage.maskedEmail}</span>. It expires in 10 minutes.
                                         </p>
                                         {otpError && (
                                             <div className="w-full flex items-start gap-2 p-3 rounded-2xl bg-red-500/10 text-red-400 text-xs font-bold shadow-[0_0_25px_-12px_rgba(0,0,0,0.5)]">
@@ -381,7 +381,7 @@ export function AdminPortal({ onBack, notify }) {
                                         <button
                                             onClick={handleVerifyOtp}
                                             disabled={busy === 'otp' || otpCode.length !== 6}
-                                            className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#1A6140] text-white shadow-[0_0_35px_-8px_rgba(26,97,64,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
+                                            className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#0E4D30] text-white shadow-[0_0_35px_-8px_rgba(14,77,48,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
                                         >
                                             {busy === 'otp' ? <Loader2 size={18} className="animate-spin" /> : <><Lock size={18} /> Verify code</>}
                                         </button>
@@ -427,7 +427,7 @@ export function AdminPortal({ onBack, notify }) {
                                         <button
                                             onClick={handleLogin}
                                             disabled={busy === 'login' || !email.trim() || !password}
-                                            className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#1A6140] text-white shadow-[0_0_35px_-8px_rgba(26,97,64,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
+                                            className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#0E4D30] text-white shadow-[0_0_35px_-8px_rgba(14,77,48,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
                                         >
                                             {busy === 'login' ? <Loader2 size={18} className="animate-spin" /> : <><Lock size={18} /> Sign in</>}
                                         </button>
@@ -449,7 +449,7 @@ function FullScreenSpinner({ isLight, label, standalone = false }) {
             className={`${standalone ? 'fixed inset-0 z-[600]' : 'min-h-screen w-full'} flex items-center justify-center ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}
         >
             <div className="flex flex-col items-center gap-4">
-                <div className="w-14 h-14 rounded-3xl bg-[#1A6140] flex items-center justify-center shadow-[0_0_45px_-8px_rgba(26,97,64,0.65)]">
+                <div className="w-14 h-14 rounded-3xl bg-[#0E4D30] flex items-center justify-center shadow-[0_0_45px_-8px_rgba(14,77,48,0.65)]">
                     <Loader2 size={22} className="animate-spin text-white" />
                 </div>
                 <p className={`text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-[#0a261a]/40' : 'text-white/40'}`}>{label}</p>

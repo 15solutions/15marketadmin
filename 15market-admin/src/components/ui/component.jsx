@@ -66,7 +66,7 @@ const SCHEMES = {
         tint: { color: BRAND, mode: "color-dodge" },
         theta: 0.2,
         baseTilt: 0.2,
-        halo: "#1A6140",
+        halo: "#0E4D30",
         haloRing: "#F4F7F5",
     },
 };

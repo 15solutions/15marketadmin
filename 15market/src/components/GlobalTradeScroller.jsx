@@ -225,7 +225,7 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
     const inkSoftClass = isLight ? 'text-white/70' : 'text-black/70';
 
     return (
-        <div ref={stripRef} className={`w-full ${isV1 ? 'h-5 md:h-6 lg:h-10 ' + v1Bg : 'h-7 md:h-7 lg:h-10 bg-[#1A6140]'} relative z-[45] overflow-hidden`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+        <div ref={stripRef} className={`w-full ${isV1 ? 'h-5 md:h-6 lg:h-10 ' + v1Bg : 'h-7 md:h-7 lg:h-10 bg-[#0E4D30]'} relative z-[45] overflow-hidden`} style={{ fontFamily: '"Comfortaa", cursive' }}>
             {/* Smooth Transition Layer for Broadcasts */}
             <AnimatePresence mode="wait">
                 {activeBroadcast ? (
@@ -277,10 +277,10 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
                                         width: 72,
                                         background: isV1
                                             ? `linear-gradient(to right, ${isLight ? '#ffffff' : '#0a0a0a'} 0%, ${isLight ? '#ffffff' : '#0a0a0a'} 40%, rgba(0,0,0,0) 100%)`
-                                            : 'linear-gradient(to right, #1A6140 0%, #1A6140 40%, rgba(26,97,64,0) 100%)'
+                                            : 'linear-gradient(to right, #0E4D30 0%, #0E4D30 40%, rgba(14,77,48,0) 100%)'
                                     }}
                                 />
-                                <div className={`absolute right-0 top-0 bottom-0 w-16 z-[5] bg-gradient-to-l pointer-events-none ${isV1 ? (isLight ? 'from-white' : 'from-[#0a0a0a]') : 'from-[#1A6140]'}`} />
+                                <div className={`absolute right-0 top-0 bottom-0 w-16 z-[5] bg-gradient-to-l pointer-events-none ${isV1 ? (isLight ? 'from-white' : 'from-[#0a0a0a]') : 'from-[#0E4D30]'}`} />
                             </>
                         )}
 
