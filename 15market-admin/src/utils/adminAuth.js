@@ -58,6 +58,9 @@ export async function loginWithPassword(email, password) {
         const msg = data.error_description || data.error || data.msg || 'Invalid email or password';
         throw new Error(String(msg).replace(/^Invalid login credentials$/i, 'Invalid email or password'));
     }
+    // TWO-FACTOR: a correct password now stops at the email-code challenge.
+    // The session stays server-held until /admin/auth/otp/verify confirms it.
+    if (data.requires2fa && data.challengeId) return data;
     // Never persist a token-less session: it would pass the login step and then
     // fail silently on the first authenticated call.
     if (!(data.session?.access_token || data.access_token)) {
@@ -69,6 +72,59 @@ export async function loginWithPassword(email, password) {
         expiresAt: Date.now() + (data.session?.expires_in || data.expires_in || 3600) * 1000,
         email: data.user?.email || ''
     });
+    return data;
+}
+
+/**
+ * Second factor — POST the emailed code. Success releases the held session
+ * and persists it exactly like a plain login would.
+ */
+export async function verifyAdminOtp(challengeId, code) {
+    let res;
+    try {
+        res = await fetch(`${KEEPER_URL_ARC}/admin/auth/otp/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ challengeId, code }),
+            signal: AbortSignal.timeout(15000),
+        });
+    } catch (e) {
+        throw new Error('Could not reach the verification gateway. Try again.');
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        const err = new Error(data.error || 'Wrong code');
+        err.attemptsLeft = data.attemptsLeft;
+        err.exhausted = data.exhausted;
+        throw err;
+    }
+    if (!(data.session?.access_token || data.access_token)) {
+        throw new Error('Verification succeeded but no session was returned. Please try again.');
+    }
+    saveSession({
+        accessToken: data.session?.access_token || data.access_token,
+        refreshToken: data.session?.refresh_token || data.refresh_token,
+        expiresAt: Date.now() + (data.session?.expires_in || data.expires_in || 3600) * 1000,
+        email: data.user?.email || ''
+    });
+    return data;
+}
+
+/** Fresh code to the same mailbox (30s cooldown enforced server-side). */
+export async function resendAdminOtp(challengeId) {
+    let res;
+    try {
+        res = await fetch(`${KEEPER_URL_ARC}/admin/auth/otp/resend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ challengeId }),
+            signal: AbortSignal.timeout(15000),
+        });
+    } catch (e) {
+        throw new Error('Could not reach the verification gateway. Try again.');
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not resend the code');
     return data;
 }
 

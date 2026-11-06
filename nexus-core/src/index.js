@@ -274,6 +274,19 @@ app.delete('/admin/auth/admins/:id', requireRoot, handleAdminDelete);
  * failure in 10 minutes flags the IP for blocking, and a success clears the
  * window and writes an audit event.
  */
+/**
+ * ADMIN EMAIL 2FA — after a correct password, sign-in pauses at a second
+ * factor: a 6-digit OTP is emailed to the admin and the session is held
+ * hostage until the code confirms. Challenges live in memory only (a restart
+ * invalidates pending ones — worst case the admin signs in again) with a
+ * 10-minute lifetime, a 5-attempt cap and a 30s resend cooldown. Wrong codes
+ * count into the SAME SIEM brute-force window as wrong passwords.
+ */
+const crypto2fa = require('crypto');
+const adminOtpChallenges = new Map(); // challengeId -> { email, code, attempts, expiresAt, lastResend, session, user }
+const ADMIN_OTP_TTL = 10 * 60 * 1000;
+const ADMIN_OTP_MAX_ATTEMPTS = 5;
+
 app.post('/admin/auth/login', async (req, res) => {
     const ip = clientIP(req);
     if (siem.isBlocked(ip)) return res.status(403).json({ error: 'Access blocked by platform security' });
@@ -300,13 +313,6 @@ app.post('/admin/auth/login', async (req, res) => {
             });
         }
         siem.clearFailures(ip);
-        siem.addEvent({
-            type: 'ADMIN_LOGIN',
-            severity: 'info',
-            message: `Admin signed in`,
-            ip,
-            meta: { email: maskEmail }
-        });
         // Supabase's password grant returns the session FLAT ({ access_token,
         // refresh_token, expires_in, user, ... }) — there is no nested `session`
         // key. Re-shape it so the portal receives the tokens it stores.
@@ -320,10 +326,116 @@ app.post('/admin/auth/login', async (req, res) => {
         if (!session.access_token) {
             return res.status(502).json({ error: 'Authentication upstream returned no session' });
         }
-        return res.json({ user: data.user, session });
+
+        // TWO-FACTOR: hold the verified session in the challenge — it is not
+        // released until the emailed code proves control of the admin mailbox.
+        const adminEmail = String(email).trim().toLowerCase();
+        const code = crypto2fa.randomInt(100000, 1000000).toString();
+        const challengeId = crypto2fa.randomBytes(18).toString('hex');
+        const challenge = {
+            email: adminEmail,
+            code,
+            attempts: 0,
+            expiresAt: Date.now() + ADMIN_OTP_TTL,
+            lastResend: Date.now(),
+            session,
+            user: data.user
+        };
+        try {
+            await notificationService.sendOtpEmail(adminEmail, code);
+        } catch (e) {
+            console.warn(`[Admin2FA] OTP email failed for ${maskEmail}: ${e.message}`);
+        }
+        adminOtpChallenges.set(challengeId, challenge);
+        if (adminOtpChallenges.size > 100) {
+            for (const [k, v] of adminOtpChallenges) {
+                if (Date.now() >= v.expiresAt) adminOtpChallenges.delete(k);
+            }
+        }
+        siem.addEvent({
+            type: 'ADMIN_2FA_CHALLENGED',
+            severity: 'info',
+            message: `Password verified — email code sent. Awaiting second factor.`,
+            ip,
+            meta: { email: maskEmail }
+        });
+        return res.json({ requires2fa: true, challengeId, maskedEmail: maskEmail });
     } catch (e) {
         return res.status(502).json({ error: 'Authentication upstream unreachable', detail: e.message });
     }
+});
+
+/**
+ * POST /admin/auth/otp/verify { challengeId, code } — the second factor.
+ * Success releases the held session exactly as the login route used to.
+ */
+app.post('/admin/auth/otp/verify', async (req, res) => {
+    const ip = clientIP(req);
+    if (siem.isBlocked(ip)) return res.status(403).json({ error: 'Access blocked by platform security' });
+    const { challengeId, code } = req.body || {};
+    const ch = adminOtpChallenges.get(String(challengeId || ''));
+    if (!ch) return res.status(401).json({ error: 'This verification request expired. Please sign in again.', exhausted: true });
+    if (Date.now() >= ch.expiresAt) {
+        adminOtpChallenges.delete(String(challengeId));
+        return res.status(401).json({ error: 'The code expired (10 minutes). Please sign in again.', exhausted: true });
+    }
+    const maskEmail = String(ch.email).replace(/^(.{2}).*(@.*)$/, '$1***$2');
+    const norm = String(code || '').replace(/\D/g, '');
+    if (norm.length !== 6 || norm !== ch.code) {
+        ch.attempts += 1;
+        siem.trackAdminAuthFailure(ip, { email: maskEmail, via: '/admin/auth/otp/verify' });
+        const attemptsLeft = Math.max(0, ADMIN_OTP_MAX_ATTEMPTS - ch.attempts);
+        if (attemptsLeft === 0) {
+            adminOtpChallenges.delete(String(challengeId));
+            return res.status(401).json({ error: 'Too many wrong codes. Please sign in again.', exhausted: true });
+        }
+        return res.status(401).json({ error: attemptsLeft === 4 ? 'Wrong code — check the newest email.' : `Wrong code. ${attemptsLeft} tries left.`, attemptsLeft });
+    }
+
+    // The email box is proven — release the held session and audit.
+    adminOtpChallenges.delete(String(challengeId));
+    siem.clearFailures(ip);
+    siem.addEvent({
+        type: 'ADMIN_LOGIN',
+        severity: 'info',
+        message: 'Admin signed in (second factor confirmed)',
+        ip,
+        meta: { email: maskEmail }
+    });
+    return res.json({ user: ch.user, session: ch.session });
+});
+
+/**
+ * POST /admin/auth/otp/resend { challengeId } — fresh code to the same
+ * mailbox; 30s cooldown per challenge to keep the mailbox readable.
+ */
+app.post('/admin/auth/otp/resend', async (req, res) => {
+    const ip = clientIP(req);
+    if (siem.isBlocked(ip)) return res.status(403).json({ error: 'Access blocked by platform security' });
+    const ch = adminOtpChallenges.get(String((req.body || {}).challengeId || ''));
+    if (!ch) return res.status(401).json({ error: 'This verification request expired. Please sign in again.', exhausted: true });
+    if (Date.now() >= ch.expiresAt) {
+        adminOtpChallenges.delete(String((req.body || {}).challengeId));
+        return res.status(401).json({ error: 'The code expired. Please sign in again.', exhausted: true });
+    }
+    if (Date.now() - (ch.lastResend || 0) < 30000) {
+        return res.status(429).json({ error: 'Hold on — the last code was just sent.' });
+    }
+    ch.code = crypto2fa.randomInt(100000, 1000000).toString();
+    ch.lastResend = Date.now();
+    try {
+        await notificationService.sendOtpEmail(ch.email, ch.code);
+    } catch (e) {
+        console.warn(`[Admin2FA] OTP resend failed: ${e.message}`);
+    }
+    siem.addEvent({
+        type: 'ADMIN_2FA_RESENT',
+        severity: 'info',
+        message: 'Second-factor code re-issued by request.',
+        ip,
+        meta: { email: String(ch.email).replace(/^(.{2}).*(@.*)$/, '$1***$2') }
+    });
+    res.json({ ok: true });
 });
 
 /**
