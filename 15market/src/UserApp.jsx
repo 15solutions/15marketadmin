@@ -3767,7 +3767,12 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               >
                 <div className="absolute top-0 left-0 w-full h-full"
                   style={{
-                    background: 'linear-gradient(180deg, rgba(14,77,48,0.4) 0%, rgba(14,77,48,0.15) 40%, rgba(14,77,48,0.05) 70%, transparent 100%)',
+                    // Solid exact banner green in light mode - a translucent
+                    // wash over the white canvas reads sage, never the brand
+                    // green. Dark keeps the soft wash over the near-black.
+                    background: theme === 'light'
+                      ? 'linear-gradient(180deg, #0E4D30 0%, #0E4D30 38%, rgba(14,77,48,0.45) 72%, transparent 100%)'
+                      : 'linear-gradient(180deg, rgba(14,77,48,0.4) 0%, rgba(14,77,48,0.15) 40%, rgba(14,77,48,0.05) 70%, transparent 100%)',
                   }}
                 />
               </motion.div>
