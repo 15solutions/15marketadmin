@@ -56,7 +56,7 @@ const nearestWrappedIndex = (current, idx, total) => idx + Math.round((current -
 
 function getLogoFilter(isLight) {
   if (isLight) return 'brightness(0)';
-  return 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)';
+  return 'brightness(0) saturate(100%) invert(29%) sepia(16%) saturate(1410%) hue-rotate(96deg) brightness(88%) contrast(110%)';
 }
 
 /**

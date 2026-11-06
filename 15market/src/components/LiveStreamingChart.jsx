@@ -363,7 +363,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
             ctx.lineWidth = 1.5;
-            ctx.strokeStyle = isLight ? '#123F28' : GREEN;
+            ctx.strokeStyle = GREEN;
             ctx.shadowBlur = 15;
             ctx.shadowColor = isLight ? 'rgb(14,77,48,0.5)' : 'rgba(14,77,48,0.6)';
             ctx.moveTo(startX, startY);
@@ -688,7 +688,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.restore();
 
             const labelH = 20;
-            ctx.fillStyle = isLight ? '#123F28' : GREEN;
+            ctx.fillStyle = GREEN;
             ctx.beginPath();
             ctx.roundRect(liveXBoundary + 6, liveY - labelH/2, priceScaleWidth - 12, labelH, 4);
             ctx.fill();

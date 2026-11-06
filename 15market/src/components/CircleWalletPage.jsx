@@ -2195,7 +2195,7 @@ export function CircleWalletPage({
                                                                 src="/circle.png"
                                                                 alt="Circle"
                                                                 className="h-5 md:h-10 object-contain drop-shadow-[0_0_10px_rgba(14,77,48,0.3)] relative z-30"
-                                                                style={{ filter: 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)' }}
+                                                                style={{ filter: 'brightness(0) saturate(100%) invert(29%) sepia(16%) saturate(1410%) hue-rotate(96deg) brightness(88%) contrast(110%)' }}
                                                             />
                                                             {/* The CCTP label only on external-wallet rails —
                                                                 auth-created accounts run the embedded rails. */}
@@ -2274,7 +2274,7 @@ export function CircleWalletPage({
                                                                                         <img
                                                                                             src={selectedToken.icon}
                                                                                             className={`w-full h-full object-contain ${isLight ? 'drop-shadow-[0_0_40px_rgba(0,0,0,0.1)]' : 'drop-shadow-[0_0_40px_rgba(14,77,48,0.3)]'}`}
-                                                                                            style={{ filter: isLight ? 'brightness(0) opacity(40%)' : 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)' }}
+                                                                                            style={{ filter: isLight ? 'brightness(0) saturate(100%) invert(29%) sepia(16%) saturate(1410%) hue-rotate(96deg) brightness(88%) contrast(110%) opacity(45%)' : 'brightness(0) saturate(100%) invert(29%) sepia(16%) saturate(1410%) hue-rotate(96deg) brightness(88%) contrast(110%)' }}
                                                                                             alt={selectedToken.symbol}
                                                                                         />
                                                                                         {fundingType === 'usdc' && (
@@ -2381,7 +2381,7 @@ export function CircleWalletPage({
                                                                                     <img
                                                                                         src={selectedToken.icon}
                                                                                         className="w-full h-full object-contain drop-shadow-[0_0_80px_rgba(14,77,48,0.5)]"
-                                                                                        style={{ filter: isLight ? 'brightness(0) opacity(40%)' : 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)' }}
+                                                                                        style={{ filter: isLight ? 'brightness(0) saturate(100%) invert(29%) sepia(16%) saturate(1410%) hue-rotate(96deg) brightness(88%) contrast(110%) opacity(45%)' : 'brightness(0) saturate(100%) invert(29%) sepia(16%) saturate(1410%) hue-rotate(96deg) brightness(88%) contrast(110%)' }}
                                                                                         alt={selectedToken.symbol}
                                                                                     />
                                                                                     {fundingType === 'usdc' && (

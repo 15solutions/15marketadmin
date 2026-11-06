@@ -18,7 +18,7 @@ const FALLBACK_LOGOS = {
     avax: '/avaxusdc.png',
 };
 
-const getLogoFilter = (isLight) => (isLight ? 'brightness(0)' : 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)');
+const getLogoFilter = (isLight) => ('brightness(0) saturate(100%) invert(29%) sepia(16%) saturate(1410%) hue-rotate(96deg) brightness(88%) contrast(110%)');
 
 export default function CustomChart({ symbol = 'SOLUSDT', theme = 'dark', currentPrice, activeMarket, setActiveMarket, activeTrades = [], uiVersion = 'v1', priceHistory = [], windowMs = 20000 }) {
     const isDark = theme !== 'light';

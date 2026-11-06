@@ -110,7 +110,7 @@ export function UnifiedFundingModal({
                 <img 
                     src={iconSrc} 
                     className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(14,77,48,0.3)]" 
-                    style={{ filter: isLight && mode === 'native' ? 'brightness(0) saturate(100%) invert(64%) sepia(26%) saturate(1028%) hue-rotate(101deg) brightness(88%) contrast(82%)' : 'none' }}
+                    style={{ filter: isLight && mode === 'native' ? 'brightness(0) saturate(100%) invert(29%) sepia(16%) saturate(1410%) hue-rotate(96deg) brightness(88%) contrast(110%)' : 'none' }}
                     alt={token.symbol} 
                 />
             </div>
