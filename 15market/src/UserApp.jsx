@@ -3884,7 +3884,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
           {/* OVERLAY: Maintenance Mode */}
           {platformSettings.maintenanceMode && (
-            <div className={`fixed inset-0 z-[3000] flex flex-col items-center justify-center p-8 text-center ${isLight ? 'bg-[#f0f9f4]' : 'bg-[#050505]'}`}>
+            <div className={`fixed inset-0 z-[3000] flex flex-col items-center justify-center p-8 text-center ${isLight ? 'bg-[#EFF4F1]' : 'bg-[#050505]'}`}>
               <div className="w-24 h-24 bg-[#0E4D30]/10 rounded-[32px] flex items-center justify-center mb-8 border border-[#0E4D30]/20">
                 <Settings className="text-[#0E4D30] w-12 h-12 animate-spin-slow" />
               </div>

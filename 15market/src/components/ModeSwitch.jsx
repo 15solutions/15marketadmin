@@ -22,7 +22,7 @@ export function ModeSwitch({ theme, mode = 'classic', onChange }) {
             aria-label="Game mode"
             className={`relative h-10 w-20 rounded-full overflow-hidden border transition-all duration-500 ${
                 isLight
-                    ? 'bg-[#e6f4ed] border-[#0E4D30]/20'
+                    ? 'bg-[#E6EDE9] border-[#0E4D30]/20'
                     : 'bg-black/40 border-white/10'
             }`}
         >

@@ -311,7 +311,7 @@ body.light {
 
 /* Light Mode Static Panels */
 .light .static-panel-light {
-  background: #C2D1C9 !important;
+  background: #C2D2CA !important;
   border: 1.5px solid rgba(18, 63, 40, 0.25) !important;
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.04),
@@ -461,7 +461,7 @@ body.light {
 .coral-green-gradient-light {
   background: linear-gradient(145deg,
       #f5faf7 0%,
-      #edf5f0 100%) !important;
+      #EDF2EF 100%) !important;
 }
 
 .light .text-black\/20 {

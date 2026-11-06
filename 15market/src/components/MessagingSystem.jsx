@@ -89,8 +89,8 @@ function MessagingSystem({ wallet, connection, isOpen, onClose, isAdminView = fa
 
     const content = (
         <div className={embedded
-            ? `w-full h-full ${isLight ? 'bg-[#f0f9f4] border-[#0E4D30]/20' : 'bg-[#0D0D0D] border-white/10'} border rounded-[32px] flex flex-col overflow-hidden backdrop-blur-md`
-            : `w-[450px] h-[650px] ${isLight ? 'bg-[#f0f9f4] border-[#0E4D30]/20' : 'bg-[#0D0D0D] border-white/10'} border rounded-[40px] shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden backdrop-blur-2xl`
+            ? `w-full h-full ${isLight ? 'bg-[#EFF4F1] border-[#0E4D30]/20' : 'bg-[#0D0D0D] border-white/10'} border rounded-[32px] flex flex-col overflow-hidden backdrop-blur-md`
+            : `w-[450px] h-[650px] ${isLight ? 'bg-[#EFF4F1] border-[#0E4D30]/20' : 'bg-[#0D0D0D] border-white/10'} border rounded-[40px] shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden backdrop-blur-2xl`
         }>
             {/* Header */}
             <div className={`p-6 border-b ${isLight ? 'border-[#0E4D30]/10' : 'border-white/5'} flex items-center justify-between`}>
@@ -140,7 +140,7 @@ function MessagingSystem({ wallet, connection, isOpen, onClose, isAdminView = fa
             </div>
 
             {/* Input Area */}
-            <form onSubmit={handleSendMessage} className={`p-6 ${isLight ? 'bg-[#f0f9f4] border-[#0E4D30]/10' : 'bg-black/40 border-white/5'} border-t`}>
+            <form onSubmit={handleSendMessage} className={`p-6 ${isLight ? 'bg-[#EFF4F1] border-[#0E4D30]/10' : 'bg-black/40 border-white/5'} border-t`}>
                 <div className="flex gap-3">
                     <input
                         value={inputMessage}

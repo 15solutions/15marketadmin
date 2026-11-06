@@ -2567,7 +2567,7 @@ export function CircleWalletPage({
                             ) : (
                                 <div className="flex flex-col gap-4">
                                     {walletInfo?.transactions?.map((tx, i) => (
-                                        <div key={i} className={`p-8 rounded-[40px] border ${isLight ? 'bg-[#C2D1C9] border-black/5 shadow-sm' : 'bg-[#111] border-white/5'} flex items-center justify-between transition-all hover:scale-[1.01]`}>
+                                        <div key={i} className={`p-8 rounded-[40px] border ${isLight ? 'bg-[#C2D2CA] border-black/5 shadow-sm' : 'bg-[#111] border-white/5'} flex items-center justify-between transition-all hover:scale-[1.01]`}>
                                             <div className="flex items-center gap-5">
                                                 <div className={`w-14 h-14 rounded-full flex items-center justify-center ${tx.type === 'OUTGOING' ? 'bg-orange-500/10 text-orange-500' : 'bg-[#0E4D30]/10 text-[#0E4D30]'}`}>
                                                     {tx.type === 'OUTGOING' ? <Send size={24} /> : <ArrowDownLeft size={24} />}

@@ -1168,9 +1168,9 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 {isNotificationsOpen && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-black/30 backdrop-blur-sm">
                         <motion.div initial={{opacity:0,scale:0.9,y:20}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:0.9,y:20}}
-                            className={`w-full max-w-md ${isLight ? 'bg-white border-[#e2ece5]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8 flex flex-col`}>
+                            className={`w-full max-w-md ${isLight ? 'bg-white border-[#E2EAE6]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8 flex flex-col`}>
                             <div className="flex flex-col items-center text-center mb-4">
-                                <div className={`w-14 h-14 rounded-2xl ${isLight ? 'bg-[#eef5f1]' : 'bg-white/5'} flex items-center justify-center mb-4`}><AnimatedBell size={28} className="text-[#0E4D30]"/></div>
+                                <div className={`w-14 h-14 rounded-2xl ${isLight ? 'bg-[#EEF3F0]' : 'bg-white/5'} flex items-center justify-center mb-4`}><AnimatedBell size={28} className="text-[#0E4D30]"/></div>
                                 <h3 className={`text-2xl font-black ${isLight ? 'text-[#133a2a]' : 'text-white'} uppercase font-comfortaa`}>Notifications</h3>
                             </div>
                             
@@ -1192,7 +1192,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         const colorClass = typeColors[notif.type] || typeColors.info;
                                         
                                         return (
-                                            <div key={notif.id} className={`p-4 rounded-2xl border ${isLight ? 'bg-[#f8fbf9] border-[#e2ece5]' : 'bg-white/[0.02] border-white/5'} flex gap-3 items-start transition-all`}>
+                                            <div key={notif.id} className={`p-4 rounded-2xl border ${isLight ? 'bg-[#EFF4F1] border-[#E2EAE6]' : 'bg-white/[0.02] border-white/5'} flex gap-3 items-start transition-all`}>
                                                 <div className={`p-2 rounded-xl border ${colorClass.split(' ').slice(0, 2).join(' ')} flex-shrink-0 mt-0.5`}>
                                                     {notif.type === 'success' && <Check size={14} className="text-[#0E4D30]"/>}
                                                     {notif.type === 'warning' && <AlertCircle size={14} className="text-amber-500"/>}
@@ -1216,7 +1216,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
 
                             <div className="flex flex-col gap-2">
                                 {notifications.length > 0 && (
-                                    <button onClick={handleClearNotifications} className={`w-full py-3.5 ${isLight ? 'bg-[#eef5f1] hover:bg-[#e2ece5] text-[#133a2a]' : 'bg-white/5 hover:bg-white/10 text-white'} text-[10px] font-black uppercase tracking-widest rounded-full transition-all`}>
+                                    <button onClick={handleClearNotifications} className={`w-full py-3.5 ${isLight ? 'bg-[#EEF3F0] hover:bg-[#E2EAE6] text-[#133a2a]' : 'bg-white/5 hover:bg-white/10 text-white'} text-[10px] font-black uppercase tracking-widest rounded-full transition-all`}>
                                         Clear All
                                     </button>
                                 )}
@@ -1417,7 +1417,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             className="cursor-default flex flex-col items-center gap-4 w-full max-w-[560px]"
                         >
                             {/* The VISIBLE card (reacts to theme) */}
-                            <div className="w-full rounded-[28px] overflow-hidden relative" style={{ background: isLight ? '#eef5f1' : '#0a0a0a', fontFamily: '"Comfortaa", cursive', boxShadow: isLight ? '0 10px 40px rgba(0,0,0,0.1)' : 'none' }}>
+                            <div className="w-full rounded-[28px] overflow-hidden relative" style={{ background: isLight ? '#EEF3F0' : '#0a0a0a', fontFamily: '"Comfortaa", cursive', boxShadow: isLight ? '0 10px 40px rgba(0,0,0,0.1)' : 'none' }}>
                                 {/* Watermark pattern */}
                                 <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
                                      style={{ backgroundImage: `url(${isLight ? '/goblogo.png' : '/gowlogo.png'})`, backgroundSize: '30px 30px', backgroundRepeat: 'repeat', transform: 'rotate(-15deg) scale(1.6)' }} />
@@ -1605,16 +1605,16 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             {modalConfig && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-black/30 backdrop-blur-sm">
                     <motion.div initial={{opacity:0,scale:0.9,y:20}} animate={{opacity:1,scale:1,y:0}}
-                        className={`w-full max-w-md ${isLight ? 'bg-white border-[#e2ece5]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8`}>
+                        className={`w-full max-w-md ${isLight ? 'bg-white border-[#E2EAE6]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8`}>
                         <div className="flex flex-col items-center text-center">
-                            <div className={`w-16 h-16 rounded-2xl ${isLight ? 'bg-[#eef5f1]' : 'bg-white/5'} flex items-center justify-center mb-6`}>
+                            <div className={`w-16 h-16 rounded-2xl ${isLight ? 'bg-[#EEF3F0]' : 'bg-white/5'} flex items-center justify-center mb-6`}>
                                 {modalConfig.type==='alert'?<AlertCircle size={32} className="text-[#0E4D30]"/>:<Zap size={32} className="text-[#0E4D30]"/>}
                             </div>
                             <h3 className={`text-2xl font-black ${isLight ? 'text-[#133a2a]' : 'text-white'} mb-2 uppercase`}>{modalConfig.title}</h3>
                             <p className={`text-sm font-medium ${isLight ? 'text-[#133a2a]/50' : 'text-white/50'} mb-8 whitespace-pre-line`}>{modalConfig.message}</p>
                             <div className="grid grid-cols-2 gap-4 w-full">
                                 {modalConfig.type==='confirm' && (
-                                    <button onClick={() => setModalConfig(null)} className={`py-4 ${isLight ? 'bg-[#eef5f1] text-[#133a2a] hover:bg-[#e2ece5]' : 'bg-white/10 text-white hover:bg-white/20'} text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Cancel</button>
+                                    <button onClick={() => setModalConfig(null)} className={`py-4 ${isLight ? 'bg-[#EEF3F0] text-[#133a2a] hover:bg-[#E2EAE6]' : 'bg-white/10 text-white hover:bg-white/20'} text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Cancel</button>
                                 )}
                                 <button onClick={() => { if(modalConfig.onConfirm) modalConfig.onConfirm(); setModalConfig(null); }}
                                     className={`py-4 ${isLight ? 'bg-[#133a2a] hover:bg-[#0E4D30]' : 'bg-white/10 hover:bg-white/20'} text-white text-xs font-black uppercase tracking-widest rounded-full transition-all ${modalConfig.type==='alert'?'col-span-2':''}`}>
@@ -1630,15 +1630,15 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             {promptConfig && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-black/30 backdrop-blur-sm">
                     <motion.div initial={{opacity:0,scale:0.9,y:20}} animate={{opacity:1,scale:1,y:0}}
-                        className={`w-full max-w-md ${isLight ? 'bg-white border-[#e2ece5]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8`}>
+                        className={`w-full max-w-md ${isLight ? 'bg-white border-[#E2EAE6]' : 'bg-[#1a1a1a] border-white/10'} border shadow-2xl rounded-[32px] p-8`}>
                         <div className="flex flex-col">
                             <h3 className={`text-2xl font-black ${isLight ? 'text-[#133a2a]' : 'text-white'} mb-6 uppercase text-center`}>{promptConfig.title}</h3>
                             <input type={promptConfig.inputType||"text"} autoFocus placeholder={promptConfig.placeholder} value={promptValue}
                                 onChange={(e) => setPromptValue(e.target.value)}
-                                className={`w-full ${isLight ? 'bg-[#f0f6f2] border-[#e2ece5] text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-4 px-6 font-bold text-center focus:border-[#0E4D30]/50 outline-none transition-all mb-6`}
+                                className={`w-full ${isLight ? 'bg-[#f0f6f2] border-[#E2EAE6] text-[#133a2a] placeholder:text-[#133a2a]/30' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'} border rounded-2xl py-4 px-6 font-bold text-center focus:border-[#0E4D30]/50 outline-none transition-all mb-6`}
                                 onKeyDown={(e) => { if(e.key==='Enter'){promptConfig.onConfirm(promptValue);setPromptConfig(null);} }}/>
                             <div className="grid grid-cols-2 gap-4 w-full">
-                                <button onClick={() => {setPromptConfig(null);setPromptValue("");}} className={`py-4 ${isLight ? 'bg-[#eef5f1] text-[#133a2a] hover:bg-[#e2ece5]' : 'bg-white/10 text-white hover:bg-white/20'} text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Cancel</button>
+                                <button onClick={() => {setPromptConfig(null);setPromptValue("");}} className={`py-4 ${isLight ? 'bg-[#EEF3F0] text-[#133a2a] hover:bg-[#E2EAE6]' : 'bg-white/10 text-white hover:bg-white/20'} text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Cancel</button>
                                 <button onClick={() => {promptConfig.onConfirm(promptValue);setPromptConfig(null);setPromptValue("");}} className={`py-4 ${isLight ? 'bg-[#133a2a] hover:bg-[#0E4D30]' : 'bg-white/10 hover:bg-white/20'} text-white text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Confirm</button>
                             </div>
                             {promptConfig.footer && <div className="mt-6 w-full">{promptConfig.footer}</div>}

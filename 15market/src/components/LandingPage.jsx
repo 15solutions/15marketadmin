@@ -25,7 +25,7 @@ const LandingBackground = ({ theme }) => {
     }, []);
 
     return (
-        <div className={`absolute inset-0 overflow-hidden z-0 pointer-events-none ${isLight ? 'bg-[#f0f8f4]' : 'bg-[#050505]'} transition-colors duration-500`}>
+        <div className={`absolute inset-0 overflow-hidden z-0 pointer-events-none ${isLight ? 'bg-[#EFF4F1]' : 'bg-[#050505]'} transition-colors duration-500`}>
             {/* Mouse Follow Glow */}
             <div
                 className="absolute w-[450px] h-[450px] rounded-full blur-[100px] opacity-[0.25] pointer-events-none transition-all duration-300"

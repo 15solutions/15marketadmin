@@ -95,7 +95,7 @@ export default function HelpPage({ onBack, theme, isSmallScreen }) {
     ];
 
     return (
-        <div className={`w-full h-screen overflow-hidden flex flex-col ${isLight ? 'text-black bg-[#EAF3EE]' : 'text-white bg-black'}`}
+        <div className={`w-full h-screen overflow-hidden flex flex-col ${isLight ? 'text-black bg-[#EAF0EC]' : 'text-white bg-black'}`}
             style={{ fontFamily: '"Comfortaa", cursive' }}>
             <style>{scrollbarCss}</style>
 

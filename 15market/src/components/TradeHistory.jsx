@@ -60,7 +60,7 @@ function TradeHistoryComponent({
 
                             return (
                                 <div key={t.id} className={`flex flex-row items-center justify-between p-2 lg:p-4 rounded-xl border transition-all group ${isLight
-                                    ? 'bg-[#C2D1C9] border-[#0E4D30]/35 shadow-sm hover:shadow-md'
+                                    ? 'bg-[#C2D2CA] border-[#0E4D30]/35 shadow-sm hover:shadow-md'
                                     : 'bg-black/40 border-white/10 hover:border-[#0E4D30]/30'}`}>
                                     <div className="flex items-center gap-2 lg:gap-4">
                                         <div className="relative">

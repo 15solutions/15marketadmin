@@ -237,7 +237,7 @@ export function ProfileModal({
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className={`w-full max-w-[90%] md:max-w-md ${isLight ? 'bg-[#f0f9f4] border-[#0E4D30]/20' : 'bg-[#0D0D0D] border-[#0E4D30]/30'} border rounded-[24px] md:rounded-[32px] p-5 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.1)] relative overflow-y-auto max-h-[90vh] custom-scrollbar`}
+                    className={`w-full max-w-[90%] md:max-w-md ${isLight ? 'bg-[#EFF4F1] border-[#0E4D30]/20' : 'bg-[#0D0D0D] border-[#0E4D30]/30'} border rounded-[24px] md:rounded-[32px] p-5 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.1)] relative overflow-y-auto max-h-[90vh] custom-scrollbar`}
                 >
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#0E4D30] to-transparent" />
 
@@ -245,7 +245,7 @@ export function ProfileModal({
                         <div className="flex items-center gap-4">
                             <div className="relative group cursor-pointer" onClick={() => setShowAvatarSelector(!showAvatarSelector)}>
                                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#0E4D30] to-black p-[2px] overflow-hidden transition-all group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(14,77,48,0.3)]">
-                                    <div className={`w-full h-full rounded-full ${isLight ? 'bg-[#e6f4ed]' : 'bg-[#050505]'} flex items-center justify-center overflow-hidden relative`}>
+                                    <div className={`w-full h-full rounded-full ${isLight ? 'bg-[#E6EDE9]' : 'bg-[#050505]'} flex items-center justify-center overflow-hidden relative`}>
                                         {userProfile?.xProfileImage || avatar ? (
                                             <img src={userProfile?.xProfileImage || avatar} alt="Profile" className="w-full h-full object-cover" />
                                         ) : (
@@ -698,7 +698,7 @@ export function ProfileModal({
                                     {/* Deposit / Withdraw from local storage */}
                                     {transactionHistory && transactionHistory.map((tx, i) => (
                                         <div key={tx.id || `tx-${i}`} className={`flex flex-row items-center justify-between p-2 lg:p-4 rounded-xl border transition-all group ${isLight
-                                            ? 'bg-[#f0f9f4] border-[#0E4D30]/10 shadow-sm hover:shadow-md hover:border-[#0E4D30]/40'
+                                            ? 'bg-[#EFF4F1] border-[#0E4D30]/10 shadow-sm hover:shadow-md hover:border-[#0E4D30]/40'
                                             : 'bg-black/40 border-white/10 hover:border-[#0E4D30]/30'}`}>
                                             <div className="flex items-center gap-3">
                                                 <div className={`p-1.5 rounded-lg ${tx.type === "DEPOSIT" ? "bg-[#0E4D30]/10 text-[#0E4D30]" : "bg-orange-500/10 text-orange-500"}`}>

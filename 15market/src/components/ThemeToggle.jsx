@@ -12,7 +12,7 @@ export function ThemeToggle({ theme, onToggle }) {
                 relative h-10 w-20 rounded-full overflow-hidden border transition-all duration-500
                 ${isDark
                     ? 'bg-black/40 border-white/10 shadow-[inner_0_2px_10px_rgba(0,0,0,0.5)]'
-                    : 'bg-[#e6f4ed] border-[#0E4D30]/20 shadow-[inner_0_2px_10px_rgba(14,77,48,0.1)]'}
+                    : 'bg-[#E6EDE9] border-[#0E4D30]/20 shadow-[inner_0_2px_10px_rgba(14,77,48,0.1)]'}
             `}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}

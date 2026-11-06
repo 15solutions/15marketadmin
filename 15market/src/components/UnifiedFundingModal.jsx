@@ -424,7 +424,7 @@ export function UnifiedFundingModal({
 
                 <div className="p-6 flex flex-col gap-6 max-h-[85dvh] overflow-y-auto custom-scrollbar">
                                         {/* Guided Funding Selection */}
-                    <div className={`p-8 rounded-[40px] border relative overflow-hidden flex flex-col items-center justify-center min-h-[320px] ${isLight ? 'bg-[#C2D1C9] border-black/5 shadow-xl' : 'bg-[#111] border-white/5 shadow-2xl'}`}>
+                    <div className={`p-8 rounded-[40px] border relative overflow-hidden flex flex-col items-center justify-center min-h-[320px] ${isLight ? 'bg-[#C2D2CA] border-black/5 shadow-xl' : 'bg-[#111] border-white/5 shadow-2xl'}`}>
                         <div className="absolute top-0 right-0 w-32 h-32 bg-[#0E4D30]/5 blur-[60px] rounded-full" />
                         
                         <AnimatePresence mode="wait">
@@ -561,7 +561,7 @@ export function UnifiedFundingModal({
                     {/* Quote & Results */}
                     <AnimatePresence>
                         {quote ? (
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`p-6 rounded-[32px] border ${isLight ? 'bg-[#C2D1C9] border-black/5 shadow-md' : 'bg-[#151515] border-white/5'} flex flex-col gap-4`}>
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`p-6 rounded-[32px] border ${isLight ? 'bg-[#C2D2CA] border-black/5 shadow-md' : 'bg-[#151515] border-white/5'} flex flex-col gap-4`}>
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1">Estimated Deposit</p>
