@@ -11,10 +11,11 @@
 //      and mounts the full AdminDashboard with that context.
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Shield, Mail, Lock, Loader2, CheckCircle2, AlertTriangle, UserPlus } from "lucide-react";
+import { Lock, Loader2, CheckCircle2, AlertTriangle, UserPlus } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
 import { getSession, sessionValid, clearSession, loginWithPassword, refreshSession, verifyAdminOtp, resendAdminOtp } from "../utils/adminAuth";
 import NotifyFlash from "./ui/NotifyFlash";
+import { AdminOtpPage } from "./AdminOtpPage";
 
 const AdminDashboard = React.lazy(() => import("./AdminDashboard").then(m => ({ default: m.AdminDashboard })));
 
@@ -140,11 +141,13 @@ export function AdminPortal({ onBack, notify }) {
         }
     };
 
-    const handleVerifyOtp = async () => {
+    const handleVerifyOtp = async (override) => {
+        const value = String(override ?? otpCode).replace(/\D/g, '');
+        if (value.length !== 6) return;
         setOtpError('');
         setBusy('otp');
         try {
-            await verifyAdminOtp(otpStage.challengeId, otpCode);
+            await verifyAdminOtp(otpStage.challengeId, value);
             setOtpStage(null);
             setOtpCode('');
             await loadAuthContext();
@@ -157,6 +160,7 @@ export function AdminPortal({ onBack, notify }) {
                 return;
             }
             setOtpError(e.message || 'Wrong code');
+            setOtpCode('');
         } finally {
             setBusy('');
         }
@@ -256,6 +260,28 @@ export function AdminPortal({ onBack, notify }) {
         return <div style={{ fontFamily: '"Comfortaa", cursive' }}><FullScreenSpinner isLight={isLight} label="Verifying session…" standalone /></div>;
     }
 
+    // ─── Two-step verification — its own full-page screen ────────────────
+    if (otpStage) {
+        return (
+            <>
+                <AdminOtpPage
+                    isLight={isLight}
+                    maskedEmail={otpStage.maskedEmail}
+                    code={otpCode}
+                    setCode={setOtpCode}
+                    error={otpError}
+                    clearError={() => setOtpError('')}
+                    busy={busy}
+                    resendIn={resendIn}
+                    onVerify={handleVerifyOtp}
+                    onResend={handleResendOtp}
+                    onBack={() => { setOtpStage(null); setOtpCode(''); setOtpError(''); }}
+                />
+                {flashLayer}
+            </>
+        );
+    }
+
     // ─── Login / one-time root setup — full screen, user-side design ─────
     const needsBootstrap = bootStatus && bootStatus.initialized === false;
     const ink = isLight ? 'text-[#0a261a]' : 'text-white';
@@ -297,7 +323,7 @@ export function AdminPortal({ onBack, notify }) {
             <div className="flex-1 overflow-y-auto flex flex-col px-6 py-10 relative z-10">
                 <div className="w-full max-w-md flex flex-col items-center m-auto">
                     <AnimatePresence mode="wait">
-                        <motion.div key={needsBootstrap ? 'bootstrap' : (otpStage ? 'otp' : 'login')} {...stepAnim} className="w-full flex flex-col items-center">
+                        <motion.div key={needsBootstrap ? 'bootstrap' : 'login'} {...stepAnim} className="w-full flex flex-col items-center">
                             {/* Brand — the same wordmark the user app uses, theme-picked,
                                 with an ADMIN badge split off by a vertical hairline */}
                             <div className="flex items-center gap-4 mb-8">
@@ -347,57 +373,6 @@ export function AdminPortal({ onBack, notify }) {
                                         <p className={`text-[10px] font-bold text-center leading-relaxed mt-1 ${inkSoft}`}>
                                             Secure your account with a password. One-time setup.
                                         </p>
-                                    </>
-                                ) : otpStage ? (
-                                    <>
-                                        {/* TWO-FACTOR — the emailed-code panel.
-                                            Same canvas, no chrome: masked
-                                            target, one spaced code input,
-                                            verify primary, resend cooldown. */}
-                                        <div className="flex items-center justify-center mb-1">
-                                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${isLight ? 'bg-[#0E4D30]/10' : 'bg-[#0E4D30]/25'}`}>
-                                                <Shield size={22} className="text-[#0E4D30]" />
-                                            </div>
-                                        </div>
-                                        <p className="text-lg font-black text-center">Two-Step Verification</p>
-                                        <p className={`text-[11px] font-bold text-center leading-relaxed -mt-2 ${inkSoft}`}>
-                                            A 6-digit code was emailed to <span className="text-[#0E4D30]">{otpStage.maskedEmail}</span>. It expires in 10 minutes.
-                                        </p>
-                                        {otpError && (
-                                            <div className="w-full flex items-start gap-2 p-3 rounded-2xl bg-red-500/10 text-red-400 text-xs font-bold shadow-[0_0_25px_-12px_rgba(0,0,0,0.5)]">
-                                                <AlertTriangle size={14} className="mt-0.5 shrink-0" /> {otpError}
-                                            </div>
-                                        )}
-                                        <input
-                                            inputMode="numeric"
-                                            autoComplete="one-time-code"
-                                            autoFocus
-                                            value={otpCode}
-                                            onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                            onKeyDown={e => e.key === 'Enter' && otpCode.length === 6 && handleVerifyOtp()}
-                                            placeholder="·· ····"
-                                            className={`${inputCls} !tracking-[0.6em] !text-center`}
-                                        />
-                                        <button
-                                            onClick={handleVerifyOtp}
-                                            disabled={busy === 'otp' || otpCode.length !== 6}
-                                            className="w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-[#0E4D30] text-white shadow-[0_0_35px_-8px_rgba(14,77,48,0.6)] hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
-                                        >
-                                            {busy === 'otp' ? <Loader2 size={18} className="animate-spin" /> : <><Lock size={18} /> Verify code</>}
-                                        </button>
-                                        <button
-                                            onClick={handleResendOtp}
-                                            disabled={resendIn > 0 || busy === 'resend'}
-                                            className={`text-[11px] font-black uppercase tracking-widest underline underline-offset-4 transition-opacity disabled:opacity-40 ${busy === 'resend' ? 'opacity-40' : ''}`}
-                                        >
-                                            {busy === 'resend' ? 'Sending…' : resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
-                                        </button>
-                                        <button
-                                            onClick={() => { setOtpStage(null); setOtpCode(''); setOtpError(''); }}
-                                            className={`text-[10px] font-bold uppercase tracking-widest -mt-1 ${inkSoft}`}
-                                        >
-                                            Use a different account
-                                        </button>
                                     </>
                                 ) : (
                                     <>

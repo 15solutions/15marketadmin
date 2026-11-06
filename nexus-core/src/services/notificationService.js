@@ -196,9 +196,9 @@ function getEmail(id) {
 }
 
 function getEmailShell(innerHtml, headline) {
-    // One 100%-width bgcolor'd table wraps a 540px content table so no
-    // client can ever show a white page around the design. Everything is
-    // inline styles + bgcolor: mail clients strip <style> blocks and do
+    // One 100%-width table wraps a 540px content table. It sets NO page
+    // background: the design sits directly on the mail app's own system
+    // background (dark or light). Everything is inline styles: mail clients strip <style> blocks and do
     // not fetch web fonts, so nothing here may depend on either.
     //
     // SYSTEM DARK/LIGHT: the device's theme decides the palette. The inline
@@ -218,10 +218,9 @@ function getEmailShell(innerHtml, headline) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700;900&family=Inter:wght@400;600;700&display=swap');</style>
         <style>
-            /* System light theme: pale brand-green canvas, dark ink. Dark
-               stays whatever the inline styles say. */
+            /* System light theme: dark ink. No background is ever set, so the
+               mail app's own background shows through in both themes. */
             @media (prefers-color-scheme: light) {
-                .em-bg { background-color: #F4F7F5 !important; }
                 .em-body { color: #3b4a43 !important; }
                 .em-foot { color: #7d8d85 !important; }
                 .em-foot-warn { color: #b45309 !important; }
@@ -232,10 +231,10 @@ function getEmailShell(innerHtml, headline) {
             }
         </style>
     </head>
-    <body class="em-bg" style="margin:0; padding:0; background-color:#070a09;">
-        <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#070a09" class="em-bg" style="width:100%; background-color:#070a09; margin:0; padding:0; border-collapse:collapse;">
+    <body style="margin:0; padding:0;">
+        <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%; margin:0; padding:0; border-collapse:collapse;">
             <tr>
-                <td align="center" bgcolor="#070a09" class="em-bg" style="background-color:#070a09; padding:52px 20px 44px;">
+                <td align="center" style="padding:52px 20px 44px;">
                     <table role="presentation" width="540" border="0" cellpadding="0" cellspacing="0" style="width:100%; max-width:540px; border-collapse:collapse; text-align:left;">
                         <!-- Header banner: ONE baked canvas (pattern fading
                              to solid toward the left where the logo sits,
