@@ -798,11 +798,6 @@ export default function TradingWidget({
                 <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
                   YES <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={Math.round(yesShare * 100)} />¢</span>
                 </span>
-                {/* Real-time share count the stake buys on this side (a share
-                    costs the side's price and redeems $1 at settlement). */}
-                <span className="text-[9px] font-bold tabular-nums opacity-80 tracking-wide">
-                  ≈ {stake > 0 ? (stake / Math.max(0.01, yesShare)).toFixed(2) : '0.00'} shares
-                </span>
               </button>
               <button
                 onClick={() => handleTrade('NO')}
@@ -811,9 +806,6 @@ export default function TradingWidget({
               >
                 <span className="flex items-center gap-2 text-[18px] font-black tracking-wide">
                   NO <span className="text-[17px] inline-flex items-center"><PriceMeterTicker value={Math.round(noShare * 100)} />¢</span>
-                </span>
-                <span className="text-[9px] font-bold tabular-nums opacity-80 tracking-wide">
-                  ≈ {stake > 0 ? (stake / Math.max(0.01, noShare)).toFixed(2) : '0.00'} shares
                 </span>
               </button>
             </motion.div>

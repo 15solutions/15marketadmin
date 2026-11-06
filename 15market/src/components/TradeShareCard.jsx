@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Share2, ArrowUp, ArrowDown, Copy, Check } from 'lucide-react';
+import { X, Share2, ArrowUp, ArrowDown, Copy, Check, ExternalLink } from 'lucide-react';
 import { tradeShares } from '../utils/tradeStatus';
 // Static, not dynamic. This component is itself lazy-loaded (UserApp.jsx), so
 // qrcode still lands in its own chunk and never in the initial bundle - but a
@@ -9,7 +9,7 @@ import { tradeShares } from '../utils/tradeStatus';
 // rendered as an empty box with no clue why. CircleWalletPage already imports
 // qrcode statically and works.
 import QRCode from 'qrcode';
-import { SITE_URL } from '../constants';
+import { SITE_URL, ARC_EXPLORER } from '../constants';
 
 const LOGO_MAP = {
   eth: '/ethusdc.png',
@@ -235,29 +235,25 @@ const captureCard = async () => {
 };
 
 const handleNativeShare = async () => {
+    // Same contract as the PnL receipt cards' SAVE IMAGE: capture the card and
+    // drop the PNG straight into downloads. The native share sheet detour was
+    // what broke the button - its rejection paths landed in a swallowed catch
+    // (empty `catch {}`) so the tap could end with no file and no message.
     if (saveState) return;
     setSaveState('saving');
     try {
       const dataUrl = await captureCard();
-      if (!dataUrl) { setSaveState(null); return; }
-      try {
-        const res = await fetch(dataUrl);
-        const blob = await res.blob();
-        const file = new File([blob], `15market-${isWin ? 'win' : 'loss'}.png`, { type: 'image/png' });
-        if (navigator.share) {
-          await navigator.share({ files: [file], title: `15market ${isWin ? 'Win' : 'Loss'}` });
-          setSaveState('saved');
-          setTimeout(() => { setSaveState(null); onClose(); }, 1500);
-          return;
-        }
-      } catch {}
+      if (!dataUrl) throw new Error('capture failed');
       const link = document.createElement('a');
       link.download = `15market-${isWin ? 'win' : 'loss'}-${tradeId}.png`;
       link.href = dataUrl;
       link.click();
       setSaveState('saved');
       setTimeout(() => { setSaveState(null); onClose(); }, 1500);
-    } catch { setSaveState(null); }
+    } catch {
+      setSaveState('failed');
+      setTimeout(() => { setSaveState(null); onClose(); }, 1600);
+    }
 };
 
   if (!trade) return null;
@@ -599,7 +595,7 @@ const handleNativeShare = async () => {
 
               {/* Save Confirmation Overlay */}
               <AnimatePresence>
-                {saveState === 'saved' && (
+                {(saveState === 'saved' || saveState === 'failed') && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -608,17 +604,23 @@ const handleNativeShare = async () => {
                     style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
                   >
                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', damping: 15, stiffness: 300 }}>
-                      <Check size={48} className="text-[#0E4D30]" strokeWidth={3} />
+                      {saveState === 'saved' ? (
+                        <Check size={48} className="text-[#0E4D30]" strokeWidth={3} />
+                      ) : (
+                        <X size={48} className="text-[#EF5350]" strokeWidth={3} />
+                      )}
                     </motion.div>
-                    <motion.span
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.15 }}
-                      className="text-white text-[14px] font-bold mt-3"
-                      style={{ fontFamily: '"Comfortaa", cursive' }}
-                    >
-                      Saved!
-                    </motion.span>
+                    {saveState === 'saved' && (
+                      <motion.span
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                        className="text-white text-[14px] font-bold mt-3"
+                        style={{ fontFamily: '"Comfortaa", cursive' }}
+                      >
+                        Saved!
+                      </motion.span>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -641,6 +643,19 @@ const handleNativeShare = async () => {
                 )}
                 Share
               </button>
+              {/* Explorer — mobile only. Opens the settled trade's on-chain
+                  record on ArcScan, or the explorer root when no tx is linked. */}
+              <a
+                href={txHash ? `${ARC_EXPLORER}/tx/${txHash}` : ARC_EXPLORER}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="md:hidden flex items-center gap-2 px-8 py-2.5 rounded-full text-[12px] font-bold text-white/90 border border-white/20 bg-white/5 transition-all hover:scale-105 active:scale-95 hover:bg-white/10"
+                style={{ fontFamily: '"Comfortaa", cursive' }}
+                title={txHash ? 'View on ArcScan Explorer' : 'Open ArcScan Explorer'}
+              >
+                <ExternalLink size={14} />
+                Explorer
+              </a>
             </div>
           </motion.div>
         </motion.div>
