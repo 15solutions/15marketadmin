@@ -3963,14 +3963,13 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 withdrawals) show as amber dots. Hidden on a dedicated
                 single-task dashboard — one task needs no nav. */}
             {!dedicatedMode && (
-            /* Dark mode: NO divider line, NO translucency — the bar color
-               IS the page background (#050505), and the content doesn't
-               butt against a line. Instead everything scrolling toward
-               the bar dissolves through a backdrop blur ramp, as if the
-               page keeps going underneath it. */
-            <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] ${isLight ? 'bg-[#F4F7F5] border-t border-black/10' : 'bg-[#050505]'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
-                {/* Under-blur ramp — only on dark, per the divider-free look */}
-                {!isLight && (
+            /* BOTH themes: NO divider line, NO translucency — the bar color
+               IS the page background, and the content doesn't butt against
+               a line. Everything scrolling toward the bar dissolves through
+               a backdrop blur ramp, as if the page keeps going underneath
+               it — same treatment on light (#F4F7F5) as on dark (#050505). */
+            <div className={`md:hidden fixed bottom-0 inset-x-0 z-[60] ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`} style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
+                {/* Under-blur ramp — dissolves scrolling content into the bar */}
                 <div
                     className="absolute bottom-full inset-x-0 h-16 pointer-events-none"
                     style={{
@@ -3980,8 +3979,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         WebkitMaskImage: 'linear-gradient(to top, black 18%, transparent 96%)'
                     }}
                 />
-                )}
-                <div className="flex items-stretch px-1.5 pt-1 overflow-x-auto no-scrollbar snap-x snap-mandatory">
+                <div className="flex items-stretch px-1.5 pt-1.5 overflow-x-auto no-scrollbar snap-x snap-mandatory">
                     {visibleNav.map((t, i) => {
                         const Icon = t.icon;
                         const active = activeNav === t.key;
@@ -3991,15 +3989,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 key={t.key}
                                 ref={(el) => { if (el) mobileNavRefs.current[t.key] = el; else delete mobileNavRefs.current[t.key]; }}
                                 onClick={() => selectSection(t.key)}
-                                className={`relative flex-none w-[84px] shrink-0 snap-start flex flex-col items-center gap-1 py-2 rounded-2xl transition-all active:scale-95 ${active
+                                className={`relative flex-none w-[100px] shrink-0 snap-start flex flex-col items-center gap-1.5 py-3 rounded-2xl transition-all active:scale-95 ${active
                                     ? 'text-[#3CB371]'
                                     : isLight ? 'text-black/40' : 'text-white/40'}`}
                             >
-                                {active && <motion.div layoutId="mob-tab-dot" className="absolute top-0 h-[3px] w-7 rounded-full bg-[#3CB371]" />}
-                                <Icon size={18} className="flex-none" />
-                                <span className="text-[7px] font-black uppercase tracking-widest truncate max-w-full">{t.label}</span>
+                                {active && <motion.div layoutId="mob-tab-dot" className="absolute top-0 h-[3px] w-8 rounded-full bg-[#3CB371]" />}
+                                <Icon size={24} className="flex-none" />
+                                <span className="text-[9px] font-black uppercase tracking-widest truncate max-w-full">{t.label}</span>
                                 {badge > 0 && (
-                                    <span className="absolute top-1 right-2.5 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[7px] font-black leading-none">{badge}</span>
+                                    <span className="absolute top-1 right-3 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[8px] font-black leading-none">{badge}</span>
                                 )}
                             </button>
                         );
