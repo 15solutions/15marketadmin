@@ -124,6 +124,31 @@ function recordInbound(payload = {}) {
     return { ok: true, email: { ...rec, html: undefined, text: undefined } };
 }
 
+/**
+ * Resend's `email.received` webhook carries METADATA ONLY (from, to, subject,
+ * attachment names) — never the body. The text/html must be fetched from the
+ * Receiving API with the account API key. Returns {} on any failure so the
+ * message is still recorded (header-only) instead of being lost.
+ */
+async function fetchReceivedBody(emailId) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key || !emailId) return {};
+    try {
+        const res = await fetch(`https://api.resend.com/emails/receiving/${encodeURIComponent(emailId)}`, {
+            headers: { Authorization: `Bearer ${key}` },
+            signal: AbortSignal.timeout(8000)
+        });
+        if (!res.ok) {
+            console.warn(`[MailInbox] body fetch for ${emailId} failed: HTTP ${res.status}`);
+            return {};
+        }
+        return await res.json();
+    } catch (e) {
+        console.warn(`[MailInbox] body fetch for ${emailId} failed: ${e.message}`);
+        return {};
+    }
+}
+
 /** Console rows: headers + preview only, never the (heavy) body. */
 function listInbound() {
     return inbox.map(r => ({ ...r, html: undefined, text: undefined }));
@@ -199,15 +224,22 @@ function verifyResendSignature(headers = {}, rawBody = '', secret = '') {
     if (Math.abs(Date.now() / 1000 - ts) > 600) return { verified: false, reason: 'stale-timestamp' };
 
     try {
-        const expected = crypto.createHmac('sha256', secret.replace(/^whsec_/, ''))
-            .update(Buffer.from(`${id}.${ts}.${rawBody}`, 'utf8'))
-            .digest('base64');
-        const ok = sigs.some(s => {
-            try {
-                return crypto.timingSafeEqual(Buffer.from(s), Buffer.from(expected));
-            } catch {
-                return false;
-            }
+        // Svix signs with the BASE64-DECODED secret (the part after
+        // `whsec_`). Using the encoded text as the key never matches, which
+        // silently rejected every real webhook. The raw-text key is kept as a
+        // fallback for secrets that were pasted without the whsec_ envelope.
+        const bare = secret.trim().replace(/^whsec_/, '');
+        const keys = [Buffer.from(bare, 'base64'), Buffer.from(bare, 'utf8')];
+        const signed = Buffer.from(`${id}.${ts}.${rawBody}`, 'utf8');
+        const ok = keys.some(key => {
+            const expected = crypto.createHmac('sha256', key).update(signed).digest('base64');
+            return sigs.some(s => {
+                try {
+                    return crypto.timingSafeEqual(Buffer.from(s), Buffer.from(expected));
+                } catch {
+                    return false;
+                }
+            });
         });
         return ok ? { verified: true } : { verified: false, reason: 'bad-signature' };
     } catch {
@@ -215,4 +247,4 @@ function verifyResendSignature(headers = {}, rawBody = '', secret = '') {
     }
 }
 
-module.exports = { recordInbound, listInbound, getInbound, markRead, unread, verifyResendSignature, initInbound };
+module.exports = { fetchReceivedBody, recordInbound, listInbound, getInbound, markRead, unread, verifyResendSignature, initInbound };

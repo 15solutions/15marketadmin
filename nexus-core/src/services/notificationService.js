@@ -37,7 +37,7 @@ let notificationStats = { sent: 0, failed: 0, emailsSent: 0, emailsFailed: 0, pu
 // ─── Email design + outbox ───────────────────────────────────────────────
 // One plain design for EVERY email the platform sends: the 15market logo
 // sits on the plain dark background, title + message below, and a shared
-// footer carrying the company line + the no-reply warning.
+// footer carrying the company line.
 //
 // MAILBOX-PROOF: email clients strip <style> blocks (Gmail limits them,
 // Outlook desktop deletes them wholesale), refuse web fonts, and know
@@ -69,6 +69,11 @@ const EMAIL_FOOTER_BG_URL = process.env.EMAIL_FOOTER_BG_URL || 'https://15market
 // Notifications go out from the info@ address. The support@ mailbox is the
 // send-and-receive inbox and is never used as the automated sender.
 const EMAIL_FROM_DEFAULT = '15MARKET <info@15market.online>';
+// support@ is the two-way address: admin-composed mail goes out from it and
+// every reply (to any 15market message) is routed back to it, where the
+// inbound webhook lands it in the admin Mail console.
+const EMAIL_SUPPORT_ADDRESS = process.env.SUPPORT_EMAIL || 'support@15market.online';
+const EMAIL_FROM_SUPPORT = process.env.RESEND_FROM_SUPPORT || `15MARKET Support <${EMAIL_SUPPORT_ADDRESS}>`;
 const EMAIL_OUTBOX_PATH = path.join(__dirname, '..', '..', 'data', 'email-outbox.json');
 
 // The design's typefaces cannot be fetched by most mail clients — keep
@@ -226,7 +231,6 @@ function getEmailShell(innerHtml, headline) {
             @media (prefers-color-scheme: light) {
                 .em-body { color: #3b4a43 !important; }
                 .em-foot { color: #7d8d85 !important; }
-                .em-foot-warn { color: #b45309 !important; }
                 .em-soft { color: #6b7c74 !important; }
                 .em-strong { color: #133a2a !important; }
                 .em-code { color: #159b62 !important; }
@@ -290,7 +294,6 @@ function getEmailShell(innerHtml, headline) {
                         </tr>
                         <tr>
                             <td align="center" class="em-foot" style="text-align:center; font-size:11px; line-height:1.7; color:#6f7f77; font-family:${EMAIL_FONT_BODY}; padding:2px 24px 0;">
-                                <p class="em-foot-warn" style="margin:0 0 10px; color:#e0a166; font-weight:600;">Warning: this is a no-reply email address. Replies to this email will not be read or processed.</p>
                                 <p style="margin:0;">Copyright &#169; 2026 15market &#183; All rights reserved</p>
                             </td>
                         </tr>
@@ -449,6 +452,7 @@ async function sendNotificationEmail(addr, title, message, type, notification) {
         console.log(`[Notification-Email] Sending to ${emailAddress} for ${addr}...`);
         const { data, error } = await resend.emails.send({
             from: process.env.RESEND_FROM || EMAIL_FROM_DEFAULT,
+            replyTo: EMAIL_SUPPORT_ADDRESS,
             to: [emailAddress],
             subject: title,
             html: htmlContent,
@@ -494,6 +498,7 @@ async function sendOtpEmail(emailAddress, code) {
         const htmlContent = getOtpEmailTemplate(code);
         const { data, error } = await resend.emails.send({
             from: process.env.RESEND_FROM || EMAIL_FROM_DEFAULT,
+            replyTo: EMAIL_SUPPORT_ADDRESS,
             to: [emailAddress],
             subject: 'Your Email Verification Code',
             html: htmlContent
@@ -528,7 +533,8 @@ async function sendAdminEmail({ to, subject, message, type = 'info' }) {
     }
     try {
         const { data, error } = await resend.emails.send({
-            from: process.env.RESEND_FROM || EMAIL_FROM_DEFAULT,
+            from: EMAIL_FROM_SUPPORT,
+            replyTo: EMAIL_SUPPORT_ADDRESS,
             to: [to],
             subject: title,
             html: htmlContent

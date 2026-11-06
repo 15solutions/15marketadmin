@@ -855,7 +855,7 @@ const mailbox = require('./mailbox');
 // Boot hydration for the inbound side (Supabase → hot cache + backfill).
 mailbox.initInbound();
 
-app.post('/mail/inbound', (req, res) => {
+app.post('/mail/inbound', async (req, res) => {
     try {
         const secret = process.env.RESEND_WEBHOOK_SECRET || '';
         if (secret) {
@@ -879,7 +879,17 @@ app.post('/mail/inbound', (req, res) => {
         } else {
             console.warn('[MailInbound] accepting UNSIGNED inbound webhook — set RESEND_WEBHOOK_SECRET to enforce Svix signatures');
         }
-        const out = mailbox.recordInbound(req.body);
+        // Only received mail belongs in the inbox. Resend can also deliver
+        // sent/delivered/bounced events to the same endpoint — acknowledge
+        // and ignore those instead of filing them as phantom emails.
+        const evType = req.body && req.body.type;
+        if (evType && evType !== 'email.received') return res.json({ ok: true, ignored: evType });
+
+        // The webhook is metadata-only: pull the body from the Receiving API.
+        const payload = req.body || {};
+        const meta = payload.data || payload;
+        const full = await mailbox.fetchReceivedBody(meta.email_id || meta.id);
+        const out = mailbox.recordInbound({ ...payload, data: { ...meta, ...(full.html != null ? { html: full.html } : {}), ...(full.text != null ? { text: full.text } : {}) } });
         if (out.ok && !out.duplicate && out.email) {
             io.emit('mail_inbound', { id: out.email.id, from: out.email.fromAddr, subject: out.email.subject });
             siem.addEvent({
