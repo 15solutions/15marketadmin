@@ -33,7 +33,7 @@ const SYMBOL_COLORS = {
   ETH: '#627EEA',
   BTC: '#F7931A',
   SOL: '#9945FF',
-  MON: '#00D4AA',
+  MON: '#0E4D30',
   AVAX: '#E84142',
 };
 

@@ -1863,7 +1863,7 @@ export function CircleWalletPage({
                                                 // Dashboard card host comment).
                                                 boxShadow: isLight
                                                     ? '0 10px 24px rgba(14,77,48,0.16), 0 16px 36px rgba(11,50,32,0.12)'
-                                                    : '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20,241,149,0.13)' }}
+                                                    : '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgb(14,77,48,0.13)' }}
                                             className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
                                         >
                                             <div
@@ -1872,7 +1872,7 @@ export function CircleWalletPage({
                                                 style={{
                                                     fontFamily: '"Comfortaa", cursive',
                                                     background: 'linear-gradient(145deg, #0e4d30 0%, #123f28 55%, #0b3220 100%)',
-                                                    border: '1.5px solid rgba(99,194,141,0.45)',
+                                                    border: '1.5px solid rgb(14,77,48,0.45)',
                                                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), inset 0 0 46px rgba(0,0,0,0.28)'
                                                 }}
                                             >
@@ -1893,9 +1893,9 @@ export function CircleWalletPage({
                                                     <svg className="absolute inset-0 w-full h-full" viewBox="0 0 448 260" fill="none">
                                                         <defs>
                                                             <linearGradient id="beam-stroke-hub" x1="0" y1="0" x2="1" y2="0">
-                                                                <stop offset="0%" stopColor="rgba(126,255,199,0)" />
-                                                                <stop offset="42%" stopColor="rgba(126,255,199,0.34)" />
-                                                                <stop offset="74%" stopColor="rgba(178,255,225,0.72)" />
+                                                                <stop offset="0%" stopColor="rgb(14,77,48,0)" />
+                                                                <stop offset="42%" stopColor="rgb(14,77,48,0.34)" />
+                                                                <stop offset="74%" stopColor="rgb(14,77,48,0.72)" />
                                                                 <stop offset="93%" stopColor="rgba(255,255,255,0.88)" />
                                                                 <stop offset="100%" stopColor="rgba(255,255,255,0)" />
                                                             </linearGradient>
@@ -2311,7 +2311,7 @@ export function CircleWalletPage({
                                                                                     id="generate-sol-wallet-btn"
                                                                                     onClick={handleGenerateSolWallet}
                                                                                     disabled={isCreatingSolWallet}
-                                                                                    className="w-full py-3 rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] text-black font-black uppercase text-[8px] tracking-widest hover:opacity-90 active:scale-[0.95] transition-all shadow-lg disabled:opacity-60 flex items-center justify-center gap-1"
+                                                                                    className="w-full py-3 rounded-full bg-gradient-to-r from-[#9945FF] to-[#0E4D30] text-black font-black uppercase text-[8px] tracking-widest hover:opacity-90 active:scale-[0.95] transition-all shadow-lg disabled:opacity-60 flex items-center justify-center gap-1"
                                                                                 >
                                                                                     {isCreatingSolWallet ? <RefreshCw size={10} className="animate-spin" /> : <Zap size={10} />}
                                                                                     {isCreatingSolWallet ? 'Creating...' : 'Generate'}
@@ -2406,7 +2406,7 @@ export function CircleWalletPage({
                                                                                 id="generate-sol-wallet-btn-desktop"
                                                                                 onClick={handleGenerateSolWallet}
                                                                                 disabled={isCreatingSolWallet}
-                                                                                className="px-5 py-3.5 rounded-[16px] bg-gradient-to-r from-[#9945FF] to-[#14F195] text-black font-black uppercase text-[10px] tracking-widest hover:opacity-90 active:scale-[0.97] transition-all shadow-xl shadow-[#9945FF]/25 disabled:opacity-60 flex items-center gap-2"
+                                                                                className="px-5 py-3.5 rounded-[16px] bg-gradient-to-r from-[#9945FF] to-[#0E4D30] text-black font-black uppercase text-[10px] tracking-widest hover:opacity-90 active:scale-[0.97] transition-all shadow-xl shadow-[#9945FF]/25 disabled:opacity-60 flex items-center gap-2"
                                                                             >
                                                                                 {isCreatingSolWallet ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
                                                                                 {isCreatingSolWallet ? 'Creating...' : 'Generate Wallet'}

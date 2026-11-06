@@ -200,7 +200,7 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                     <ArrowLeft size={16} className="text-[#0E4D30]" />
                 </button>
                 <div className="flex items-center gap-2">
-                    {/* Asset recolored in place: glyph is now ~#19784D — brighter than the
+                    {/* Asset recolored in place: glyph is now ~#0E4D30 — brighter than the
                         #0E4D30 brand green without going neon. Used by the trading area too. */}
                     <img
                         src={isLight ? '/goblogo.png' : '/gowlogo.png'}
@@ -449,7 +449,7 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
                                 <button
                                     type="button"
                                     disabled
-                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl border text-[9px] font-black uppercase tracking-widest cursor-not-allowed ${isLight ? 'bg-[#0E4D30]/10 border-[#0E4D30]/30 text-[#0E4D30]' : 'bg-[#0E4D30]/15 border-[#0E4D30]/40 text-[#7ee2b4]'}`}
+                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl border text-[9px] font-black uppercase tracking-widest cursor-not-allowed ${isLight ? 'bg-[#0E4D30]/10 border-[#0E4D30]/30 text-[#0E4D30]' : 'bg-[#0E4D30]/15 border-[#0E4D30]/40 text-[#0E4D30]'}`}
                                     title="Payout chain — automatically set to Arc for now"
                                 >
                                     <Lock size={11} /> Chain: Arc (auto)

@@ -120,12 +120,12 @@ body.theme-arc {
 }
 
 :root {
-  --primary-color: #3CB371;
-  --primary-glow: rgba(60, 179, 113, 0.7);
-  --primary-glow-subtle: rgba(60, 179, 113, 0.3);
-  --primary-border: rgba(60, 179, 113, 0.5);
-  --primary-bg: rgba(60, 179, 113, 0.1);
-  --primary-bg-hover: rgba(60, 179, 113, 0.2);
+  --primary-color: #0E4D30;
+  --primary-glow: rgb(14,77,48, 0.7);
+  --primary-glow-subtle: rgb(14,77,48, 0.3);
+  --primary-border: rgb(14,77,48, 0.5);
+  --primary-bg: rgb(14,77,48, 0.1);
+  --primary-bg-hover: rgb(14,77,48, 0.2);
   --primary-bg-modal: rgba(13, 13, 13, 0.95);
 }
 
@@ -144,12 +144,12 @@ body.theme-arc {
 }
 
 .light:not(.theme-arc) {
-  --primary-color: #059669;
-  --primary-glow: rgba(5, 150, 105, 0.7);
-  --primary-glow-subtle: rgba(5, 150, 105, 0.3);
-  --primary-border: rgba(5, 150, 105, 0.5);
-  --primary-bg: rgba(5, 150, 105, 0.1);
-  --primary-bg-hover: rgba(5, 150, 105, 0.2);
+  --primary-color: #0E4D30;
+  --primary-glow: rgb(14,77,48, 0.7);
+  --primary-glow-subtle: rgb(14,77,48, 0.3);
+  --primary-border: rgb(14,77,48, 0.5);
+  --primary-bg: rgb(14,77,48, 0.1);
+  --primary-bg-hover: rgb(14,77,48, 0.2);
 }
 
 .light.theme-arc {

@@ -33,7 +33,7 @@ function useFittedSize(wrapperRef) {
 //   dark  — sphere renders near-black; white-hot dots × multiply(green) = brand dots
 //   light — sphere renders white;        dark dots  × lighten(green)  = brand dots
 // Neutral [0.3,...] is load-bearing: darker bases (e.g. 0.1) kill the dots.
-const BRAND = "#3CB371";
+const BRAND = "#0E4D30";
 const SCHEMES = {
     dark: {
         cobe: {

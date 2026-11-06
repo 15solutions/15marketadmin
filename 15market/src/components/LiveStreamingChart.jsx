@@ -365,7 +365,7 @@ function LiveStreamingChartComponent({ theme, symbol, activeTrades = [], current
             ctx.lineWidth = 1.5;
             ctx.strokeStyle = isLight ? '#123F28' : GREEN;
             ctx.shadowBlur = 15;
-            ctx.shadowColor = isLight ? 'rgba(30,90,56,0.5)' : 'rgba(14,77,48,0.6)';
+            ctx.shadowColor = isLight ? 'rgb(14,77,48,0.5)' : 'rgba(14,77,48,0.6)';
             ctx.moveTo(startX, startY);
             for (let i = firstIdx + 1; i <= lastIdx; i++) {
                 ctx.lineTo(getX(history[i].t), toY(history[i].p));

@@ -603,7 +603,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             style={{
                 fontFamily: '"Comfortaa", cursive',
                 background: 'linear-gradient(145deg, #0e4d30 0%, #123f28 55%, #0b3220 100%)',
-                border: '1.5px solid rgba(99,194,141,0.45)',
+                border: '1.5px solid rgb(14,77,48,0.45)',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), inset 0 0 46px rgba(0,0,0,0.28)'
             }}
         >
@@ -624,9 +624,9 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 448 260" fill="none">
                     <defs>
                         <linearGradient id="beam-stroke-dash" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0%" stopColor="rgba(126,255,199,0)" />
-                            <stop offset="42%" stopColor="rgba(126,255,199,0.34)" />
-                            <stop offset="74%" stopColor="rgba(178,255,225,0.72)" />
+                            <stop offset="0%" stopColor="rgb(14,77,48,0)" />
+                            <stop offset="42%" stopColor="rgb(14,77,48,0.34)" />
+                            <stop offset="74%" stopColor="rgb(14,77,48,0.72)" />
                             <stop offset="93%" stopColor="rgba(255,255,255,0.88)" />
                             <stop offset="100%" stopColor="rgba(255,255,255,0)" />
                         </linearGradient>
@@ -781,7 +781,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 // tinted shadow instead.
                                 boxShadow: isLight
                                     ? '0 10px 24px rgba(14,77,48,0.16), 0 16px 36px rgba(11,50,32,0.12)'
-                                    : '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgba(20,241,149,0.13)' }}
+                                    : '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgb(14,77,48,0.13)' }}
                             className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
                         >
                             {renderWalletCard(walletCardSide)}
@@ -1619,7 +1619,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     <button onClick={() => setModalConfig(null)} className={`py-4 ${isLight ? 'bg-[#eef5f1] text-[#133a2a] hover:bg-[#e2ece5]' : 'bg-white/10 text-white hover:bg-white/20'} text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Cancel</button>
                                 )}
                                 <button onClick={() => { if(modalConfig.onConfirm) modalConfig.onConfirm(); setModalConfig(null); }}
-                                    className={`py-4 ${isLight ? 'bg-[#133a2a] hover:bg-[#1a4a37]' : 'bg-white/10 hover:bg-white/20'} text-white text-xs font-black uppercase tracking-widest rounded-full transition-all ${modalConfig.type==='alert'?'col-span-2':''}`}>
+                                    className={`py-4 ${isLight ? 'bg-[#133a2a] hover:bg-[#0E4D30]' : 'bg-white/10 hover:bg-white/20'} text-white text-xs font-black uppercase tracking-widest rounded-full transition-all ${modalConfig.type==='alert'?'col-span-2':''}`}>
                                     {modalConfig.confirmText||"OK"}
                                 </button>
                             </div>
@@ -1641,7 +1641,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 onKeyDown={(e) => { if(e.key==='Enter'){promptConfig.onConfirm(promptValue);setPromptConfig(null);} }}/>
                             <div className="grid grid-cols-2 gap-4 w-full">
                                 <button onClick={() => {setPromptConfig(null);setPromptValue("");}} className={`py-4 ${isLight ? 'bg-[#eef5f1] text-[#133a2a] hover:bg-[#e2ece5]' : 'bg-white/10 text-white hover:bg-white/20'} text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Cancel</button>
-                                <button onClick={() => {promptConfig.onConfirm(promptValue);setPromptConfig(null);setPromptValue("");}} className={`py-4 ${isLight ? 'bg-[#133a2a] hover:bg-[#1a4a37]' : 'bg-white/10 hover:bg-white/20'} text-white text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Confirm</button>
+                                <button onClick={() => {promptConfig.onConfirm(promptValue);setPromptConfig(null);setPromptValue("");}} className={`py-4 ${isLight ? 'bg-[#133a2a] hover:bg-[#0E4D30]' : 'bg-white/10 hover:bg-white/20'} text-white text-xs font-black uppercase tracking-widest rounded-full transition-all`}>Confirm</button>
                             </div>
                             {promptConfig.footer && <div className="mt-6 w-full">{promptConfig.footer}</div>}
                         </div>

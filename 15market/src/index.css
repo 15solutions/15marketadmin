@@ -370,7 +370,7 @@ body.light {
 /* Light Mode Borders */
 .light .border-white\/5,
 .light .border-white\/10 {
-  border-color: rgba(30, 90, 56, 0.12) !important;
+  border-color: rgb(14,77,48, 0.12) !important;
 }
 
 /* Light Mode Backgrounds — Clean Elevations */
@@ -404,11 +404,11 @@ body.light {
 
 /* Light Mode Hover States */
 .light .hover\:bg-white\/5:hover {
-  background-color: rgba(30, 90, 56, 0.10) !important;
+  background-color: rgb(14,77,48, 0.10) !important;
 }
 
 .light .hover\:bg-white\/10:hover {
-  background-color: rgba(30, 90, 56, 0.14) !important;
+  background-color: rgb(14,77,48, 0.14) !important;
 }
 
 /* Light Mode Input Fields — Disabled: new design sets input styles explicitly */
@@ -417,7 +417,7 @@ body.light {
 .light select,
 .light textarea {
   background-color: rgba(255, 255, 255, 0.4) !important;
-  border-color: rgba(30, 90, 56, 0.2) !important;
+  border-color: rgb(14,77,48, 0.2) !important;
   color: #05140b !important;
 }
 */

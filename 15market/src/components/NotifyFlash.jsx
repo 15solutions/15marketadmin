@@ -13,8 +13,8 @@ import { Check, X, Info } from 'lucide-react';
 const KINDS = {
     success: {
         icon: Check,
-        ink: '#6EF2B0',
-        ring: 'rgba(110,242,176,0.55)',
+        ink: '#0E4D30',
+        ring: 'rgb(14,77,48,0.55)',
         hue: '26,97,64',
         label: 'Confirmed'
     },
@@ -27,15 +27,15 @@ const KINDS = {
     },
     pending: {
         icon: Info,
-        ink: '#6EF2B0',
-        ring: 'rgba(110,242,176,0.55)',
+        ink: '#0E4D30',
+        ring: 'rgb(14,77,48,0.55)',
         hue: '26,97,64',
         label: 'In progress'
     },
     info: {
         icon: Info,
-        ink: '#6EF2B0',
-        ring: 'rgba(110,242,176,0.55)',
+        ink: '#0E4D30',
+        ring: 'rgb(14,77,48,0.55)',
         hue: '26,97,64',
         label: 'Notice'
     }

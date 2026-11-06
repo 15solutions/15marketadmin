@@ -32,14 +32,14 @@ const DEST = [
 ];
 
 // NIGHT is rendered straight from the reference's structure, recolored to the
-// brand's green: mint (#3CB371) atmosphere, sage land, #4FB57F arcs.
+// brand's green: mint (#0E4D30) atmosphere, sage land, #0E4D30 arcs.
 const NIGHT = {
   ground: "transparent",
-  land: "#98c9ae",
-  arc: "#4FB57F",
+  land: "#0E4D30",
+  arc: "#0E4D30",
   glow: "rgb(60 179 113 / 0.13)",
   text: "#eaf7ef",
-  muted: "#7fb396",
+  muted: "#0E4D30",
 };
 
 export function RouteGlobe({

@@ -41,7 +41,7 @@ export function DailyChange({ pct, invert = false, size = 'md' }) {
     const good = flat ? null : (invert ? !up : up);
     const tone = good === null
         ? 'text-current opacity-40'
-        : good ? 'text-[#3CB371]' : 'text-[#EF5350]';
+        : good ? 'text-[#0E4D30]' : 'text-[#EF5350]';
     const Icon = flat ? Minus : up ? TrendingUp : TrendingDown;
     const text = size === 'sm' ? 'text-[8px]' : 'text-[9px]';
 

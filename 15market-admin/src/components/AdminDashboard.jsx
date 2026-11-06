@@ -201,15 +201,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     // THE metric rows, shared by the desktop side panels and the mobile strip.
     const platformStats = useMemo(() => ([
         { label: 'Registered Users', value: String(stats.totalWallets | 0), color: '#a855f7', daily: dailyChanges.totalWallets },
-        { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#14b8a6', daily: dailyChanges.totalTrades },
+        { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#0E4D30', daily: dailyChanges.totalTrades },
         { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b', daily: dailyChanges.activeStakesTotal },
-        { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true, daily: dailyChanges.treasuryBalance }
+        { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#0E4D30', usdc: true, daily: dailyChanges.treasuryBalance }
     ]), [stats.totalWallets, stats.totalTrades, stats.activeStakesTotal, stats.treasuryBalance, dailyChanges]);
     const pulseStats = useMemo(() => ([
-        { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e', daily: dailyChanges.activeCount },
-        { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371', daily: dailyChanges.totalVolume },
+        { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#0E4D30', daily: dailyChanges.activeCount },
+        { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#0E4D30', daily: dailyChanges.totalVolume },
         { label: 'Open Disputes', value: String(stats.pendingDisputes | 0), color: '#ef4444', daily: dailyChanges.pendingDisputes, invert: true },
-        { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, color: '#3CB371', daily: dailyChanges.bullBearRatio }
+        { label: 'Bullish Sentiment', value: `${stats.bullBearRatio != null ? stats.bullBearRatio : 50}%`, color: '#0E4D30', daily: dailyChanges.bullBearRatio }
     ]), [stats.activeCount, stats.totalVolume, stats.pendingDisputes, stats.bullBearRatio, dailyChanges]);
 
     const [recentActivity, setRecentActivity] = useState([]);
@@ -399,7 +399,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 </button>
             )}
             {act.won && !act.payoutFailed && (act.paid !== false) && (
-                <span className={`px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest w-fit ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-[#0E4D30]/20 text-[#4ade80]'}`}>
+                <span className={`px-1.5 py-[2px] rounded-full text-[7px] font-black uppercase tracking-widest w-fit ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-[#0E4D30]/20 text-[#0E4D30]'}`}>
                     Paid
                 </span>
             )}
@@ -1903,11 +1903,11 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         platform health reads at a glance. */}
                     <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory gap-4 md:grid md:grid-cols-3 lg:grid-cols-6 md:gap-6 md:overflow-visible">
                         {[
-                            { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#3CB371', daily: dailyChanges.totalVolume },
+                            { label: 'Total Volume', value: `$${Number(stats.totalVolume || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#0E4D30', daily: dailyChanges.totalVolume },
                             { label: 'Revenue · Fees', value: `$${Number(stats.platformRevenue || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, color: '#3b82f6', daily: dailyChanges.platformRevenue },
-                            { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#22c55e', daily: dailyChanges.activeCount },
+                            { label: 'Users Live Now', value: String(stats.activeCount | 0), color: '#0E4D30', daily: dailyChanges.activeCount },
                             { label: 'Active Stakes', value: `$${Number(stats.activeStakesTotal || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`, color: '#f59e0b', daily: dailyChanges.activeStakesTotal },
-                            { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#3CB371', usdc: true, daily: dailyChanges.treasuryBalance },
+                            { label: 'Treasury', value: Number(stats.treasuryBalance || 0).toFixed(2), color: '#0E4D30', usdc: true, daily: dailyChanges.treasuryBalance },
                             { label: 'Total Trades', value: String(stats.totalTrades | 0), color: '#a78bfa', daily: dailyChanges.totalTrades }
                         ].map((stat, i) => (
                             <div key={i} className="border-l-2 pl-3 min-w-0 flex-none w-[128px] snap-start md:w-auto md:flex-1" style={{ borderColor: `${stat.color}55` }}>
@@ -2079,10 +2079,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         ) : Object.entries(stats.userCountries || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([iso, count], i) => (
                             <div key={iso} className={`flex items-center justify-between gap-4 py-2.5 ${i > 0 ? (isLight ? 'border-t border-black/5' : 'border-t border-white/5') : ''}`}>
                                 <div className="flex items-center gap-3">
-                                    <span className={`w-8 py-1 rounded-lg text-[8px] font-black uppercase flex items-center justify-center ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-[#0E4D30]/15 text-[#3CB371]'}`}>{iso}</span>
+                                    <span className={`w-8 py-1 rounded-lg text-[8px] font-black uppercase flex items-center justify-center ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-[#0E4D30]/15 text-[#0E4D30]'}`}>{iso}</span>
                                     <span className="text-[9px] font-black uppercase tracking-widest opacity-50">Users</span>
                                 </div>
-                                <span className="text-sm font-black text-[#3CB371] whitespace-nowrap">{count}</span>
+                                <span className="text-sm font-black text-[#0E4D30] whitespace-nowrap">{count}</span>
                             </div>
                         ))}
                     </div>
@@ -3107,7 +3107,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                                 disabled={blockBusy === ev.ip}
                                                 title={blockedNow ? 'Restore access' : 'Block this IP across the platform'}
                                                 className={`flex-none p-1.5 rounded-md border transition-colors ${blockedNow
-                                                    ? `border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 ${isLight ? '' : ''}`
+                                                    ? `border-[#0E4D30]/30 text-[#0E4D30] hover:bg-[#0E4D30]/10 ${isLight ? '' : ''}`
                                                     : `border-red-500/30 text-red-500 hover:bg-red-500/10 ${isLight ? '' : ''}`} disabled:opacity-40`}
                                             >
                                                 {blockBusy === ev.ip ? <RefreshCw size={10} className="animate-spin" /> : <Ban size={10} />}
@@ -3584,7 +3584,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         </button>
                                     ))}
                                 </div>
-                                <button onClick={fetchRefWithdrawals} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30] hover:bg-[#0E4D30]/20' : 'bg-[#0E4D30]/15 text-[#3CB371] hover:bg-[#0E4D30]/25'}`}>
+                                <button onClick={fetchRefWithdrawals} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30] hover:bg-[#0E4D30]/20' : 'bg-[#0E4D30]/15 text-[#0E4D30] hover:bg-[#0E4D30]/25'}`}>
                                     <RefreshCw size={13} />
                                 </button>
                             </div>
@@ -3678,7 +3678,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                         className={`w-full pl-10 pr-3 py-2.5 rounded-xl border text-[10px] font-bold outline-none transition-all ${isLight ? 'bg-white border-black/10 focus:border-[#0E4D30] text-black' : 'bg-black/40 border-white/10 focus:border-[#0E4D30] text-white'}`}
                                     />
                                 </div>
-                                <button onClick={() => fetchRefUsers()} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30] hover:bg-[#0E4D30]/20' : 'bg-[#0E4D30]/15 text-[#3CB371] hover:bg-[#0E4D30]/25'}`}>
+                                <button onClick={() => fetchRefUsers()} className={`p-2.5 rounded-xl transition-all shrink-0 ${isLight ? 'bg-[#0E4D30]/10 text-[#0E4D30] hover:bg-[#0E4D30]/20' : 'bg-[#0E4D30]/15 text-[#0E4D30] hover:bg-[#0E4D30]/25'}`}>
                                     <RefreshCw size={13} />
                                 </button>
                             </div>
@@ -3990,10 +3990,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 ref={(el) => { if (el) mobileNavRefs.current[t.key] = el; else delete mobileNavRefs.current[t.key]; }}
                                 onClick={() => selectSection(t.key)}
                                 className={`relative flex-none w-[100px] shrink-0 snap-start flex flex-col items-center gap-1.5 py-3 rounded-2xl transition-all active:scale-95 ${active
-                                    ? 'text-[#3CB371]'
+                                    ? 'text-[#0E4D30]'
                                     : isLight ? 'text-black/40' : 'text-white/40'}`}
                             >
-                                {active && <motion.div layoutId="mob-tab-dot" className="absolute top-0 h-[3px] w-8 rounded-full bg-[#3CB371]" />}
+                                {active && <motion.div layoutId="mob-tab-dot" className="absolute top-0 h-[3px] w-8 rounded-full bg-[#0E4D30]" />}
                                 <Icon size={24} className="flex-none" />
                                 <span className="text-[9px] font-black uppercase tracking-widest truncate max-w-full">{t.label}</span>
                                 {badge > 0 && (
