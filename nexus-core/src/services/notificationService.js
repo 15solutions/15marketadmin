@@ -286,7 +286,7 @@ function getEmailShell(innerHtml, headline) {
                             <td align="center" style="padding:0 0 18px; text-align:center;">
                                 <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto; border-collapse:collapse;">
                                     <tr>
-                                        <td style="padding:0 6px;"><a href="https://x.com/15market" target="_blank" style="text-decoration:none;"><img src="${EMAIL_ICON_X_URL}" alt="X" width="28" height="28" style="display:block; width:28px; height:28px; border:0; outline:none;" /></a></td>
+                                        <td style="padding:0 6px;"><a href="https://x.com/15_markets" target="_blank" style="text-decoration:none;"><img src="${EMAIL_ICON_X_URL}" alt="X" width="28" height="28" style="display:block; width:28px; height:28px; border:0; outline:none;" /></a></td>
                                         <td style="padding:0 6px;"><a href="https://discord.gg/15market" target="_blank" style="text-decoration:none;"><img src="${EMAIL_ICON_DISCORD_URL}" alt="Discord" width="28" height="28" style="display:block; width:28px; height:28px; border:0; outline:none;" /></a></td>
                                     </tr>
                                 </table>
