@@ -64,6 +64,8 @@ const EMAIL_PATTERN_URL = process.env.EMAIL_PATTERN_URL || 'https://15market.onl
 const EMAIL_BANNER_BG_URL = process.env.EMAIL_BANNER_BG_URL || 'https://15market.online/mail-banner-bg.png';
 const EMAIL_ICON_X_URL = process.env.EMAIL_ICON_X_URL || 'https://15market.online/mail-icon-x.png';
 const EMAIL_ICON_DISCORD_URL = process.env.EMAIL_ICON_DISCORD_URL || 'https://15market.online/mail-icon-discord.png';
+// Footer strip canvas: the pulse motif mirrored — emitter on the left edge.
+const EMAIL_FOOTER_BG_URL = process.env.EMAIL_FOOTER_BG_URL || 'https://15market.online/mail-footer-bg.png';
 const EMAIL_OUTBOX_PATH = path.join(__dirname, '..', '..', 'data', 'email-outbox.json');
 
 // The design's typefaces cannot be fetched by most mail clients — keep
@@ -254,14 +256,14 @@ function getEmailShell(innerHtml, headline) {
                             </td>
                         </tr>
                         ${innerHtml}
-                        <!-- Footer: constant brand-green strip with the
-                             wordmark right-aligned (FCMB-style), then round
-                             social buttons (pre-baked circle bitmaps — SVG
-                             does not render in mail clients), then the
-                             no-reply warning + copyright. -->
+                        <!-- Footer: constant brand-green strip mirroring the
+                             header's pulse motif — emitter + ripples on the
+                             LEFT edge, fading right so the right-aligned
+                             wordmark sits on calm ground. bgcolor fallback
+                             keeps it a clean bar if remote images are off. -->
                         <tr>
                             <td style="padding:34px 0 18px;">
-                                <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#0E4D30" style="width:100%; background-color:#0E4D30; border-radius:14px; border-collapse:separate;">
+                                <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#0E4D30" background="${EMAIL_FOOTER_BG_URL}" style="width:100%; background-color:#0E4D30; background-image:url('${EMAIL_FOOTER_BG_URL}'); background-repeat:no-repeat; background-size:cover; border-radius:14px; border-collapse:separate;">
                                     <tr>
                                         <td align="right" style="padding:15px 20px; font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:17px; color:#ffffff;">15market</td>
                                     </tr>
