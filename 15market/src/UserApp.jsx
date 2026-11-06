@@ -245,7 +245,7 @@ const DissolveTransition = ({ isAnimating, targetTheme }) => {
       }}
       className="fixed inset-0 z-[10000] pointer-events-none"
       style={{
-        backgroundColor: targetTheme === 'light' ? '#8CB09D' : '#030303',
+        backgroundColor: targetTheme === 'light' ? '#F4F7F5' : '#030303',
       }}
     />
   );
@@ -3333,7 +3333,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
-            className={`fixed inset-0 z-[5000] ${theme === 'light' ? 'bg-[#8CB09D]' : 'bg-[#050505]'}`}
+            className={`fixed inset-0 z-[5000] ${theme === 'light' ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}
           />
         )}
         {isWalletLoading && (

@@ -22,7 +22,7 @@ const getLogoFilter = (isLight) => ('brightness(0) saturate(100%) invert(29%) se
 
 export default function CustomChart({ symbol = 'SOLUSDT', theme = 'dark', currentPrice, activeMarket, setActiveMarket, activeTrades = [], uiVersion = 'v1', priceHistory = [], windowMs = 20000 }) {
     const isDark = theme !== 'light';
-    const controlBgAlt = isDark ? 'bg-[#0a0a0a]/95' : 'bg-[#8CB09D]/95';
+    const controlBgAlt = isDark ? 'bg-[#0a0a0a]/95' : 'bg-[#F4F7F5]/95';
     const controlBorder = isDark ? 'border-white/10' : 'border-[#0E4D30]/25';
     const controlText = isDark ? 'text-white' : 'text-[#0a261a]';
     const controlTextDim = isDark ? 'text-white/40' : 'text-[#0a261a]/60';

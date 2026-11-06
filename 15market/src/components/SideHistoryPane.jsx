@@ -61,7 +61,7 @@ const SideHistoryPane = ({
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
                             transition={{ delay: 0.1 }}
-                            className={`flex-1 flex flex-col overflow-hidden py-6 pr-4 pl-2 ${!isDark ? 'bg-[#8CB09D]' : ''}`}
+                            className={`flex-1 flex flex-col overflow-hidden py-6 pr-4 pl-2 ${!isDark ? 'bg-[#F4F7F5]' : ''}`}
                         >
                             <div className="flex items-center justify-between mb-6 px-2">
                                 <div className="flex items-center gap-2">
