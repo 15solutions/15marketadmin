@@ -971,7 +971,6 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     <AnimatedRefresh size={12} className="text-[#0E4D30]"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Transactions</span>
                                 </div>
-                                <button className={`text-[8px] font-bold ${isLight ? 'text-black/50 hover:text-black' : 'text-white/40 hover:text-white'} flex items-center gap-1 uppercase tracking-widest transition-colors`}>View all<ChevronRight size={10}/></button>
                             </div>
                             <div className="flex-1 tx-scroll flex flex-col gap-3">
                                 {(!transactionHistory||transactionHistory.length===0) ? (
@@ -1133,7 +1132,6 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                         <AnimatedRefresh size={14} className="text-[#0E4D30]"/>
                                         <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Transactions</span>
                                     </div>
-                                    <button className={`text-[9px] font-bold ${isLight ? 'text-black/50 hover:text-black' : 'text-white/40 hover:text-white'} flex items-center gap-1 uppercase tracking-widest transition-colors`}>View all<ChevronRight size={12}/></button>
                                 </div>
                                 <div className="flex-1 tx-scroll flex flex-col gap-4">
                                     {(!transactionHistory||transactionHistory.length===0) ? (
