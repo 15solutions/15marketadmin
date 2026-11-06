@@ -66,6 +66,9 @@ const EMAIL_ICON_X_URL = process.env.EMAIL_ICON_X_URL || 'https://15market.onlin
 const EMAIL_ICON_DISCORD_URL = process.env.EMAIL_ICON_DISCORD_URL || 'https://15market.online/mail-icon-discord.png';
 // Footer strip canvas: the pulse motif mirrored — emitter on the left edge.
 const EMAIL_FOOTER_BG_URL = process.env.EMAIL_FOOTER_BG_URL || 'https://15market.online/mail-footer-bg.png';
+// Notifications go out from the info@ address. The support@ mailbox is the
+// send-and-receive inbox and is never used as the automated sender.
+const EMAIL_FROM_DEFAULT = '15MARKET <info@15market.online>';
 const EMAIL_OUTBOX_PATH = path.join(__dirname, '..', '..', 'data', 'email-outbox.json');
 
 // The design's typefaces cannot be fetched by most mail clients — keep
@@ -234,8 +237,8 @@ function getEmailShell(innerHtml, headline) {
     <body style="margin:0; padding:0;">
         <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%; margin:0; padding:0; border-collapse:collapse;">
             <tr>
-                <td align="center" style="padding:52px 20px 44px;">
-                    <table role="presentation" width="540" border="0" cellpadding="0" cellspacing="0" style="width:100%; max-width:540px; border-collapse:collapse; text-align:left;">
+                <td align="center" style="padding:0 0 36px;">
+                    <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; text-align:left;">
                         <!-- Header banner: ONE baked canvas (pattern fading
                              to solid toward the left where the logo sits,
                              Glassdoor-style) used as the td background with
@@ -243,18 +246,24 @@ function getEmailShell(innerHtml, headline) {
                              up 2.2x, no wordmark; the headline is the big
                              bold white line inside the banner. -->
                         <tr>
-                            <td style="padding:0 0 28px;">
-                                <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#0E4D30" background="${EMAIL_BANNER_BG_URL}" style="width:100%; background-color:#0E4D30; background-image:url('${EMAIL_BANNER_BG_URL}'); background-repeat:no-repeat; background-size:cover; border-radius:20px; border-collapse:separate;">
+                            <td style="padding:0 0 22px;">
+                                <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#0E4D30" background="${EMAIL_BANNER_BG_URL}" style="width:100%; background-color:#0E4D30; background-image:url('${EMAIL_BANNER_BG_URL}'); background-repeat:no-repeat; background-size:cover; border-collapse:collapse;">
                                     <tr>
-                                        <td style="padding:24px 28px 16px;">
-                                            <img src="${EMAIL_LOGO_URL}" alt="15market" width="108" height="108" style="display:block; width:108px; height:108px; border:0; outline:none; text-decoration:none;" />
-                                            <h1 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:32px; line-height:1.15; color:#ffffff; margin:4px 0 0; text-align:left;">${headline || ''}</h1>
+                                        <td style="padding:17px 24px 11px;">
+                                            <img src="${EMAIL_LOGO_URL}" alt="15market" width="76" height="76" style="display:block; width:76px; height:76px; border:0; outline:none; text-decoration:none;" />
+                                            <h1 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:22px; line-height:1.15; color:#ffffff; margin:3px 0 0; text-align:left;">${headline || ''}</h1>
                                         </td>
                                     </tr>
                                 </table>
                             </td>
                         </tr>
-                        ${innerHtml}
+                        <tr>
+                            <td style="padding:0 24px;">
+                                <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%; max-width:540px; margin:0 auto; border-collapse:collapse; text-align:left;">
+                                    ${innerHtml}
+                                </table>
+                            </td>
+                        </tr>
                         <!-- Footer: constant brand-green strip mirroring the
                              header's pulse motif — emitter + ripples on the
                              LEFT edge, fading right so the right-aligned
@@ -262,9 +271,9 @@ function getEmailShell(innerHtml, headline) {
                              keeps it a clean bar if remote images are off. -->
                         <tr>
                             <td style="padding:34px 0 18px;">
-                                <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#0E4D30" background="${EMAIL_FOOTER_BG_URL}" style="width:100%; background-color:#0E4D30; background-image:url('${EMAIL_FOOTER_BG_URL}'); background-repeat:no-repeat; background-size:cover; border-radius:14px; border-collapse:separate;">
+                                <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#0E4D30" background="${EMAIL_FOOTER_BG_URL}" style="width:100%; background-color:#0E4D30; background-image:url('${EMAIL_FOOTER_BG_URL}'); background-repeat:no-repeat; background-size:cover; border-collapse:collapse;">
                                     <tr>
-                                        <td align="right" style="padding:15px 20px; font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:17px; color:#ffffff;">15market</td>
+                                        <td align="right" style="padding:15px 24px; font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:17px; color:#ffffff;">15market</td>
                                     </tr>
                                 </table>
                             </td>
@@ -280,7 +289,7 @@ function getEmailShell(innerHtml, headline) {
                             </td>
                         </tr>
                         <tr>
-                            <td align="center" class="em-foot" style="text-align:center; font-size:11px; line-height:1.7; color:#6f7f77; font-family:${EMAIL_FONT_BODY}; padding:2px 0 0;">
+                            <td align="center" class="em-foot" style="text-align:center; font-size:11px; line-height:1.7; color:#6f7f77; font-family:${EMAIL_FONT_BODY}; padding:2px 24px 0;">
                                 <p class="em-foot-warn" style="margin:0 0 10px; color:#e0a166; font-weight:600;">Warning: this is a no-reply email address. Replies to this email will not be read or processed.</p>
                                 <p style="margin:0;">Copyright &#169; 2026 15market &#183; All rights reserved</p>
                             </td>
@@ -439,7 +448,7 @@ async function sendNotificationEmail(addr, title, message, type, notification) {
 
         console.log(`[Notification-Email] Sending to ${emailAddress} for ${addr}...`);
         const { data, error } = await resend.emails.send({
-            from: process.env.RESEND_FROM || '15MARKET <onboarding@resend.dev>',
+            from: process.env.RESEND_FROM || EMAIL_FROM_DEFAULT,
             to: [emailAddress],
             subject: title,
             html: htmlContent,
@@ -484,7 +493,7 @@ async function sendOtpEmail(emailAddress, code) {
     try {
         const htmlContent = getOtpEmailTemplate(code);
         const { data, error } = await resend.emails.send({
-            from: process.env.RESEND_FROM || '15MARKET <onboarding@resend.dev>',
+            from: process.env.RESEND_FROM || EMAIL_FROM_DEFAULT,
             to: [emailAddress],
             subject: 'Your Email Verification Code',
             html: htmlContent
@@ -519,7 +528,7 @@ async function sendAdminEmail({ to, subject, message, type = 'info' }) {
     }
     try {
         const { data, error } = await resend.emails.send({
-            from: process.env.RESEND_FROM || '15MARKET <onboarding@resend.dev>',
+            from: process.env.RESEND_FROM || EMAIL_FROM_DEFAULT,
             to: [to],
             subject: title,
             html: htmlContent
