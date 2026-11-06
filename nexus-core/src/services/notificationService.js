@@ -59,6 +59,9 @@ const EMAIL_LOGO_URL_LIGHT = process.env.EMAIL_LOGO_URL_LIGHT || 'https://15mark
 // logo). Cells carry bgcolor fallbacks, so a client that refuses remote
 // background images still renders a clean solid banner.
 const EMAIL_PATTERN_URL = process.env.EMAIL_PATTERN_URL || 'https://15market.online/mail-banner-tile.png';
+// The full header canvas as one baked bitmap (solid-left fade into the
+// rings motif) — gradients/fades cannot be done reliably in mail CSS.
+const EMAIL_BANNER_BG_URL = process.env.EMAIL_BANNER_BG_URL || 'https://15market.online/mail-banner-bg.png';
 const EMAIL_ICON_X_URL = process.env.EMAIL_ICON_X_URL || 'https://15market.online/mail-icon-x.png';
 const EMAIL_ICON_DISCORD_URL = process.env.EMAIL_ICON_DISCORD_URL || 'https://15market.online/mail-icon-discord.png';
 const EMAIL_OUTBOX_PATH = path.join(__dirname, '..', '..', 'data', 'email-outbox.json');
@@ -232,27 +235,19 @@ function getEmailShell(innerHtml, headline) {
             <tr>
                 <td align="center" bgcolor="#070a09" class="em-bg" style="background-color:#070a09; padding:52px 20px 44px;">
                     <table role="presentation" width="540" border="0" cellpadding="0" cellspacing="0" style="width:100%; max-width:540px; border-collapse:collapse; text-align:left;">
-                        <!-- Header banner: a constant deep-green canvas carrying
-                             the interlocked-rings pattern tile, the brand mark
-                             + wordmark on the LEFT (Glassdoor-style) and the
-                             headline in bold white inside — not on the page
-                             background. background attribute + inline style
-                             + bgcolor stack: whatever the client honours, the
-                             banner still renders (worst case solid green). -->
+                        <!-- Header banner: ONE baked canvas (pattern fading
+                             to solid toward the left where the logo sits,
+                             Glassdoor-style) used as the td background with
+                             a solid bgcolor fallback. Logo-only mark blown
+                             up 2.2x, no wordmark; the headline is the big
+                             bold white line inside the banner. -->
                         <tr>
                             <td style="padding:0 0 28px;">
-                                <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#0E4D30" background="${EMAIL_PATTERN_URL}" style="width:100%; background-color:#0E4D30; background-image:url('${EMAIL_PATTERN_URL}'); background-repeat:repeat; background-size:96px 96px; border-radius:20px; border-collapse:separate;">
+                                <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#0E4D30" background="${EMAIL_BANNER_BG_URL}" style="width:100%; background-color:#0E4D30; background-image:url('${EMAIL_BANNER_BG_URL}'); background-repeat:no-repeat; background-size:cover; border-radius:20px; border-collapse:separate;">
                                     <tr>
                                         <td style="padding:30px 28px 28px;">
-                                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-                                                <tr>
-                                                    <td style="padding:0 12px 0 0; vertical-align:middle;">
-                                                        <img src="${EMAIL_LOGO_URL}" alt="15market" width="46" height="46" style="display:block; width:46px; height:46px; border:0; outline:none; text-decoration:none;" />
-                                                    </td>
-                                                    <td style="vertical-align:middle; font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:21px; letter-spacing:0.5px; color:#ffffff; white-space:nowrap;">15market</td>
-                                                </tr>
-                                            </table>
-                                            <h1 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:25px; line-height:1.25; color:#ffffff; margin:24px 0 0; text-align:left;">${headline || ''}</h1>
+                                            <img src="${EMAIL_LOGO_URL}" alt="15market" width="160" height="160" style="display:block; width:160px; height:160px; border:0; outline:none; text-decoration:none;" />
+                                            <h1 style="font-family:${EMAIL_FONT_BRAND}; font-weight:900; font-size:30px; line-height:1.22; color:#ffffff; margin:10px 0 0; text-align:left;">${headline || ''}</h1>
                                         </td>
                                     </tr>
                                 </table>
