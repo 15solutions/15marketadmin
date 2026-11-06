@@ -37,6 +37,12 @@ export function AdminPortal({ onBack, notify }) {
     const [otpError, setOtpError] = useState('');
     const [resendIn, setResendIn] = useState(0); // resend cooldown seconds
     const isLight = localStorage.getItem("15market_theme") === 'light';
+    // Status-bar / browser chrome matches the page canvas on the login screens.
+    useEffect(() => {
+        let m = document.querySelector('meta[name="theme-color"]');
+        if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.appendChild(m); }
+        m.content = isLight ? '#F4F7F5' : '#050505';
+    }, [isLight]);
 
     // ─── Confirmation host — the console's notify() used to be a dead-end
     // console.log. Every success/failure/notice now takes the screen

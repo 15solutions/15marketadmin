@@ -1766,7 +1766,7 @@ export function CircleWalletPage({
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className={`absolute inset-0 z-[100] ${isLight ? 'bg-[#F4F7F5]' : 'bg-black'} overflow-hidden flex flex-col font-sans transition-all duration-700 ${isLoading ? 'blur-3xl scale-[1.1]' : 'blur-0 scale-100'}`}
+                className={`absolute inset-0 z-[100] ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'} overflow-hidden flex flex-col font-sans transition-all duration-700 ${isLoading ? 'blur-3xl scale-[1.1]' : 'blur-0 scale-100'}`}
                 style={{ fontFamily: '"Comfortaa", cursive' }}
             >
                 {/* Full-page Standard Carbon-Fibre Texture */}

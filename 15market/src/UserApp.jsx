@@ -742,6 +742,16 @@ const performStealthChecks = useCallback(async (addr) => {
     }
 
     localStorage.setItem("15market_theme", theme);
+
+    // Browser / status-bar chrome follows the same canvas as the page so the
+    // top and bottom of a phone screen never differ from the app surface.
+    let themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (!themeMeta) {
+      themeMeta = document.createElement('meta');
+      themeMeta.name = 'theme-color';
+      document.head.appendChild(themeMeta);
+    }
+    themeMeta.content = theme === 'light' ? '#F4F7F5' : '#050505';
   }, [theme, network]);
 
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -3261,7 +3271,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
 
   return (
-    <div className={`min-h-screen ${!isSmallScreen ? 'h-screen' : 'h-screen h-[100dvh]'} w-full text-current selection:bg-[#0E4D30]/30 selection:text-white transition-colors duration-500 overflow-hidden font-sans relative ${isLight ? 'bg-[#F4F7F5]' : 'bg-black'}`}>
+    <div className={`min-h-screen ${!isSmallScreen ? 'h-screen' : 'h-screen h-[100dvh]'} w-full text-current selection:bg-[#0E4D30]/30 selection:text-white transition-colors duration-500 overflow-hidden font-sans relative ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}>
       <div className={`fixed inset-0 opacity-[0.1] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] ${isLight ? 'hidden' : ''}`} />
 
       {/* Landscape Blocker — branded fullscreen gate for mobile devices in landscape */}
@@ -3273,7 +3283,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className={`fixed inset-0 z-[15000] flex flex-col items-center justify-center ${isLight ? 'bg-[#F4F7F5]' : 'bg-black'}`}
+            className={`fixed inset-0 z-[15000] flex flex-col items-center justify-center ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}
             style={{ fontFamily: '"Comfortaa", cursive' }}
           >
             {/* Subtle background glow */}

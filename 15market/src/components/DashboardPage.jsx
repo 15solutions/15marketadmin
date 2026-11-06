@@ -796,7 +796,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     // dashboard card stays a clean, non-fragmented display only.
 
     return (
-        <div className={`h-screen w-full flex flex-col overflow-hidden relative ${isLight ? 'text-black bg-white' : 'text-white bg-black'}`} style={{ fontFamily: '"Comfortaa", cursive' }}>
+        <div className={`h-screen w-full flex flex-col overflow-hidden relative ${isLight ? 'text-black bg-[#F4F7F5]' : 'text-white bg-[#050505]'}`} style={{ fontFamily: '"Comfortaa", cursive' }}>
             <style>{`
                 @import url('https://fonts.cdnfonts.com/css/sankyu');
                 .no-scrollbar::-webkit-scrollbar { display: none; }

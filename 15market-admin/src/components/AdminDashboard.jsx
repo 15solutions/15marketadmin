@@ -132,6 +132,12 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         return saved;
     });
     const isLight = themeState === 'light';
+    // Status-bar / browser chrome follows the same canvas as the page.
+    useEffect(() => {
+        let m = document.querySelector('meta[name="theme-color"]');
+        if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.appendChild(m); }
+        m.content = isLight ? '#F4F7F5' : '#050505';
+    }, [isLight]);
     const toggleTheme = () => {
         const next = isLight ? 'dark' : 'light';
         try {
