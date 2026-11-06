@@ -62,8 +62,8 @@ const EMAIL_PATTERN_URL = process.env.EMAIL_PATTERN_URL || 'https://15market.onl
 // The full header canvas as one baked bitmap (solid-left fade into the
 // rings motif) — gradients/fades cannot be done reliably in mail CSS.
 const EMAIL_BANNER_BG_URL = process.env.EMAIL_BANNER_BG_URL || 'https://15market.online/mail-banner-bg.png';
-const EMAIL_ICON_X_URL = process.env.EMAIL_ICON_X_URL || 'https://15market.online/mail-icon-x.png';
-const EMAIL_ICON_DISCORD_URL = process.env.EMAIL_ICON_DISCORD_URL || 'https://15market.online/mail-icon-discord.png';
+const EMAIL_ICON_X_URL = process.env.EMAIL_ICON_X_URL || 'https://15market.online/mail-icon-x.png?v=2';
+const EMAIL_ICON_DISCORD_URL = process.env.EMAIL_ICON_DISCORD_URL || 'https://15market.online/mail-icon-discord.png?v=2';
 // Footer strip canvas: the pulse motif mirrored — emitter on the left edge.
 const EMAIL_FOOTER_BG_URL = process.env.EMAIL_FOOTER_BG_URL || 'https://15market.online/mail-footer-bg.png';
 // Notifications go out from the info@ address. The support@ mailbox is the
@@ -282,8 +282,8 @@ function getEmailShell(innerHtml, headline) {
                             <td align="center" style="padding:0 0 18px; text-align:center;">
                                 <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto; border-collapse:collapse;">
                                     <tr>
-                                        <td style="padding:0 7px;"><a href="https://x.com/15market" target="_blank" style="text-decoration:none;"><img src="${EMAIL_ICON_X_URL}" alt="X" width="42" height="42" style="display:block; width:42px; height:42px; border:0; border-radius:21px; outline:none;" /></a></td>
-                                        <td style="padding:0 7px;"><a href="https://discord.gg/15market" target="_blank" style="text-decoration:none;"><img src="${EMAIL_ICON_DISCORD_URL}" alt="Discord" width="42" height="42" style="display:block; width:42px; height:42px; border:0; border-radius:21px; outline:none;" /></a></td>
+                                        <td style="padding:0 6px;"><a href="https://x.com/15market" target="_blank" style="text-decoration:none;"><img src="${EMAIL_ICON_X_URL}" alt="X" width="28" height="28" style="display:block; width:28px; height:28px; border:0; outline:none;" /></a></td>
+                                        <td style="padding:0 6px;"><a href="https://discord.gg/15market" target="_blank" style="text-decoration:none;"><img src="${EMAIL_ICON_DISCORD_URL}" alt="Discord" width="28" height="28" style="display:block; width:28px; height:28px; border:0; outline:none;" /></a></td>
                                     </tr>
                                 </table>
                             </td>
