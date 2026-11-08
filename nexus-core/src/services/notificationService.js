@@ -34,6 +34,150 @@ let socketIo = null;
 
 let notificationStats = { sent: 0, failed: 0, emailsSent: 0, emailsFailed: 0, pushSent: 0, pushFailed: 0 };
 
+// ─── Durable notification store ──────────────────────────────────────────
+// The panels' history used to live INSIDE the profile object, but the
+// profile serializer has no notifications column — every write evaporated
+// on restart. Notifications now get their own Supabase table
+// (`user_notifications`, migration 016) behind the same durability stack
+// as the money ledger: Supabase record of record → JSON mirror → memory.
+const NOTIF_MIRROR_PATH = path.join(__dirname, '..', '..', 'data', 'notifications.json');
+const notifMemory = new Map(); // addr -> [notification] newest first
+
+function notifRowFromDb(row) {
+    return {
+        id: row.id,
+        title: row.title,
+        message: row.message,
+        type: row.type || 'info',
+        timestamp: Date.parse(row.created_at) || Date.now(),
+        read: row.read === true
+    };
+}
+
+function loadNotifMirror() {
+    try {
+        if (!fs.existsSync(NOTIF_MIRROR_PATH)) return;
+        const parsed = JSON.parse(fs.readFileSync(NOTIF_MIRROR_PATH, 'utf8'));
+        for (const item of Array.isArray(parsed) ? parsed : []) {
+            if (!item || !item.address || !item.id) continue;
+            const addr = String(item.address).toLowerCase();
+            if (!notifMemory.has(addr)) notifMemory.set(addr, []);
+            const list = notifMemory.get(addr);
+            if (!list.some(x => x.id === item.id)) {
+                list.push({
+                    id: item.id, title: item.title, message: item.message,
+                    type: item.type || 'info', timestamp: item.timestamp || Date.now(),
+                    read: item.read === true
+                });
+            }
+        }
+        for (const list of notifMemory.values()) list.sort((a, b) => b.timestamp - a.timestamp);
+    } catch (e) { /* mirror load is best-effort */ }
+}
+
+function saveNotifMirror() {
+    try {
+        const flat = [];
+        for (const [addr, list] of notifMemory.entries()) {
+            for (const n of list.slice(0, 100)) {
+                flat.push({ address: addr, id: n.id, title: n.title, message: n.message, type: n.type, timestamp: n.timestamp, read: !!n.read });
+            }
+        }
+        fs.writeFileSync(NOTIF_MIRROR_PATH, JSON.stringify(flat));
+    } catch (e) { /* mirror write is best-effort */ }
+}
+
+async function initNotifications() {
+    if (notifMemory.size) { /* already hydrated */ }
+    loadNotifMirror();
+    if (SUPABASE_ENABLED) {
+        try {
+            const rows = await supabaseSelect('/rest/v1/user_notifications?select=id,address,title,message,type,read,created_at&order=created_at.desc&limit=2000');
+            let n = 0;
+            for (const r of rows || []) {
+                if (!r || !r.address) continue;
+                const addr = String(r.address).toLowerCase();
+                if (!notifMemory.has(addr)) notifMemory.set(addr, []);
+                const list = notifMemory.get(addr);
+                if (!list.some(x => x.id === r.id)) { list.push(notifRowFromDb(r)); n++; }
+            }
+            for (const list of notifMemory.values()) list.sort((a, b) => b.timestamp - a.timestamp);
+            console.log(`[Notifications] hydrated ${n} from Supabase (mirror merged)`);
+        } catch (e) {
+            if (!/relation .* does not exist|404|not found/i.test(String(e.message || e))) {
+                console.warn('[Notifications] Supabase hydration failed:', e.message || e);
+            } else {
+                console.log('[Notifications] table not ready - running on JSON mirror until migration 016 applies');
+            }
+        }
+    }
+}
+
+function recordNotificationStore(addr, notification) {
+    if (!addr || !notification) return;
+    const a = String(addr).toLowerCase();
+    if (!notifMemory.has(a)) notifMemory.set(a, []);
+    const list = notifMemory.get(a);
+    if (list.some(x => x.id === notification.id)) return;
+    list.unshift(notification);
+    if (list.length > 200) list.length = 200;
+    saveNotifMirror();
+    if (SUPABASE_ENABLED) {
+        supabaseUpsert('user_notifications', [{
+            id: notification.id,
+            address: a,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type || 'info',
+            read: notification.read === true,
+            created_at: new Date(notification.timestamp || Date.now()).toISOString()
+        }], 'id').then(ok => {
+            if (!ok) console.warn('[Notifications] Supabase write failed for', notification.id);
+        }).catch(e => console.warn('[Notifications] Supabase write error:', e.message || e));
+    }
+}
+
+// Merged read: durable store first, memory fills gaps (covers pre-migration
+// rows and Supabase hiccups).
+async function listNotifications(userAddr, limit = 50) {
+    const addr = String(userAddr || '').toLowerCase();
+    if (!addr) return [];
+    let extra = [];
+    if (SUPABASE_ENABLED) {
+        try {
+            const rows = await supabaseSelect(`/rest/v1/user_notifications?select=id,title,message,type,read,created_at&address=eq.${encodeURIComponent(addr)}&order=created_at.desc&limit=${Math.min(200, limit * 2)}`);
+            extra = (rows || []).map(notifRowFromDb);
+        } catch (e) { /* read falls back to memory */ }
+    }
+    const own = notifMemory.get(addr) || [];
+    const seen = new Set();
+    const merged = [];
+    for (const r of [...extra, ...own]) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        merged.push(r);
+    }
+    merged.sort((a, b) => b.timestamp - a.timestamp);
+    return merged.slice(0, limit);
+}
+
+// Clear-all: wipes Supabase, the mirror and memory for one address.
+async function clearNotifications(userAddr) {
+    const addr = String(userAddr || '').toLowerCase();
+    if (!addr) return false;
+    notifMemory.delete(addr);
+    saveNotifMirror();
+    if (SUPABASE_ENABLED) {
+        try {
+            await supabaseDelete('user_notifications', `address=eq.${encodeURIComponent(addr)}`);
+        } catch (e) {
+            console.warn('[Notifications] clear failed in Supabase:', e.message || e);
+            return false;
+        }
+    }
+    return true;
+}
+
 // ─── Email design + outbox ───────────────────────────────────────────────
 // One plain design for EVERY email the platform sends: the 15market logo
 // sits on the plain dark background, title + message below, and a shared
@@ -93,7 +237,7 @@ const EMAIL_BLOCKED_TITLES = /trade (won|lost)|copy trad|trades copied|provider 
 // console. Supabase is the DURABLE STORE OF RECORD (survives restarts and
 // Render's per-deploy disk wipes); the local JSON mirror is a fallback
 // snapshot, hydrated at boot — same split profiles.js / mailbox.js use.
-const { supabaseUpsert, supabaseSelect } = require('../supabaseRest');
+const { SUPABASE_ENABLED, supabaseUpsert, supabaseSelect, supabaseDelete } = require('../supabaseRest');
 const OUTBOX_CAP = 500; // hot in-memory window; Supabase keeps everything ever
 let emailOutbox = [];
 try {
@@ -383,17 +527,11 @@ async function notifyUser(userAddr, title, message, type = 'info', emailEnabled 
     console.log(`[Notification] Creating for ${addr}: "${title}" - ${message}`);
 
     try {
-        const profile = profiles.get(addr);
-        if (profile) {
-            profile.notifications = profile.notifications || [];
-            profile.notifications.unshift(notification);
-            if (profile.notifications.length > 50) {
-                profile.notifications = profile.notifications.slice(0, 50);
-            }
-            profiles.upsert(addr, { notifications: profile.notifications });
-        } else {
-            profiles.upsert(addr, { notifications: [notification] });
-        }
+        // Durable record — Supabase `user_notifications` with JSON mirror and
+        // memory behind it. Nothing touches the profile object anymore (the
+        // profile serializer has no notifications column, which is exactly
+        // why the panels used to come up empty after every restart).
+        recordNotificationStore(addr, notification);
         notificationStats.sent++;
     } catch (e) {
         console.error(`[Notification] Failed to persist notification for ${addr}:`, e.message);
@@ -568,5 +706,8 @@ module.exports = {
     getEmailTemplate,
     getOtpEmailTemplate,
     getStats,
-    initOutbox
+    initOutbox,
+    initNotifications,
+    listNotifications,
+    clearNotifications
 };

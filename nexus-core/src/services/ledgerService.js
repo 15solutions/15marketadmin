@@ -21,7 +21,7 @@ const MIRROR_PATH = path.join(__dirname, '..', '..', 'data', 'transactions-ledge
 
 // Canonical kinds. Anything unknown is coerced to TRANSFER so a buggy
 // caller can never poison the feed with an unrenderable type.
-const KINDS = new Set(['DEPOSIT', 'WITHDRAW', 'TRANSFER', 'IN', 'OUT']);
+const KINDS = new Set(['DEPOSIT', 'WITHDRAW', 'TRANSFER', 'IN', 'OUT', 'SWAP']);
 
 const memory = new Map(); // address(lowercase) -> [row, ...] newest first
 let hydrated = false;

@@ -527,10 +527,8 @@ class ClassicEngine {
 
     this.settleCopyTrades(trade, payoutAmount);
 
-    try {
-      const notifier = require('./services/notificationService');
-      notifier.notifyUserWithPush(trade.userAddr, "Trade Won 🎉", `Your ${trade.symbol?.toUpperCase() || 'BTC'} ${trade.direction === 1 ? 'LONG' : 'SHORT'} trade won! +${payoutAmount.toFixed(2)} USDC.`, "success");
-    } catch (e) {}
+    // Trade outcomes fire no notification (in-app, push or email) — the user
+    // opted out of win/loss spam; settlement still rides trade_settled.
 
     console.log(`[Instant] Bet #${trade.id} credited. Payout: ${payoutStr} USDC`);
   }
@@ -1178,11 +1176,8 @@ class ClassicEngine {
     trade.status = 'LOST';
     trade.settledAt = Date.now();
 
-    // Phone + in-app notification for lost trades
-    try {
-      const notifier = require('./services/notificationService');
-      notifier.notifyUserWithPush(trade.userAddr, "Trade Lost", `Your ${trade.symbol?.toUpperCase() || 'BTC'} ${trade.direction === 1 ? 'LONG' : 'SHORT'} trade lost. -${(Number(trade.amount) || 0).toFixed(2)} USDC.`, "error");
-    } catch (e) {}
+    // Trade outcomes fire no notification (in-app, push or email) — the user
+    // opted out of win/loss spam; settlement still rides trade_settled.
 
     this.io.to(trade.userAddr).emit('trade_settled', {
       betId: trade.id,
@@ -1289,15 +1284,8 @@ class ClassicEngine {
             reason: won ? 'COPY_WIN' : 'COPY_LOSS'
           });
 
-          try {
-            const notifier = require('./services/notificationService');
-            const providerName = provider?.providerApplication?.contactInfo?.name || provider?.username || providerAddr.substring(0, 6);
-            if (won) {
-              notifier.notifyUserWithPush(addr, "Copy Trade Won 🎉", `${providerName}'s copy trade won! +${settledTrade.payout.toFixed(2)} USDC on ${settledTrade.asset?.toUpperCase() || 'BTC'}.`, "success");
-            } else {
-              notifier.notifyUserWithPush(addr, "Copy Trade Lost", `${providerName}'s copy trade lost. -${settledTrade.amount.toFixed(2)} USDC on ${settledTrade.asset?.toUpperCase() || 'BTC'}.`, "error");
-            }
-          } catch (e) {}
+          // Copy-trade outcomes fire no notification either — same opt-out
+          // as regular trades; balances still ride balance_update.
         }
       }
     } catch (err) {

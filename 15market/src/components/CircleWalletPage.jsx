@@ -476,6 +476,24 @@ export function CircleWalletPage({
             refreshHubAssets(walletKey);
             const shortFrom = `${String(eoaWallet.address || '').slice(0, 5)}…${String(eoaWallet.address || '').slice(-4)}`;
             notify(`Swapped ${amt} ${sellToken.symbol} for about ${built.quote?.output ?? '?'} ${buyToken.symbol} in ${shortFrom}`, 'success');
+
+            // Durable record + notification: swaps settle in the browser, so
+            // /push-tx is the event — it also raises the "Swap Completed"
+            // notification and its email on the node.
+            const swapLedgerTx = {
+                id: `swap_${Date.now()}`,
+                type: 'SWAP',
+                amount: String(amt),
+                timestamp: Date.now(),
+                tx: swapTx.hash,
+                network: 'arc'
+            };
+            setLocalTx(prev => [swapLedgerTx, ...prev]);
+            fetch(`${KEEPER_URL_ARC}/push-tx`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address: eoaWallet.address, transaction: swapLedgerTx })
+            }).catch(() => { });
         } catch (err) {
             notify(err?.shortMessage || err?.message || 'Swap failed', 'error');
         } finally {
@@ -499,12 +517,17 @@ export function CircleWalletPage({
     const [qrCodeData, setQrCodeData] = useState("");
     const [activeTab, setActiveTab] = useState('assets');
 
-    // Activity rows: the durable ledger (deposits / withdrawals / transfers —
-    // trades excluded by design, recorded in their own tables) merged with
-    // the on-chain Circle rows for external flows the ledger can't observe.
-    // Newest first, capped so the panel stays scroll-light.
+    // Local-append rows for browser-executed events (hub swap, external send
+    // from the main wallet) so the Activity tab is instant; the durable
+    // copy lives server-side via /push-tx and joins on the next hydration.
+    const [localTx, setLocalTx] = useState([]);
+
+    // Activity rows: the durable ledger (deposits / withdrawals / transfers /
+    // swaps — trades excluded by design, recorded in their own tables) merged
+    // with the on-chain Circle rows for external flows the ledger can't
+    // observe. Newest first, capped so the panel stays scroll-light.
     const activityRows = useMemo(() => {
-        const ledger = (activityFeed || []).slice(0, 80).map(tx => ({
+        const ledger = (activityFeed || []).concat(localTx).slice(0, 80).map(tx => ({
             key: tx.id || `l${tx.timestamp}`,
             incoming: tx.type === 'DEPOSIT' || tx.type === 'IN' || tx.type === 'INCOMING',
             kind: tx.type,
@@ -521,7 +544,7 @@ export function CircleWalletPage({
         return [...ledger, ...chain]
             .sort((a, b) => b.when - a.when)
             .slice(0, 120);
-    }, [activityFeed, walletInfo]);
+    }, [activityFeed, localTx, walletInfo]);
 
     const [isDownloading, setIsDownloading] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -1229,6 +1252,27 @@ export function CircleWalletPage({
                     setShowSendModal(false);
                     setSendAmount("");
                     setDestAddress("");
+
+                    // Durable record + notification: the transfer left the
+                    // user's own wallet in the browser, so /push-tx is the
+                    // event — it also raises the "Funds Sent" notification
+                    // and its email on the node.
+                    const sentTx = {
+                        id: `send_${Date.now()}`,
+                        type: 'TRANSFER',
+                        amount: String(amt),
+                        timestamp: Date.now(),
+                        tx: txHash,
+                        to: destAddress,
+                        network: 'arc'
+                    };
+                    const fromAddr = eoaWallet?.address || address;
+                    setLocalTx(prev => [sentTx, ...prev]);
+                    fetch(`${KEEPER_URL_ARC}/push-tx`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ address: fromAddr, transaction: sentTx })
+                    }).catch(() => { });
                 }
             }
         } catch (err) {
@@ -2608,7 +2652,7 @@ export function CircleWalletPage({
                                                     {tx.incoming ? <ArrowDownLeft size={24} /> : <Send size={24} />}
                                                 </div>
                                                 <div>
-                                                    <p className={`text-sm font-black uppercase tracking-wider text-white`}>{tx.incoming ? (tx.kind === 'TRANSFER' ? 'Transfer In' : 'Deposit') : (tx.kind === 'TRANSFER' ? 'Transfer Out' : 'Withdrawal')}</p>
+                                                    <p className={`text-sm font-black uppercase tracking-wider text-white`}>{tx.incoming ? (tx.kind === 'TRANSFER' ? 'Transfer In' : 'Deposit') : (tx.kind === 'SWAP' ? 'Swap' : (tx.kind === 'TRANSFER' ? 'Transfer Out' : 'Withdrawal'))}</p>
                                                     <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest text-white">{tx.when ? new Date(tx.when).toLocaleDateString() : '—'}</p>
                                                 </div>
                                             </div>

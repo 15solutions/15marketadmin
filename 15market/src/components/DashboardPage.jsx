@@ -238,11 +238,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         setNotifications([]);
         if (address) {
             try {
-                await fetch(`${KEEPER_URL_ARC}/profiles/${address.toLowerCase()}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notifications: [] })
-                });
+                await fetch(`${KEEPER_URL_ARC}/notifications/${address.toLowerCase()}`, { method: 'DELETE' });
             } catch (e) {
                 console.error("Failed to clear notifications:", e);
             }
@@ -431,10 +427,15 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         if (Array.isArray(data.trades)) {
                             setUserHistory(data.trades);
                         }
-                        // Populate notifications
-                        if (Array.isArray(data.notifications)) {
-                            setNotifications(data.notifications);
-                        }
+                        // Populate notifications — dedicated durable feed
+                        // (the profile object no longer carries them).
+                        try {
+                            const nres = await fetch(`${KEEPER_URL_ARC}/notifications/${address.toLowerCase()}`);
+                            if (nres.ok) {
+                                const ndata = await nres.json();
+                                if (Array.isArray(ndata.notifications)) setNotifications(ndata.notifications);
+                            }
+                        } catch (e) { /* node unreachable — keep current list */ }
                     }
                 }
             }
@@ -992,7 +993,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                 {tx.type==="DEPOSIT"?<ArrowUp size={10}/>:<ArrowDown size={10}/>}
                                             </div>
                                             <div>
-                                                <div className={`text-[10px] font-bold ${isLight ? 'text-black' : 'text-white'}`}>{tx.type==="DEPOSIT"?"Deposit":"Withdrawal"}</div>
+                                                <div className={`text-[10px] font-bold ${isLight ? 'text-black' : 'text-white'}`}>{tx.type==="DEPOSIT"?"Deposit":tx.type==="SWAP"?"Swap":"Withdrawal"}</div>
                                                 <div className={`text-[7px] font-semibold mt-0.5 ${isLight ? 'text-black/50' : 'text-white/40'}`}>{new Date(tx.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
                                             </div>
                                         </div>
@@ -1153,7 +1154,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                     {tx.type==="DEPOSIT"?<ArrowUp size={12}/>:<ArrowDown size={12}/>}
                                                 </div>
                                                 <div>
-                                                    <div className={`text-[11px] font-bold ${isLight ? 'text-black' : 'text-white'}`}>{tx.type==="DEPOSIT"?"Deposit":"Withdrawal"}</div>
+                                                    <div className={`text-[11px] font-bold ${isLight ? 'text-black' : 'text-white'}`}>{tx.type==="DEPOSIT"?"Deposit":tx.type==="SWAP"?"Swap":"Withdrawal"}</div>
                                                     <div className={`text-[8px] font-semibold mt-0.5 ${isLight ? 'text-black/50' : 'text-white/40'}`}>{new Date(tx.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
                                                 </div>
                                             </div>

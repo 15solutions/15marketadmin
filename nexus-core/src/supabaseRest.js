@@ -77,4 +77,13 @@ async function supabaseSelect(query) {
     try { return await res.json(); } catch { return null; }
 }
 
-module.exports = { SUPABASE_ENABLED, supabaseUpsert, supabasePatch, supabaseSelect };
+/** Delete rows matching a Supabase filter path — returns true on success. */
+async function supabaseDelete(table, matchPath) {
+    const res = await supabaseFetch(`/rest/v1/${table}?${matchPath}`, {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' }
+    });
+    return !!res;
+}
+
+module.exports = { SUPABASE_ENABLED, supabaseUpsert, supabasePatch, supabaseSelect, supabaseDelete };

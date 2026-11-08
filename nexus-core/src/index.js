@@ -96,6 +96,9 @@ notificationService.initOutbox();
 // hydrates from Supabase (record store) + JSON mirror at boot so the
 // Transfer Hub Activity and dashboard Transactions survive restarts.
 ledgerService.initLedger();
+// Same durability for the notifications panels (their old home inside the
+// profile object had no serializer column, so history died on restart).
+notificationService.initNotifications();
 const siem = require('./siem');
 const dailyChange = require('./dailyChange');
 // Every HIGH/CRITICAL SIEM alert reaches open admin dashboards live.
@@ -730,7 +733,7 @@ app.post('/fiat/withdraw/:address', async (req, res) => {
     io.to(addr).emit('fiat_withdrawal_update', { id: out.request.id, status: 'pending' });
     notificationService.notifyUser(addr, 'Fiat Withdrawal Request Submitted',
         `Your request to withdraw ${out.request.amount} USDC (local fiat payout) from your ${source} wallet has been submitted. The funds are already in the platform vault — the team will review your request shortly.`,
-        'info').catch(() => {});
+        'info', true).catch(() => {});
     res.json({ ok: true, request: out.request });
 });
 
@@ -1429,6 +1432,28 @@ app.get('/fund/quote', async (req, res) => {
 });
 
 /**
+ * GET /notifications/:address — persistent panel history (newest first).
+ * DELETE /notifications/:address — clear-all for that wallet.
+ */
+app.get('/notifications/:address', async (req, res) => {
+  try {
+    const rows = await notificationService.listNotifications(req.params.address, 50);
+    res.json({ success: true, notifications: rows });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/notifications/:address', async (req, res) => {
+  try {
+    const ok = await notificationService.clearNotifications(req.params.address);
+    res.json({ success: ok });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
  * POST /push-tx
  *
  * The client uploads a transaction it just executed (deposit confirmed from
@@ -1443,6 +1468,26 @@ app.post('/push-tx', (req, res) => {
     if (!address) return res.status(400).json({ error: 'Missing address' });
     const tx = ledgerService.recordTransaction(address, req.body.transaction || req.body);
     if (!tx.row) return res.status(400).json({ error: 'Empty transaction payload' });
+
+    // Browser-executed money events (hub swap, external send from the main
+    // wallet) have no other server hook — the ledger record is the event,
+    // so every fresh row raises the matching notification + email.
+    // Sever-side hooks (/fund/confirm, /session/cashout) record first, so
+    // the client retry arrives as duplicate=true and stays quiet.
+    if (!tx.duplicate) {
+      const amt = Number(tx.row.amount).toFixed(4);
+      const copy = {
+        DEPOSIT: ['Deposit Confirmed', `Deposited ${amt} USDC into your trading wallet.`],
+        WITHDRAW: ['Withdrawal Successful', `Withdrew ${amt} USDC from your trading wallet.`],
+        TRANSFER: ['Funds Sent', `Sent ${amt} USDC out of your wallet.`],
+        SWAP: ['Swap Completed', `Swapped ${amt} USDC in the Transfer Hub.`]
+      }[tx.row.kind];
+      if (copy) {
+        notificationService.notifyUser(address, copy[0], copy[1], 'success', true)
+          .catch(e => console.warn('[Push-tx] notify failed:', e.message));
+      }
+    }
+
     res.json({ success: true, id: tx.row.id, duplicate: tx.duplicate });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1515,6 +1560,14 @@ app.post('/fund/confirm', async (req, res) => {
       tx: txHash,
       network: 'arc'
     });
+
+    notificationService.notifyUser(
+      userAddr,
+      'Deposit Confirmed',
+      `Deposited ${Number((result && result.netAmount != null ? result.netAmount : finalAmount)).toFixed(4)} USDC into your trading wallet.`,
+      'success',
+      true
+    ).catch(e => console.warn('[Fund] notify failed:', e.message));
 
     res.json({ success: true, ...result });
   } catch (err) {
@@ -2219,13 +2272,12 @@ app.post('/session/execute', async (req, res) => {
               timestamp: copyTrade.timestamp
             }
           });
-          notificationService.notifyUser(addr, "Copy Trade Executed", `Copied ${copyTrade.providerName}'s trade: ${copyTrade.asset} ${copyTrade.direction === 'UP' ? 'LONG' : 'SHORT'} ($${stake} USDC)`, "info");
+          // Trade events fire no notification (same opt-out as won/lost
+          // trades) — copy execution still rides its socket payloads.
           investorsNotified++;
           copyTradeResults.push({ addr, stake, asset: copyTrade.asset });
         }
-        if (investorsNotified > 0) {
-          notificationService.notifyUser(providerAddr, "Trades Copied", `${investorsNotified} investor(s) copied your ${tParams?.symbol || 'BTC'} trade.`, "info");
-        }
+        // (provider "Trades Copied" notices also removed under the same rule)
       }
     }
 
@@ -2389,14 +2441,25 @@ app.post('/session/cashout', async (req, res) => {
     // 2. Record server-side so the durable ledger owns this event even if
     //     the client's /push-tx never fires (dedupe by tx hash makes this
     //     and the client upload idempotent against each other).
+    const cashoutKind = (destination && String(destination).toLowerCase() !== userAddr) ? 'TRANSFER' : 'WITHDRAW';
     ledgerService.recordTransaction(userAddr, {
-      kind: (destination && String(destination).toLowerCase() !== userAddr) ? 'TRANSFER' : 'WITHDRAW',
+      kind: cashoutKind,
       amount: (amount && Number(amount) > 0 ? Number(amount) : parseFloat(ethers.formatEther(sendAmount + feeAmount))),
       timestamp: Date.now(),
       tx: tx.hash,
       to: String(targetAddr),
       network: 'arc'
     });
+
+    notificationService.notifyUser(
+      userAddr,
+      cashoutKind === 'TRANSFER' ? 'Funds Sent' : 'Withdrawal Successful',
+      cashoutKind === 'TRANSFER'
+        ? `Sent ${Number(amount || parseFloat(ethers.formatEther(sendAmount))).toFixed(4)} USDC out of your wallet.`
+        : `Withdrew ${Number(amount || parseFloat(ethers.formatEther(sendAmount))).toFixed(4)} USDC from your trading wallet.`,
+      'success',
+      true
+    ).catch(e => console.warn('[Cashout] notify failed:', e.message));
 
     res.json({ success: true, txHash: tx.hash, amount: ethers.formatEther(sendAmount) });
   } catch (err) {
@@ -2601,6 +2664,14 @@ app.post('/session/deposit', async (req, res) => {
       tx: txHash,
       network: 'arc'
     });
+
+    notificationService.notifyUser(
+      userAddr,
+      'Deposit Confirmed',
+      `Deposited ${Number(creditedAmount).toFixed(4)} USDC into your trading wallet.`,
+      'success',
+      true
+    ).catch(e => console.warn('[Deposit] notify failed:', e.message));
 
     io.to(userAddr).emit('balance_update', {
       balance: String(session.balance),
@@ -3995,8 +4066,8 @@ app.get('/copy-trading/wallet/:address', async (req, res) => {
         balance: 0 // Track isolated balance
       };
       profiles.upsert(userAddr, profile);
-      notificationService.notifyUser(userAddr, "Copy Trading Wallet Created", "Your dedicated copy trading wallet has been generated successfully.", "success");
     }
+    // (No "wallet created" notification — outside the notification allowlist.)
 
     // Sync with real on-chain balance for instant deposit reflection
     try {

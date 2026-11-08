@@ -567,7 +567,8 @@ class FundingService {
                 userAddr,
                 "CCTP Bridge Confirmed",
                 `Successfully settled ${amount} USDC on Arc Testnet via CCTP bridge. Your trading wallet has been credited!`,
-                "success"
+                "success",
+                true
             );
 
             // Push live socket update to user confirming final on-chain settlement
