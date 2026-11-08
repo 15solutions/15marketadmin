@@ -474,23 +474,6 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         }));
     }, [platformSettings.referralEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Entering the Referral section always re-reads the node's authoritative
-    // program state (switch position + saved commissions), so the console
-    // never shows a stale switch after another admin changed it.
-    useEffect(() => {
-        if (activeNav !== 'referrals' && adminTab !== 'referrals') return;
-        let gone = false;
-        (async () => {
-            try {
-                const res = await adminFetch(`${KEEPER_URL_ARC}/settings`);
-                if (!res.ok || gone) return;
-                const s = await res.json();
-                setPlatformSettings(prev => ({ ...prev, ...s }));
-            } catch (e) { /* node unreachable - drawer state stays */ }
-        })();
-        return () => { gone = true; };
-    }, [activeNav, adminTab]); // eslint-disable-line react-hooks/exhaustive-deps
-
     const saveReferralProgram = async (enable) => {
         if (refProgramBusy) return;
         const dep = String(refProgramDraft.depositPct).trim();
@@ -1266,6 +1249,27 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const dedicatedMode = visibleNav.length <= 1;
     // Fall back to the FIRST section this role actually owns.
     const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : (visibleNav[0]?.key || 'overview');
+
+    // (Declared AFTER activeNav on purpose: its dependency array reads
+    // activeNav during render, and a const read before its declaration throws
+    // "Cannot access 'activeNav' before initialization" the moment the
+    // dashboard mounts.)
+    // Entering the Referral section always re-reads the node's authoritative
+    // program state (switch position + saved commissions), so the console
+    // never shows a stale switch after another admin changed it.
+    useEffect(() => {
+        if (activeNav !== 'referrals' && adminTab !== 'referrals') return;
+        let gone = false;
+        (async () => {
+            try {
+                const res = await adminFetch(`${KEEPER_URL_ARC}/settings`);
+                if (!res.ok || gone) return;
+                const s = await res.json();
+                setPlatformSettings(prev => ({ ...prev, ...s }));
+            } catch (e) { /* node unreachable - drawer state stays */ }
+        })();
+        return () => { gone = true; };
+    }, [activeNav, adminTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Broadcast ledger: load when the tab opens, refresh on any fresh socket
     // pulse (a transmission/edit/withdrawal from anywhere re-fetches
