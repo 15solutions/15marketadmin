@@ -53,7 +53,7 @@ body {
 /* Base Neon Glow Variables */
 :root {
   --primary-color: #0E4D30;
-  --dark-green: #123F28;
+  --dark-green: #0E4D30;
   --bg-color: #FAFAFA;
   --card-bg: #FFFFFF;
   --border-color: #E9E9E9;
@@ -248,7 +248,7 @@ input[type=number] {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #123F28;
+  background: #0E4D30;
 }
 
 .light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -289,7 +289,7 @@ body.light {
   --primary-glow-strong: rgba(14,77,48, 0.4);
   --primary-glow-subtle: rgba(14,77,48, 0.1);
   --glass-bg: rgba(237, 237, 233, 0.95);
-  --glass-border: rgba(18, 63, 40, 0.15);
+  --glass-border: rgba(14,77,48, 0.15);
   --glass-highlight: rgba(255, 255, 255, 0.3);
   --text-primary: #2d3d34;
   --text-secondary: #3d4c44;
@@ -312,7 +312,7 @@ body.light {
 /* Light Mode Static Panels */
 .light .static-panel-light {
   background: #C2D2CA !important;
-  border: 1.5px solid rgba(18, 63, 40, 0.25) !important;
+  border: 1.5px solid rgba(14,77,48, 0.25) !important;
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.04),
     0 1px 0 rgba(255, 255, 255, 0.4) inset !important;
@@ -338,7 +338,7 @@ body.light {
 
 /* Light Mode Button Enhancements */
 .light button[style*="#0E4D30"],
-.light .bg-\[#0E4D30\] {
+.light .bg-\[\#0E4D30\] {
   box-shadow:
     0 4px 14px rgba(14,77,48, 0.30),
     0 0 0 1px rgba(0, 0, 0, 0.15) inset !important; /* Added outline */
@@ -346,7 +346,7 @@ body.light {
 }
 
 .light button[style*="#0E4D30"]:hover,
-.light .bg-\[#0E4D30\]:hover {
+.light .bg-\[\#0E4D30\]:hover {
   box-shadow:
     0 6px 20px rgba(14,77,48, 0.40),
     0 0 0 1px rgba(0, 0, 0, 0.25) inset !important;
@@ -767,3 +767,36 @@ iframe[id*="privy"] {
   --border: 150 12% 86%;
   --input: 150 12% 86%;
 }
+
+/* ============ LIGHT-MODE COMPANION GREEN ============
+   Dark mode keeps the exact brand #0E4D30. On the light canvas the same
+   bytes read darker (surround contrast), so light mode surfaces render the
+   same-hue companion rgb(27,116,69) = #1B7445 - one step brighter, keeping
+   the brand punch on white. Dark and light stay the same GREEN BY FAMILY,
+   each tuned for its surround. */
+.light .bg-\[\#0E4D30\] { background-color: #1B7445 !important; }
+.light .text-\[\#0E4D30\] { color: #1B7445 !important; }
+.light .border-\[\#0E4D30\] { border-color: #1B7445 !important; }
+.light .from-\[\#0E4D30\] { --tw-gradient-from: #1B7445 var(--tw-gradient-from-position) !important; }
+.light .via-\[\#0E4D30\] { --tw-gradient-stops: var(--tw-gradient-from), #1B7445 var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+.light .to-\[\#0E4D30\] { --tw-gradient-to: #1B7445 var(--tw-gradient-to-position) !important; }
+
+/* Inline-styled solid banner-green backgrounds (author !important wins
+   over normal inline styles). Property-discriminated so green inline
+   text colors are untouched by the background rule. */
+.light [style*="background: rgb(14, 77, 48)"],
+.light [style*="background: rgb(14,77,48)"],
+.light [style*="background-color: rgb(14, 77, 48)"],
+.light [style*="background-color: rgb(14,77,48)"],
+.light [style*="background: rgb(14 77 48)"],
+.light [style*="background-color: rgb(14 77 48)"],
+.light [style*="background: #0E4D30"],
+.light [style*="background-color: #0E4D30"],
+.light [style*="background: #0e4d30"],
+.light [style*="background-color: #0e4d30"] { background-color: #1B7445 !important; }
+
+.light [style*="color: rgb(14, 77, 48)"]:not([style*="background"]),
+.light [style*="color: rgb(14,77,48)"]:not([style*="background"]),
+.light [style*="color: rgb(14 77 48)"]:not([style*="background"]),
+.light [style*="color: #0E4D30"]:not([style*="background"]),
+.light [style*="color: #0e4d30"]:not([style*="background"]) { color: #1B7445 !important; }

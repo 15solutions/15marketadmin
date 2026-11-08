@@ -156,6 +156,9 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     onOpenCircleWallet,
     onTransferHub,
     onReferral,
+    // Referral program master switch (node-side). While OFF the referral
+    // page and its icon are completely absent from the user's UI.
+    referralLive = false,
     onHelp
 }) {
     const isLight = theme === 'light';
@@ -602,7 +605,9 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
             className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] group text-white cursor-pointer"
             style={{
                 fontFamily: '"Comfortaa", cursive',
-                background: 'linear-gradient(145deg, #0e4d30 0%, #123f28 55%, #0b3220 100%)',
+                background: isLight
+                    ? 'linear-gradient(145deg, #1B7445 0%, #1B7445 55%, #1B7445 100%)'
+                    : 'linear-gradient(145deg, #0e4d30 0%, #0E4D30 55%, #0E4D30 100%)',
                 border: '1.5px solid rgb(14,77,48,0.45)',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), inset 0 0 46px rgba(0,0,0,0.28)'
             }}
@@ -748,13 +753,13 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                 style={{ width: '448px', height: '260px', transform: `translateX(${deckOffsetX}px) scale(${deckScale})`, transformOrigin: 'top left', transition: 'transform 0.25s ease' }}>
                 {/* Carousel chevrons — outside the card, desktop only */}
                 <button onClick={() => showCard(walletCardSide === 'trading' ? 'main' : 'trading')} title="Main Wallet card"
-                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
-                    style={{ left: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}>
+                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0E4D30]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0E4D30] hover:scale-105 active:scale-95 transition-all"
+                    style={{ left: '-46px', boxShadow: isLight ? '0 8px 20px rgba(14,77,48,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}>
                     <ChevronLeft size={18} />
                 </button>
                 <button onClick={() => showCard(walletCardSide === 'trading' ? 'main' : 'trading')} title="Trading Wallet card"
-                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
-                    style={{ right: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}>
+                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0E4D30]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0E4D30] hover:scale-105 active:scale-95 transition-all"
+                    style={{ right: '-46px', boxShadow: isLight ? '0 8px 20px rgba(14,77,48,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}>
                     <ChevronRight size={18} />
                 </button>
 
@@ -780,7 +785,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                 // the light one — light mode gets a tight green-
                                 // tinted shadow instead.
                                 boxShadow: isLight
-                                    ? '0 10px 24px rgba(14,77,48,0.16), 0 16px 36px rgba(11,50,32,0.12)'
+                                    ? '0 10px 24px rgba(14,77,48,0.16), 0 16px 36px rgba(14,77,48,0.12)'
                                     : '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgb(14,77,48,0.13)' }}
                             className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
                         >
@@ -857,9 +862,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <button onClick={onTransferHub || (() => onOpenCircleWallet?.(null))} title="Transfer Hub" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
                             <AnimatedSend size={15} className={isLight ? 'text-black/80' : 'text-white/80'}/>
                         </button>
+                        {referralLive && (
                         <button onClick={onReferral} title="Referral Program" className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`}>
                             <Gift size={16} className="text-[#0E4D30]"/>
                         </button>
+                        )}
                         <button onClick={() => setIsNotificationsOpen(true)} className={`w-10 h-10 ${isLight ? 'bg-white border-white hover:bg-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]' : 'bg-white/5 border-white/5 hover:bg-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.4)]'} rounded-2xl border flex items-center justify-center relative group`} title="Notifications">
                             <AnimatedBell size={16} className={isLight ? 'text-black/80' : 'text-white/80'}/>
                             <motion.span
@@ -1686,9 +1693,11 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             <button onClick={() => { setIsMobileMenuOpen(false); onTransferHub?.() || onOpenCircleWallet?.(null); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(14,77,48,0.15)] border border-[#0E4D30]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Send size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Transfer Hub</span>
                             </button>
+                            {referralLive && (
                             <button onClick={() => { setIsMobileMenuOpen(false); onReferral?.(); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(14,77,48,0.15)] border border-[#0E4D30]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Gift size={16} className="text-[#0E4D30]"/> <span className="text-[10px] font-black uppercase tracking-widest">Referral Program</span>
                             </button>
+                            )}
                             <button onClick={() => { setIsMobileMenuOpen(false); setIsNotificationsOpen(true); }} className={`flex items-center gap-4 w-full p-4 rounded-2xl relative z-10 ${isLight ? 'bg-white shadow-[0_4px_12px_rgba(14,77,48,0.15)] border border-[#0E4D30]/10 hover:bg-[#f0f6f2] text-[#0a261a]' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
                                 <Bell size={16} className={isLight ? 'text-[#0a261a]/70' : 'text-white/70'}/> <span className="text-[10px] font-black uppercase tracking-widest">Notifications</span>
                             </button>

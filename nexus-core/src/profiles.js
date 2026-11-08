@@ -1281,6 +1281,29 @@ class ProfileService {
     // computed on read from the two authoritative ledgers:
     //   deposits → credited_deposits (one row per credited inflow)
     //   volume   → placed_bets      (one row per placed bet)
+    // Referral program-level commissions (set from the admin console's
+    // Referral Program section before the program can go live). null means
+    // "use the built-in defaults" so behavior is unchanged until the admin
+    // saves explicit commissions. Per-user overrides always win over these.
+    setReferralProgramConfig(cfg) {
+        const c = cfg || {};
+        if (c.depositPct !== undefined) {
+            const d = Number(c.depositPct);
+            this.referralProgramDepositPct = (c.depositPct === null || c.depositPct === '' || !Number.isFinite(d)) ? null : Math.max(0, Math.min(50, d));
+        }
+        if (c.volumePct !== undefined) {
+            const v = Number(c.volumePct);
+            this.referralProgramVolumePct = (c.volumePct === null || c.volumePct === '' || !Number.isFinite(v)) ? null : Math.max(0, Math.min(50, v));
+        }
+    }
+
+    getReferralProgramConfig() {
+        return {
+            depositPct: this.referralProgramDepositPct != null ? Number(this.referralProgramDepositPct) : null,
+            volumePct: this.referralProgramVolumePct != null ? Number(this.referralProgramVolumePct) : null
+        };
+    }
+
     async getReferralStats(address) {
         const addr = String(address || '').toLowerCase();
         await this.initSupabase();
@@ -1302,8 +1325,10 @@ class ProfileService {
                 suspended = p.referralSuspended === true;
             }
         } catch (e) { /* program defaults apply */ }
-        const depRate = rateOverride != null ? rateOverride / 100 : DEPOSIT_COMMISSION_RATE;
-        const volRate = rateOverride != null ? rateOverride / 100 : VOLUME_COMMISSION_RATE;
+        const depRate = rateOverride != null ? rateOverride / 100
+            : (this.referralProgramDepositPct != null ? Number(this.referralProgramDepositPct) / 100 : DEPOSIT_COMMISSION_RATE);
+        const volRate = rateOverride != null ? rateOverride / 100
+            : (this.referralProgramVolumePct != null ? Number(this.referralProgramVolumePct) / 100 : VOLUME_COMMISSION_RATE);
 
         // 1) Referred users (memory first, then the durable store by referred_by)
         const referred = new Map();

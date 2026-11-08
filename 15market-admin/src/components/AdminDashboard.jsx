@@ -458,6 +458,84 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     });
     const [wdSection, setWdSection] = useState('participants');
 
+    // ---- Referral Program switch (go-live + commissions) ----
+    // The switch mirrors platformSettings; the draft inputs let the operator
+    // type the deposit / trade commissions that must exist before the
+    // program is allowed to go live (smtp of the gate lives on the node).
+    const [refProgramDraft, setRefProgramDraft] = useState(() => ({
+        depositPct: platformSettings.referralDepositPct != null ? String(platformSettings.referralDepositPct) : '',
+        volumePct: platformSettings.referralVolumePct != null ? String(platformSettings.referralVolumePct) : ''
+    }));
+    const [refProgramBusy, setRefProgramBusy] = useState(false);
+    useEffect(() => {
+        setRefProgramDraft(draft => ({
+            depositPct: platformSettings.referralDepositPct != null ? String(platformSettings.referralDepositPct) : draft.depositPct,
+            volumePct: platformSettings.referralVolumePct != null ? String(platformSettings.referralVolumePct) : draft.volumePct
+        }));
+    }, [platformSettings.referralEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Entering the Referral section always re-reads the node's authoritative
+    // program state (switch position + saved commissions), so the console
+    // never shows a stale switch after another admin changed it.
+    useEffect(() => {
+        if (activeNav !== 'referrals' && adminTab !== 'referrals') return;
+        let gone = false;
+        (async () => {
+            try {
+                const res = await adminFetch(`${KEEPER_URL_ARC}/settings`);
+                if (!res.ok || gone) return;
+                const s = await res.json();
+                setPlatformSettings(prev => ({ ...prev, ...s }));
+            } catch (e) { /* node unreachable - drawer state stays */ }
+        })();
+        return () => { gone = true; };
+    }, [activeNav, adminTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const saveReferralProgram = async (enable) => {
+        if (refProgramBusy) return;
+        const dep = String(refProgramDraft.depositPct).trim();
+        const vol = String(refProgramDraft.volumePct).trim();
+        if (enable && (dep === '' || vol === '')) {
+            notify('Specify both referral commissions before the program can go live', 'error');
+            return;
+        }
+        if (dep !== '' && !(Number(dep) >= 0 && Number(dep) <= 50 && Number.isFinite(Number(dep)))) {
+            notify('Deposit commission must be between 0 and 50', 'error');
+            return;
+        }
+        if (vol !== '' && !(Number(vol) >= 0 && Number(vol) <= 50 && Number.isFinite(Number(vol)))) {
+            notify('Trade commission must be between 0 and 50', 'error');
+            return;
+        }
+        setRefProgramBusy(true);
+        try {
+            const payload = {
+                referralEnabled: !!enable,
+                referralDepositPct: dep === '' ? null : Number(dep),
+                referralVolumePct: vol === '' ? null : Number(vol)
+            };
+            const res = await adminFetch(`${KEEPER_URL_ARC}/settings`, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+                let msg = 'Referral program switch failed on the node';
+                try { const err = await res.json(); if (err && err.error) msg = err.error; } catch (e) {}
+                notify(msg, 'error');
+                return;
+            }
+            const saved = await res.json();
+            setPlatformSettings(prev => ({ ...prev, ...saved }));
+            try { localStorage.setItem('15market_citadel_settings', JSON.stringify({ ...platformSettings, ...saved })); } catch (e) {}
+            notify(enable ? 'Referral program is now LIVE for users' : 'Referral program is now OFF - hidden from users', 'success');
+        } catch (e) {
+            notify(e.message || 'Referral program switch failed', 'error');
+        } finally {
+            setRefProgramBusy(false);
+        }
+    };
+
+
     // Security section: internal tabs (roster / protocols), persisted.
     const [secTab, setSecTab] = useState(() => {
         try { return localStorage.getItem('15m_sec_tab') === 'protocols' ? 'protocols' : 'team'; } catch (e) { return 'team'; }
@@ -1006,6 +1084,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 });
                 
                 if (!res.ok) {
+                    let serverMsg = null;
+                    try {
+                        const err = await res.json();
+                        serverMsg = err && err.error ? err.error : null;
+                    } catch (e) {}
+                    // Backend validation rejections are final - surface the
+                    // real reason (e.g. missing referral commissions) instead
+                    // of masking it with connection-retry noise.
+                    if (serverMsg) throw new Error(serverMsg);
                     if (retries > 0) {
                         setSyncProgress(prev => prev + 10);
                         await new Promise(r => setTimeout(r, 1000));
@@ -3544,6 +3631,64 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         </div>
                         </div>{/* min-w table body (x-scrolled on phones) */}
                         </div>{/* — overflow-x: headers + rows swipe together */}
+                    </div>
+                )}
+
+                {/* Referral Program — GO-LIVE switch + program commissions.
+                    Users (page + icon) only see the referral program while
+                    the switch is live; going live refuses until both
+                    commissions are specified - the node enforces it too. */}
+                {activeNav === 'referrals' && (
+                    <div className={`w-full mb-6 rounded-3xl border p-5 flex flex-col gap-5 ${isLight ? 'bg-white/70 border-black/10' : 'bg-[#0E4D30]/10 border-white/10'}`}>
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <span className="text-[13px] font-black uppercase tracking-[0.2em]">Referral program</span>
+                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 ${platformSettings.referralEnabled ? 'bg-[#0E4D30] text-white shadow-lg shadow-[#0E4D30]/20' : isLight ? 'bg-black/5 text-black/50' : 'bg-white/5 text-white/50'}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${platformSettings.referralEnabled ? 'bg-white' : isLight ? 'bg-black/40' : 'bg-white/40'}`} />
+                                        {platformSettings.referralEnabled ? 'Live' : 'Off'}
+                                    </span>
+                                </div>
+                                <p className={`text-[11px] font-semibold mt-1.5 max-w-xl leading-relaxed ${isLight ? 'text-black/50' : 'text-white/50'}`}>
+                                    {platformSettings.referralEnabled
+                                        ? `Live for all users - deposit commission ${platformSettings.referralDepositPct ?? '—'}% · trade commission ${platformSettings.referralVolumePct ?? '—'}%`
+                                        : 'Off - users cannot see the referral page or icon until you go live with commissions set below.'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => saveReferralProgram(!platformSettings.referralEnabled)}
+                                disabled={refProgramBusy}
+                                aria-pressed={!!platformSettings.referralEnabled}
+                                title={platformSettings.referralEnabled ? 'Turn the referral program off' : 'Go live (commissions required)'}
+                                className={`relative w-[64px] h-[30px] rounded-full border transition-all flex items-center shrink-0 ${platformSettings.referralEnabled ? 'bg-[#0E4D30] border-[#0E4D30]' : isLight ? 'bg-black/10 border-black/15' : 'bg-white/10 border-white/15'} ${refProgramBusy ? 'opacity-60 pointer-events-none' : ''}`}
+                            >
+                                <span className={`absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white shadow transition-all ${platformSettings.referralEnabled ? 'left-[37px]' : 'left-[4px]'} ${isLight && !platformSettings.referralEnabled ? 'bg-white' : ''}`} />
+                            </button>
+                        </div>
+                        <div className="flex items-end gap-3 flex-wrap">
+                            {[
+                                ['depositPct', 'Deposit commission %'],
+                                ['volumePct', 'Trade commission %']
+                            ].map(([k, l]) => (
+                                <label key={k} className="flex flex-col gap-1.5 min-w-[180px]">
+                                    <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/50' : 'text-white/50'}`}>{l}</span>
+                                    <input
+                                        type="number" min="0" max="50" step="0.1"
+                                        value={refProgramDraft[k]}
+                                        onChange={(e) => setRefProgramDraft(prev => ({ ...prev, [k]: e.target.value }))}
+                                        placeholder="10"
+                                        className={`w-full px-3 py-2.5 rounded-xl border text-[13px] font-mono font-bold outline-none transition-all ${isLight ? 'bg-white border-black/10 text-black focus:border-[#0E4D30]' : 'bg-black/30 border-white/10 text-white focus:border-[#0E4D30]'}`}
+                                    />
+                                </label>
+                            ))}
+                            <button
+                                onClick={() => saveReferralProgram(platformSettings.referralEnabled)}
+                                disabled={refProgramBusy}
+                                className={`px-4 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${isLight ? 'bg-white border-black/10 text-black hover:border-[#0E4D30] hover:text-[#0E4D30]' : 'bg-white/5 border-white/10 text-white/70 hover:text-white'} ${refProgramBusy ? 'opacity-60 pointer-events-none' : ''}`}
+                            >
+                                Save commissions
+                            </button>
+                        </div>
                     </div>
                 )}
 

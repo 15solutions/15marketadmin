@@ -30,6 +30,8 @@ const rpc = require('./rpc');
 const provider = rpc.provider;
 const ClassicEngine = require('./classic');
 const profiles = require('./profiles');
+const ledgerService = require('./services/ledgerService');
+const { SUPABASE_ENABLED, supabaseSelect, supabaseUpsert } = require('./supabaseRest');
 const { ethers } = require('ethers');
 const circleService = require('./services/circleService');
 const fundingService = require('./services/fundingService');
@@ -90,6 +92,10 @@ notificationService.init(io);
 // console at boot so every mail ever sent or received survives restarts
 // and Render's per-deploy disk wipes. Backfills local-only records on top.
 notificationService.initOutbox();
+// Durable money ledger (deposits/withdrawals/transfers, never trades) —
+// hydrates from Supabase (record store) + JSON mirror at boot so the
+// Transfer Hub Activity and dashboard Transactions survive restarts.
+ledgerService.initLedger();
 const siem = require('./siem');
 const dailyChange = require('./dailyChange');
 // Every HIGH/CRITICAL SIEM alert reaches open admin dashboards live.
@@ -1265,8 +1271,65 @@ const platformSettings = {
   tradingHalted: false,
   systemBanner: "",
   bannerLevel: "info",
-  treasuryAddress: config.TREASURY_ADDRESS
+  treasuryAddress: config.TREASURY_ADDRESS,
+  // Referral program master switch. OFF hides the referral page and its
+  // icon on the user side entirely. Going LIVE requires the admin to have
+  // saved both program commissions - the post handler rejects enabling
+  // without them, so an unpriced program can never be visible to users.
+  referralEnabled: false,
+  referralDepositPct: null,
+  referralVolumePct: null
 };
+
+// Durable side of the referral switch: platform_config (migration 014)
+// survives node restarts, unlike the operational settings above. Stored
+// under one key so the program state and its commissions move together.
+async function hydrateReferralProgramConfig() {
+  if (!SUPABASE_ENABLED) return;
+  try {
+    const rows = await supabaseSelect('/rest/v1/platform_config?select=value&key=eq.referral_program');
+    const value = rows && rows[0] && rows[0].value;
+    if (value && typeof value === 'object') {
+      if (typeof value.referralEnabled === 'boolean') platformSettings.referralEnabled = value.referralEnabled;
+      if (value.referralDepositPct != null) platformSettings.referralDepositPct = Number(value.referralDepositPct);
+      if (value.referralVolumePct != null) platformSettings.referralVolumePct = Number(value.referralVolumePct);
+      profiles.setReferralProgramConfig({
+        depositPct: platformSettings.referralDepositPct,
+        volumePct: platformSettings.referralVolumePct
+      });
+      console.log(`[ReferralProgram] hydrated from platform_config: enabled=${platformSettings.referralEnabled} deposit=${platformSettings.referralDepositPct}% volume=${platformSettings.referralVolumePct}%`);
+    }
+  } catch (e) {
+    // Missing table (migration not applied yet) - stay memory-only.
+    if (!/relation .* does not exist|404|not found/i.test(String(e.message || e))) {
+      console.warn('[ReferralProgram] hydrate failed:', e.message || e);
+    }
+  }
+}
+
+async function persistReferralProgramConfig() {
+  if (!SUPABASE_ENABLED) return;
+  try {
+    const row = {
+      key: 'referral_program',
+      value: {
+        referralEnabled: platformSettings.referralEnabled,
+        referralDepositPct: platformSettings.referralDepositPct,
+        referralVolumePct: platformSettings.referralVolumePct
+      },
+      updated_at: new Date().toISOString()
+    };
+    await supabaseUpsert('platform_config', [row], 'key');
+  } catch (e) {
+    // Missing table until migration 014 runs - program still works, just
+    // resets to safe defaults on the next restart.
+    if (!/relation .* does not exist|404|not found/i.test(String(e.message || e))) {
+      console.warn('[ReferralProgram] persist failed:', e.message || e);
+    }
+  }
+}
+
+const REFERRAL_PCT_VALID = (v) => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 50;
 
 app.get('/settings', (req, res) => {
   res.json(platformSettings);
@@ -1274,6 +1337,36 @@ app.get('/settings', (req, res) => {
 
 app.post('/settings', requirePerm('platform.settings'), (req, res) => {
   const body = req.body || {};
+  // ---- Referral go-live gate ----
+  // Turning the program LIVE requires both commissions on the same request
+  // (or already saved on a previous edit). Anything less is a hard 400.
+  const wantsReferralChange = body.referralEnabled !== undefined
+    || body.referralDepositPct !== undefined
+    || body.referralVolumePct !== undefined;
+  if (wantsReferralChange) {
+    const deps = body.referralDepositPct !== undefined ? body.referralDepositPct : platformSettings.referralDepositPct;
+    const vols = body.referralVolumePct !== undefined ? body.referralVolumePct : platformSettings.referralVolumePct;
+    if (deps !== null && deps !== undefined && !REFERRAL_PCT_VALID(deps)) {
+      return res.status(400).json({ error: 'Deposit commission must be a number between 0 and 50.' });
+    }
+    if (vols !== null && vols !== undefined && !REFERRAL_PCT_VALID(vols)) {
+      return res.status(400).json({ error: 'Trade commission must be a number between 0 and 50.' });
+    }
+    if (body.referralEnabled === true && !REFERRAL_PCT_VALID(deps)) {
+      return res.status(400).json({ error: 'Specify the deposit commission before the referral program can go live.' });
+    }
+    if (body.referralEnabled === true && !REFERRAL_PCT_VALID(vols)) {
+      return res.status(400).json({ error: 'Specify the trade commission before the referral program can go live.' });
+    }
+    if (body.referralDepositPct !== undefined) platformSettings.referralDepositPct = (body.referralDepositPct === null || body.referralDepositPct === '') ? null : Number(body.referralDepositPct);
+    if (body.referralVolumePct !== undefined) platformSettings.referralVolumePct = (body.referralVolumePct === null || body.referralVolumePct === '') ? null : Number(body.referralVolumePct);
+    if (body.referralEnabled !== undefined) platformSettings.referralEnabled = !!body.referralEnabled;
+    profiles.setReferralProgramConfig({
+      depositPct: platformSettings.referralDepositPct,
+      volumePct: platformSettings.referralVolumePct
+    });
+    persistReferralProgramConfig();
+  }
   if (body.maintenanceMode !== undefined) platformSettings.maintenanceMode = !!body.maintenanceMode;
   if (body.tradingHalted !== undefined) platformSettings.tradingHalted = !!body.tradingHalted;
   if (body.systemBanner !== undefined) platformSettings.systemBanner = String(body.systemBanner).slice(0, 300);
@@ -1282,6 +1375,7 @@ app.post('/settings', requirePerm('platform.settings'), (req, res) => {
   io.emit('settings_update', platformSettings);
   res.json(platformSettings);
 });
+hydrateReferralProgramConfig();
 
 // Deposit tx hashes already credited, so a retried or replayed
 // /session/deposit can never credit the same transfer twice. In-memory by
@@ -1335,6 +1429,44 @@ app.get('/fund/quote', async (req, res) => {
 });
 
 /**
+ * POST /push-tx
+ *
+ * The client uploads a transaction it just executed (deposit confirmed from
+ * the browser, transfer signature, etc.). Persisted into the durable ledger
+ * so Transfer Hub Activity + dashboard Transactions survive reloads and
+ * restarts. Idempotent: the same tx pushed twice (or already recorded
+ * server-side by /fund/confirm / /session/cashout) resolves to one row.
+ */
+app.post('/push-tx', (req, res) => {
+  try {
+    const { address } = req.body || {};
+    if (!address) return res.status(400).json({ error: 'Missing address' });
+    const tx = ledgerService.recordTransaction(address, req.body.transaction || req.body);
+    if (!tx.row) return res.status(400).json({ error: 'Empty transaction payload' });
+    res.json({ success: true, id: tx.row.id, duplicate: tx.duplicate });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /transactions/:address
+ *
+ * The durable non-trade money ledger for a wallet (deposits, withdrawals,
+ * internal transfers). The Transfer Hub Activity feed and the dashboard
+ * Transactions cards render this so everything except trade history is
+ * persistent across devices and restarts.
+ */
+app.get('/transactions/:address', async (req, res) => {
+  try {
+    const rows = await ledgerService.listTransactions(req.params.address, 200);
+    res.json({ success: true, transactions: rows });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
  * POST /fund/confirm
  * Confirms a deposit transaction and credits the user's Trading Wallet.
  */
@@ -1373,6 +1505,15 @@ app.post('/fund/confirm', async (req, res) => {
       balance: String(session.balance),
       reason: 'DEPOSIT',
       txHash
+    });
+
+    ledgerService.recordTransaction(userAddr, {
+      kind: 'DEPOSIT',
+      amount: (result && result.netAmount != null ? result.netAmount
+        : (result && result.amount != null ? result.amount : finalAmount)),
+      timestamp: Date.now(),
+      tx: txHash,
+      network: 'arc'
     });
 
     res.json({ success: true, ...result });
@@ -1476,6 +1617,14 @@ app.post('/fund/permit-bridge', async (req, res) => {
       txHash: result.txHash
     });
     console.log(`[CCTP-GasTank] Optimistically credited ${result.netAmount} USDC to ${userAddr} (new balance: ${creditResult.newBalance})`);
+
+    ledgerService.recordTransaction(userAddr, {
+      kind: 'DEPOSIT',
+      amount: result.netAmount,
+      timestamp: Date.now(),
+      tx: result.txHash,
+      network: 'arc'
+    });
 
     res.json({ success: true, ...result });
   } catch (err) {
@@ -2237,6 +2386,18 @@ app.post('/session/cashout', async (req, res) => {
       txHash: tx.hash
     });
 
+    // 2. Record server-side so the durable ledger owns this event even if
+    //     the client's /push-tx never fires (dedupe by tx hash makes this
+    //     and the client upload idempotent against each other).
+    ledgerService.recordTransaction(userAddr, {
+      kind: (destination && String(destination).toLowerCase() !== userAddr) ? 'TRANSFER' : 'WITHDRAW',
+      amount: (amount && Number(amount) > 0 ? Number(amount) : parseFloat(ethers.formatEther(sendAmount + feeAmount))),
+      timestamp: Date.now(),
+      tx: tx.hash,
+      to: String(targetAddr),
+      network: 'arc'
+    });
+
     res.json({ success: true, txHash: tx.hash, amount: ethers.formatEther(sendAmount) });
   } catch (err) {
     console.error('[Withdrawal] Critical System Failure:', err);
@@ -2429,6 +2590,16 @@ app.post('/session/deposit', async (req, res) => {
         txHash,
         status: 'CONFIRMED',
         source: 'verified-deposit'
+    });
+
+    // Durable ledger record for the dashboard Transactions card + Transfer
+    // Hub Activity (non-trade history stays server-side per user request).
+    ledgerService.recordTransaction(userAddr, {
+      kind: 'DEPOSIT',
+      amount: creditedAmount,
+      timestamp: Date.now(),
+      tx: txHash,
+      network: 'arc'
     });
 
     io.to(userAddr).emit('balance_update', {

@@ -7,7 +7,7 @@ import { KEEPER_URL_ARC } from '../constants';
 
 const LCD_COUNTER_STYLE = `
   .lcd-live-dot-dark { background: #0E4D30; box-shadow: 0 0 6px #0E4D30, 0 0 14px #0E4D30; }
-  .lcd-live-dot-light { background: #0E4D30; box-shadow: 0 0 5px rgba(14,77,48,0.55); }
+  .lcd-live-dot-light { background: #1B7445; box-shadow: 0 0 5px rgba(27,116,69,0.55); }
   .lcd-live-blink { animation: lcd-live-blink-kf 1s step-end infinite; }
   @keyframes lcd-live-blink-kf { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
   @keyframes futuristic-sweep { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }

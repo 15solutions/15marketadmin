@@ -713,7 +713,7 @@ function MobileSteppedChart({
             resultText = isWon ? 'WON' : 'LOST';
             resultColor = isWon ? '#0E4D30' : '#FF7F50';
           } else {
-            badgeColor = isLight ? 'rgba(14,77,48,0.92)' : 'rgba(20,71,44,0.92)';
+            badgeColor = isLight ? 'rgba(14,77,48,0.92)' : 'rgba(14,77,48,0.92)';
             badgeGlow = 'rgba(14,77,48,0.35)';
           }
 

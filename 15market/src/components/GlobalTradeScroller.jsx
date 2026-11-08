@@ -277,7 +277,9 @@ function GlobalTradeScrollerComponent({ theme, isV1 = false }) {
                                         width: 72,
                                         background: isV1
                                             ? `linear-gradient(to right, ${isLight ? '#ffffff' : '#0a0a0a'} 0%, ${isLight ? '#ffffff' : '#0a0a0a'} 40%, rgba(0,0,0,0) 100%)`
-                                            : 'linear-gradient(to right, #0E4D30 0%, #0E4D30 40%, rgba(14,77,48,0) 100%)'
+                                            : (isLight
+                                                ? 'linear-gradient(to right, #1B7445 0%, #1B7445 40%, rgba(27,116,69,0) 100%)'
+                                                : 'linear-gradient(to right, #0E4D30 0%, #0E4D30 40%, rgba(14,77,48,0) 100%)')
                                     }}
                                 />
                                 <div className={`absolute right-0 top-0 bottom-0 w-16 z-[5] bg-gradient-to-l pointer-events-none ${isV1 ? (isLight ? 'from-white' : 'from-[#0a0a0a]') : 'from-[#0E4D30]'}`} />

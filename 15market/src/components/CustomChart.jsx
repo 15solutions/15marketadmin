@@ -130,7 +130,7 @@ export default function CustomChart({ symbol = 'SOLUSDT', theme = 'dark', curren
                                     src={logoSrc}
                                     alt={cleanSym}
                                     className="w-full h-full object-contain"
-                                    style={{ filter: getLogoFilter(!isDark) }}
+                                    style={{ filter: isDark ? getLogoFilter(false) : 'grayscale(1) brightness(0)' }}
                                 />
                             </span>
                         );

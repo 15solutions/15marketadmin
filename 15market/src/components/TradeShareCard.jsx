@@ -260,8 +260,8 @@ const handleNativeShare = async () => {
 
   const accent = isWin ? '#0E4D30' : '#FF1744';
   const accentMid = isWin ? '#0E4D30' : '#D50000';
-  const accentDark = isWin ? '#123F28' : '#8B0000';
-  const accentDeep = isWin ? '#063d23' : '#4a0000';
+  const accentDark = isWin ? '#0E4D30' : '#8B0000';
+  const accentDeep = isWin ? '#0E4D30' : '#4a0000';
 
   return (
     <AnimatePresence>
@@ -481,7 +481,9 @@ const handleNativeShare = async () => {
                   className="w-full h-full overflow-hidden flex flex-col items-center"
                   style={{
                     background: isWin
-                      ? 'linear-gradient(180deg, #0E4D30 0%, #123F28 100%)'
+                        ? (theme === 'light'
+                            ? 'linear-gradient(180deg, #1B7445 0%, #1B7445 100%)'
+                            : 'linear-gradient(180deg, #0E4D30 0%, #0E4D30 100%)')
                       : 'linear-gradient(180deg, #EF5350 0%, #c62828 100%)',
                     // Shadows are cast to the LEFT only. An omni or rightward
                     // glow spilled onto the 52px signature strip beside it and,

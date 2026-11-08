@@ -99,6 +99,10 @@ export function CircleWalletPage({
     onDeposit,
     onWithdraw,
     onFiatWithdraw,
+    // Durable non-trade ledger (deposits / withdrawals / transfers) from the
+    // user session. The Activity tab renders this merged with on-chain rows
+    // so everything except trade history is a persistent server record.
+    activityFeed = [],
     triggerGlobalRefresh
 }) {
     // External-wallet-only rails (CCTP burn & mint funding): the cross-chain
@@ -494,6 +498,31 @@ export function CircleWalletPage({
     const [isSending, setIsSending] = useState(false);
     const [qrCodeData, setQrCodeData] = useState("");
     const [activeTab, setActiveTab] = useState('assets');
+
+    // Activity rows: the durable ledger (deposits / withdrawals / transfers —
+    // trades excluded by design, recorded in their own tables) merged with
+    // the on-chain Circle rows for external flows the ledger can't observe.
+    // Newest first, capped so the panel stays scroll-light.
+    const activityRows = useMemo(() => {
+        const ledger = (activityFeed || []).slice(0, 80).map(tx => ({
+            key: tx.id || `l${tx.timestamp}`,
+            incoming: tx.type === 'DEPOSIT' || tx.type === 'IN' || tx.type === 'INCOMING',
+            kind: tx.type,
+            amt: parseFloat(tx.amount) || 0,
+            when: Number(tx.timestamp) || 0
+        }));
+        const chain = (walletInfo?.transactions || []).map((tx, i) => ({
+            key: tx.txHash || `c${i}`,
+            incoming: tx.type !== 'OUTGOING',
+            kind: tx.type,
+            amt: parseFloat(tx.amounts?.[0] ?? '0') || 0,
+            when: Date.parse(tx.createDate) || 0
+        }));
+        return [...ledger, ...chain]
+            .sort((a, b) => b.when - a.when)
+            .slice(0, 120);
+    }, [activityFeed, walletInfo]);
+
     const [isDownloading, setIsDownloading] = useState(false);
     const [copied, setCopied] = useState(false);
     const [showDesktopFunding, setShowDesktopFunding] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
@@ -1826,16 +1855,16 @@ export function CircleWalletPage({
                                 <button
                                     onClick={() => handleSwipeWallet('right')}
                                     title="Previous card"
-                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
-                                    style={{ left: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}
+                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0E4D30]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0E4D30] hover:scale-105 active:scale-95 transition-all"
+                                    style={{ left: '-46px', boxShadow: isLight ? '0 8px 20px rgba(14,77,48,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}
                                 >
                                     <ChevronLeft size={18} />
                                 </button>
                                 <button
                                     onClick={() => handleSwipeWallet('left')}
                                     title="Next card"
-                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0b3220]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0b3220] hover:scale-105 active:scale-95 transition-all"
-                                    style={{ right: '-46px', boxShadow: isLight ? '0 8px 20px rgba(11,50,32,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}
+                                    className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-40 w-10 h-10 rounded-full items-center justify-center bg-[#0E4D30]/85 border border-[#0E4D30]/40 text-white/90 backdrop-blur-sm hover:bg-[#0E4D30] hover:scale-105 active:scale-95 transition-all"
+                                    style={{ right: '-46px', boxShadow: isLight ? '0 8px 20px rgba(14,77,48,0.18)' : '0 10px 28px rgba(0,0,0,0.45)' }}
                                 >
                                     <ChevronRight size={18} />
                                 </button>
@@ -1862,7 +1891,7 @@ export function CircleWalletPage({
                                                 // tight green-tinted shadow (see the
                                                 // Dashboard card host comment).
                                                 boxShadow: isLight
-                                                    ? '0 10px 24px rgba(14,77,48,0.16), 0 16px 36px rgba(11,50,32,0.12)'
+                                                    ? '0 10px 24px rgba(14,77,48,0.16), 0 16px 36px rgba(14,77,48,0.12)'
                                                     : '0 10px 28px rgba(0,0,0,0.50), 0 20px 44px rgba(0,0,0,0.45), 0 10px 30px rgb(14,77,48,0.13)' }}
                                             className="absolute inset-0 rounded-[40px] cursor-grab active:cursor-grabbing"
                                         >
@@ -1871,7 +1900,9 @@ export function CircleWalletPage({
                                                 className="w-[448px] h-[260px] flex-none relative overflow-hidden rounded-[40px] text-white cursor-pointer"
                                                 style={{
                                                     fontFamily: '"Comfortaa", cursive',
-                                                    background: 'linear-gradient(145deg, #0e4d30 0%, #123f28 55%, #0b3220 100%)',
+                                                    background: isLight
+                                                        ? 'linear-gradient(145deg, #1B7445 0%, #1B7445 55%, #1B7445 100%)'
+                                                        : 'linear-gradient(145deg, #0e4d30 0%, #0E4D30 55%, #0E4D30 100%)',
                                                     border: '1.5px solid rgb(14,77,48,0.45)',
                                                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), inset 0 0 46px rgba(0,0,0,0.28)'
                                                 }}
@@ -2566,19 +2597,23 @@ export function CircleWalletPage({
                                 </div>
                             ) : (
                                 <div className="flex flex-col gap-4">
-                                    {walletInfo?.transactions?.map((tx, i) => (
-                                        <div key={i} className={`p-8 rounded-[40px] border ${isLight ? 'bg-[#C2D2CA] border-black/5 shadow-sm' : 'bg-[#111] border-white/5'} flex items-center justify-between transition-all hover:scale-[1.01]`}>
+                                    {activityRows.length === 0 ? (
+                                        <div className={`p-10 rounded-[40px] border text-center ${isLight ? 'bg-[#C2D2CA] border-black/5' : 'bg-[#111] border-white/5'}`}>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-white opacity-50">No activity yet</p>
+                                        </div>
+                                    ) : activityRows.map(tx => (
+                                        <div key={tx.key} className={`p-8 rounded-[40px] border ${isLight ? 'bg-[#C2D2CA] border-black/5 shadow-sm' : 'bg-[#111] border-white/5'} flex items-center justify-between transition-all hover:scale-[1.01]`}>
                                             <div className="flex items-center gap-5">
-                                                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${tx.type === 'OUTGOING' ? 'bg-orange-500/10 text-orange-500' : 'bg-[#0E4D30]/10 text-[#0E4D30]'}`}>
-                                                    {tx.type === 'OUTGOING' ? <Send size={24} /> : <ArrowDownLeft size={24} />}
+                                                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${tx.incoming ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-orange-500/10 text-orange-500'}`}>
+                                                    {tx.incoming ? <ArrowDownLeft size={24} /> : <Send size={24} />}
                                                 </div>
                                                 <div>
-                                                    <p className={`text-sm font-black uppercase tracking-wider text-white`}>{tx.type}</p>
-                                                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest text-white">{new Date(tx.createDate).toLocaleDateString()}</p>
+                                                    <p className={`text-sm font-black uppercase tracking-wider text-white`}>{tx.incoming ? (tx.kind === 'TRANSFER' ? 'Transfer In' : 'Deposit') : (tx.kind === 'TRANSFER' ? 'Transfer Out' : 'Withdrawal')}</p>
+                                                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest text-white">{tx.when ? new Date(tx.when).toLocaleDateString() : '—'}</p>
                                                 </div>
                                             </div>
                                             <p className={`text-xl font-black text-white`}>
-                                                {tx.type === 'OUTGOING' ? '-' : '+'}{tx.amounts?.[0] || '0.00'}
+                                                {tx.incoming ? '+' : '-'}{tx.amt.toFixed(4)}
                                             </p>
                                         </div>
                                     ))}

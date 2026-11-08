@@ -194,7 +194,7 @@ export function LandingPage({ theme, onToggle, onHelp, isSmallScreen }) {
             <header className="w-full max-w-5xl mx-auto text-center px-6 pt-8 pb-6 relative z-10 flex flex-col items-center gap-4">
                 <div className="h-[70px] sm:h-[90px] flex items-center justify-center">
                     <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-tight uppercase leading-snug">
-                        <span className="text-transparent bg-clip-text bg-gradient-to-b from-[#0E4D30] to-[#123F28] inline-block filter drop-shadow-[0_0_15px_rgba(14,77,48,0.25)]">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-b from-[#0E4D30] to-[#0E4D30] inline-block filter drop-shadow-[0_0_15px_rgba(14,77,48,0.25)]">
                             {displayText}
                         </span>
                         <span className="inline-block w-[1.5px] h-[0.75em] bg-[#0E4D30] ml-1.5 animate-pulse" />

@@ -64,7 +64,9 @@ function WonTradesBanner({ theme }) {
   return (
     <div
       className="w-full h-5 md:h-6 lg:h-7 rounded-t-[9px] relative z-50 overflow-hidden"
-      style={{ background: 'linear-gradient(180deg, #01582f 0%, #01572E 50%, #01562E 100%)' }}
+      style={{ background: theme === 'light'
+        ? 'linear-gradient(180deg, #1B7445 0%, #1B7445 50%, #1B7445 100%)'
+        : 'linear-gradient(180deg, #0E4D30 0%, #0E4D30 50%, #0E4D30 100%)' }}
     >
       <div
         key={scrollerKey}

@@ -495,11 +495,34 @@ export default function UserApp() {
   const wasConnectedRef = useRef(isConnected);
 
   // PERSISTENCE: Transaction History
-
-  // PERSISTENCE: Transaction History
   useEffect(() => {
     localStorage.setItem("15market_transactions_v1", JSON.stringify(transactionHistory));
   }, [transactionHistory]);
+
+  // PERSISTENCE: hydrated from the node's durable ledger on every session.
+  // Money events recorded server-side (deposits/withdrawals/transfers —
+  // never trades) stream in here so the dashboard cards and the Transfer
+  // Hub Activity are the same history on every device.
+  useEffect(() => {
+    if (!address) return;
+    let gone = false;
+    (async () => {
+      try {
+        const res = await fetch(`${KEEPER_URL_ARC}/transactions/${String(address).toLowerCase()}`);
+        if (!res.ok || gone) return;
+        const data = await res.json();
+        const rows = Array.isArray(data?.transactions) ? data.transactions : [];
+        if (!rows.length || gone) return;
+        setTransactionHistory(prev => {
+          const seen = new Set(prev.map(t => t.id));
+          const merged = [...rows.filter(r => r && !seen.has(r.id)), ...prev];
+          merged.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+          return merged.slice(0, 200);
+        });
+      } catch (e) { /* node unreachable — localStorage cache still in place */ }
+    })();
+    return () => { gone = true; };
+  }, [address]);
 
   // LOCK SCROLL for Mobile History Drawer
   useEffect(() => {
@@ -3050,6 +3073,14 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
         };
         setTransactionHistory(prev => [newTx, ...prev]);
 
+        // Durable: hand it to the node's ledger (dedupe by tx hash keeps
+        // this and the server-side record to a single row).
+        fetch(`${KEEPER_URL_ARC}/push-tx`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address, transaction: newTx })
+        }).catch(() => { });
+
       } catch (evmErr) {
         notify(`Deposit failed: ${evmErr.shortMessage || evmErr.message}`, "error");
       }
@@ -3406,6 +3437,10 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               }}
               onHelp={() => setView("help")}
               onReferral={() => setView("referral")}
+              // Referral program visibility is node-controlled: while the
+              // program is off the icon above and the view below both
+              // disappear entirely (settings_update socket re-syncs live).
+              referralLive={platformSettings?.referralEnabled === true}
               onSelect={(type) => setView("comingsoon")}
             />
           ) : view === "comingsoon" ? (
@@ -3425,6 +3460,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               sessionBalance={sessionBalance}
               sessionAddress={evmSessionWallet?.address}
               username={userProfile?.username}
+              activityFeed={transactionHistory}
               wallets={wallets || []}
               walletClient={walletClient}
               switchChainAsync={switchChainAsync}
@@ -3448,13 +3484,19 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               }}
             />
           ) : view === "referral" ? (
-            <ReferralHub
-              address={address}
-              userProfile={userProfile}
-              notify={notify}
-              theme={theme}
-              onBack={() => setView("dashboard")}
-            />
+            platformSettings?.referralEnabled === true ? (
+              <ReferralHub
+                address={address}
+                userProfile={userProfile}
+                notify={notify}
+                theme={theme}
+                onBack={() => setView("dashboard")}
+              />
+            ) : (
+              /* Program switched off while the user was here - snap to the
+                 holding page instead of exposing the hub. */
+              <ComingSoonPage onBack={() => setView("dashboard")} theme={theme} />
+            )
           ) : view === "help" ? (
             <HelpPage
               theme={theme}
@@ -3771,7 +3813,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                     // wash over the white canvas reads sage, never the brand
                     // green. Dark keeps the soft wash over the near-black.
                     background: theme === 'light'
-                      ? 'linear-gradient(180deg, #0E4D30 0%, #0E4D30 38%, rgba(14,77,48,0.45) 72%, transparent 100%)'
+                      ? 'linear-gradient(180deg, #1B7445 0%, #1B7445 38%, rgba(27,116,69,0.45) 72%, transparent 100%)'
                       : 'linear-gradient(180deg, rgba(14,77,48,0.4) 0%, rgba(14,77,48,0.15) 40%, rgba(14,77,48,0.05) 70%, transparent 100%)',
                   }}
                 />
