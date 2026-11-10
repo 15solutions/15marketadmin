@@ -11,7 +11,7 @@ export const ARC_RPC_FALLBACK = ARC_RPC_DRPC_PROXY;
 // Admins sign in with email+password against Supabase Auth; the browser only
 // ever needs the project URL + anon key (public by design — RLS on admin_users
 // blocks anon access, the backend verifies. Migration 011).
-export const SUPABASE_AUTH_URL = import.meta.env.VITE_SUPABASE_AUTH_URL || import.meta.env.VITE_SUPABASE_URL || 'https://cwzbdxvninfagfbaehre.supabase.co';
+export const SUPABASE_AUTH_URL = import.meta.env.VITE_SUPABASE_AUTH_URL || import.meta.env.VITE_SUPABASE_URL || '';
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const isLocal = typeof window !== 'undefined' && 
     (window.location.hostname === 'localhost' || 

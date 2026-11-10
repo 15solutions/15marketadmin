@@ -369,6 +369,18 @@ class FundingService {
         const addr = userAddr.toLowerCase();
         console.log(`[FundingService] Crediting ${amountNum} USDC to ${addr} (tx: ${txHash})`);
 
+        // REPLAY GUARD: one deposit → one credit, no matter how many routes or
+        // retries carry it. The same txHash can never be credited twice.
+        if (txHash) {
+            this._creditClaims = this._creditClaims || new Set();
+            const claimKey = `${addr}:${String(txHash).toLowerCase()}`;
+            if (this._creditClaims.has(claimKey)) {
+                console.warn(`[FundingService] Duplicate credit attempt for ${addr} (tx ${txHash}) — refused`);
+                return { success: false, duplicate: true, error: 'This deposit was already credited' };
+            }
+            this._creditClaims.add(claimKey);
+        }
+
         // Keep the reconciliation baseline in step with the on-chain inflow
         // this credit represents. Done first so a crash mid-credit cannot leave
         // the baseline permanently ahead of the chain.

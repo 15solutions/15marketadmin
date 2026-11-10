@@ -35,7 +35,7 @@ const PnLModal = lazy(() => import("./components/PnLModal").then(m => ({ default
 const TradeShareCard = lazy(() => import("./components/TradeShareCard"));
 const OnboardingFlow = lazy(() => import("./components/OnboardingFlow").then(m => ({ default: m.OnboardingFlow })));
 const MessagingSystem = lazy(() => import("./components/MessagingSystem"));
-import { ARC_CONTRACT_ADDRESS, ARC_USDC_ADDRESS, KEEPER_URL, KEEPER_URL_ARC, ADMIN_TOKEN, ARC_RPC, ARC_RPC_BACKUP, ARC_CHAIN_ID } from "./constants";
+import { ARC_CONTRACT_ADDRESS, ARC_USDC_ADDRESS, KEEPER_URL, KEEPER_URL_ARC, ARC_RPC, ARC_RPC_BACKUP, ARC_CHAIN_ID } from "./constants";
 
 
 // Memoized Sub-components
@@ -1347,13 +1347,43 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
     return () => clearInterval(interval);
   }, [address, updateEvmSessionBal]);
 
+  // ─── OWNERSHIP SIGNATURES ─────────────────────────────────────────────────
+  // Every money route (cashout, trades, deposits, ledger pushes) and the
+  // socket room join carry a wallet signature the backend verifies. One
+  // signer, one precedence: embedded wallet → wagmi → injected provider.
+  const signAuthMessage = useCallback(async (message) => {
+    if (!address) throw new Error('Wallet not connected');
+    if (embeddedWallet) return await embeddedWallet.sign(message);
+    if (walletClient) return await walletClient.signMessage({ message, account: address });
+    if (window.ethereum) {
+      const msgHex = '0x' + Array.from(new TextEncoder().encode(message))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+      return await window.ethereum.request({ method: 'personal_sign', params: [msgHex, address] });
+    }
+    throw new Error('No signing wallet available');
+  }, [address, embeddedWallet, walletClient]);
+
   // Real-time Balance Sync
   useEffect(() => {
     if (!address) return;
     // JOIN room once per address change (socketService re-joins automatically
     // after every reconnect so settlement events are never emitted into the void).
-    socketService.joinUser(address.toLowerCase());
-  }, [address]);
+    // Rooms are ownership-verified server-side: the join payload is wallet-signed.
+    const lower = address.toLowerCase();
+    const socketAuthCacheRef = { sig: null, msg: null, ts: 0 };
+    socketService.joinUser(lower, async () => {
+      const now = Date.now();
+      // Cached for 8 of the server's 10 freshness minutes, so background
+      // reconnects re-sign instead of replaying a stale challenge.
+      if (!socketAuthCacheRef.sig || now - socketAuthCacheRef.ts > 8 * 60 * 1000) {
+        const msg = `--- 15MARKET SOCKET AUTH ---\nADDRESS: ${lower}\nTIMESTAMP: ${now}`;
+        socketAuthCacheRef.sig = await signAuthMessage(msg);
+        socketAuthCacheRef.msg = msg;
+        socketAuthCacheRef.ts = now;
+      }
+      return { address: lower, message: socketAuthCacheRef.msg, signature: socketAuthCacheRef.sig };
+    });
+  }, [address, signAuthMessage]);
 
   useEffect(() => {
     if (!address) return;
@@ -1716,6 +1746,23 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       setSessionBalance(prev => Math.max(0, prev - amtNum));
       lastOptimisticActionTime.current = Date.now();
 
+      // --- OWNERSHIP SIGNATURE: a bet spends the account holder's money, so
+      // it must be authorized by the wallet owner (fresh timestamp, verified
+      // server-side). No signature → no trade.
+      let tradeAuth;
+      try {
+        const tradeMsg = `--- 15MARKET PROTOCOL ---\nACTION: TRADE\nADDRESS: ${address.toLowerCase()}\nAMOUNT: ${sanitizedAmount} USDC\nDIRECTION: ${dirVal}\nMARKET: ${assetId}\nTIMESTAMP: ${Date.now()}`;
+        tradeAuth = { message: tradeMsg, signature: await signAuthMessage(tradeMsg) };
+      } catch (signErr) {
+        notify('Trade needs your approval — sign the request in your wallet', 'error');
+        setSessionBalance(prev => prev + amtNum);
+        setActiveTrades(prev => prev.filter(t => t.id !== tradeId));
+        setTradeHistory(prev => prev.filter(t => t.id !== tradeId));
+        setIsExecuting(false);
+        executeLockRef.current = false;
+        return;
+      }
+
       // --- Execute Trade via Backend ---
       const backgroundTrade = async () => {
         const controller = new AbortController();
@@ -1734,7 +1781,9 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                 entryPrice: entryPriceParams.toString(),
                 marketId: assetId,
                 amount: sanitizedAmount,
-              }
+              },
+              message: tradeAuth.message,
+              signature: tradeAuth.signature
             })
           });
           clearTimeout(timeoutId);
@@ -2115,8 +2164,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
       await fetch(`${targetUrl}/record-fee`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': ADMIN_TOKEN
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ network: 'arc', amount })
       });
@@ -3074,12 +3122,17 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
         setTransactionHistory(prev => [newTx, ...prev]);
 
         // Durable: hand it to the node's ledger (dedupe by tx hash keeps
-        // this and the server-side record to a single row).
-        fetch(`${KEEPER_URL_ARC}/push-tx`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address, transaction: newTx })
-        }).catch(() => { });
+        // this and the server-side record to a single row). Signed — ledger
+        // rows drive notifications, so nobody else can inject them.
+        try {
+          const pushMsg = `--- 15MARKET PROTOCOL ---\nACTION: LEDGER PUSH\nKIND: DEPOSIT\nAMOUNT: ${amtNum.toFixed(4)} USDC\nTX: ${hash}\nTIMESTAMP: ${Date.now()}`;
+          const pushSig = await signAuthMessage(pushMsg);
+          fetch(`${KEEPER_URL_ARC}/push-tx`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address, transaction: newTx, message: pushMsg, signature: pushSig })
+          }).catch(() => { });
+        } catch (_) { /* row stays local-only if signing is declined */ }
 
       } catch (evmErr) {
         notify(`Deposit failed: ${evmErr.shortMessage || evmErr.message}`, "error");
@@ -3278,11 +3331,17 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
 
       setTransactionHistory(prev => [newTx, ...prev]);
 
-      fetch(`${KEEPER_URL_ARC}/push-tx`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address, transaction: newTx })
-      }).catch(() => { });
+      // Ledger row + notification ride along with the transfer — signed by
+      // the withdrawing wallet so no one else can write into this feed.
+      try {
+        const pushMsg = `--- 15MARKET PROTOCOL ---\nACTION: LEDGER PUSH\nKIND: ${isExternal ? 'TRANSFER' : 'WITHDRAW'}\nAMOUNT: ${amtNum.toFixed(4)} USDC\nTO: ${targetAddr}\nTX: ${withdrawalHash}\nTIMESTAMP: ${Date.now()}`;
+        const pushSig = await signAuthMessage(pushMsg);
+        fetch(`${KEEPER_URL_ARC}/push-tx`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address, transaction: newTx, message: pushMsg, signature: pushSig })
+        }).catch(() => { });
+      } catch (_) { /* row stays local-only if signing is declined */ }
 
       // Re-pull BOTH balances from source of truth after the transfer settles so
       // desktop and mobile always converge on the same numbers.
@@ -3431,6 +3490,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               transactionHistory={transactionHistory}
               onViewReceipt={handleViewReceipt}
               uiVersion={uiVersion}
+              signMessage={signAuthMessage}
               onOpenCircleWallet={(initialMode) => {
                 setCircleWalletMode(initialMode);
                 setView("circle_wallet");
@@ -3468,6 +3528,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               onDeposit={handleDeposit}
               onWithdraw={handleWithdraw}
               onFiatWithdraw={() => setView("fiat_withdraw")}
+              signMessage={signAuthMessage}
               triggerGlobalRefresh={triggerGlobalRefresh}
             />
           ) : view === "fiat_withdraw" ? (
@@ -3475,6 +3536,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
               address={address}
               isLight={theme === 'light'}
               notify={notify}
+              signMessage={signAuthMessage}
               sessionBalance={sessionBalance}
               evmBalance={evmBalance}
               sendToEscrow={sendToEscrow}
@@ -3491,6 +3553,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                 notify={notify}
                 theme={theme}
                 onBack={() => setView("dashboard")}
+                signMessage={signAuthMessage}
               />
             ) : (
               /* Program switched off while the user was here - snap to the
@@ -3772,6 +3835,7 @@ const statusOrder = { "PAID": 5, "WON": 5, "LOST": 5, "PAYOUT_FAILED": 5, "CANCE
                 transactionHistory={transactionHistory}
                 onViewReceipt={handleViewReceipt}
                 notify={notify}
+                signMessage={signAuthMessage}
              />
             </Suspense>
            

@@ -19,7 +19,14 @@ const truncateAddr = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—');
 const fmt = (n) => `$${Number(n || 0).toFixed(2)}`;
 const fmtUsd0 = (n) => `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
-export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
+export function ReferralHub({ address, userProfile, notify, theme, onBack, signMessage }) {
+
+    const signReferral = useCallback(async (action, extra = '') => {
+        if (!address) return null;
+        const msg = `--- 15MARKET PROTOCOL ---\nACTION: ${action}\nADDRESS: ${address.toLowerCase()}${extra ? `\n${extra}` : ''}\nTIMESTAMP: ${Date.now()}`;
+        const msgSig = signMessage ? await signMessage(msg) : null;
+        return msgSig ? { message: msg, signature: msgSig } : null;
+    }, [address, signMessage]);
     const isLight = theme === 'light';
     const [loading, setLoading] = useState(true);
     const [info, setInfo] = useState(null);        // { referralCode, referralEnrolled, referredBy }
@@ -80,7 +87,12 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
         if (!address) { setError('Connect a wallet to enroll.'); return; }
         setEnrolling(true);
         try {
-            const res = await fetch(`${KEEPER_URL_ARC}/referral/enroll/${address.toLowerCase()}`, { method: 'POST' });
+            const proof = await signReferral('REFERRAL ENROLL');
+            const res = await fetch(`${KEEPER_URL_ARC}/referral/enroll/${address.toLowerCase()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(proof || {})
+            });
             if (res.ok) {
                 notify?.('Enrolled! Your referral code is live.', 'success');
                 await refresh();
@@ -102,10 +114,11 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
         setRefCodeBusy(true);
         setRefCodeMsg(null);
         try {
+            const proof = await signReferral('REFERRAL APPLY', `CODE: ${code}`);
             const res = await fetch(`${KEEPER_URL_ARC}/referral/apply/${address.toLowerCase()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code })
+                body: JSON.stringify({ code, ...(proof || {}) })
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok) {
@@ -141,10 +154,11 @@ export function ReferralHub({ address, userProfile, notify, theme, onBack }) {
         setWdBusy(true);
         setError('');
         try {
+            const proof = await signReferral('REFERRAL WITHDRAW', `AMOUNT: ${amt}\nDEST: ${wdDest.trim()}`);
             const res = await fetch(`${KEEPER_URL_ARC}/referral/withdraw/${address.toLowerCase()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: amt, chain: 'Arc', destination: wdDest.trim() })
+                body: JSON.stringify({ amount: amt, chain: 'Arc', destination: wdDest.trim(), ...(proof || {}) })
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok) {

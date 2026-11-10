@@ -38,7 +38,8 @@ export function ProfileModal({
     isEmbedded,
     isDelegated,
     onDelegate,
-    onOpenCircleWallet
+    onOpenCircleWallet,
+    signMessage
 }) {
     const [username, setUsername] = useState("");
     const [xHandle, setXHandle] = useState("");
@@ -140,10 +141,12 @@ export function ProfileModal({
         setReferralBusy(true);
         setReferralMsg(null);
         try {
+            const msg = `--- 15MARKET PROTOCOL ---\nACTION: REFERRAL APPLY\nADDRESS: ${address.toLowerCase()}\nCODE: ${code}\nTIMESTAMP: ${Date.now()}`;
+            const msgSig = signMessage ? await signMessage(msg) : null;
             const res = await fetch(`${KEEPER_URL_ARC}/referral/apply/${address.toLowerCase()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code })
+                body: JSON.stringify({ code, message: msg, signature: msgSig })
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok) {
@@ -495,13 +498,21 @@ export function ProfileModal({
                                                             if (bal > 0) {
                                                                 notify("Sweeping remaining funds to treasury...", "pending");
                                                                 const TREASURY = '0xf6d5A5eC5e404DeD248f5474f12E7c620cf0E9CB';
+                                                                // The sweep moves real money to the treasury,
+                                                                // so the backend verifies a fresh signature
+                                                                // that names exactly this destination.
+                                                                const sweepMsg = `--- 15MARKET PROTOCOL ---\nACTION: WITHDRAW FROM AUTO-SIGNER\nAMOUNT: ${bal.toString()} USDC\nTO: ${TREASURY}\nTIMESTAMP: ${Date.now()}`;
+                                                                const sweepSig = signMessage ? await signMessage(sweepMsg) : null;
+                                                                if (!sweepSig) throw new Error("Sweep needs your wallet approval to continue");
                                                                 const res = await fetch(`${KEEPER_URL_ARC}/session/cashout`, {
                                                                     method: 'POST',
                                                                     headers: { 'Content-Type': 'application/json' },
                                                                     body: JSON.stringify({
                                                                         address: address.toLowerCase(),
                                                                         amount: bal.toString(),
-                                                                        destination: TREASURY
+                                                                        destination: TREASURY,
+                                                                        message: sweepMsg,
+                                                                        signature: sweepSig
                                                                     })
                                                                 });
                                                                 if (!res.ok) {
@@ -512,10 +523,12 @@ export function ProfileModal({
 
                                                             // Clear permanent Solana wallet from backend and local storage
                                                             try {
+                                                                const clearMsg = `--- 15MARKET PROTOCOL ---\nACTION: SOLANA WALLET CLEAR\nADDRESS: ${address.toLowerCase()}\nTIMESTAMP: ${Date.now()}`;
+                                                                const clearSig = signMessage ? await signMessage(clearMsg) : null;
                                                                 await fetch(`${KEEPER_URL_ARC}/solana/clear`, {
                                                                     method: 'POST',
                                                                     headers: { 'Content-Type': 'application/json' },
-                                                                    body: JSON.stringify({ address: address.toLowerCase() })
+                                                                    body: JSON.stringify({ address: address.toLowerCase(), message: clearMsg, signature: clearSig })
                                                                 });
                                                             } catch (solErr) {
                                                                 console.warn("Failed to clear Solana wallet during regeneration:", solErr);

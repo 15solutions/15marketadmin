@@ -5,7 +5,7 @@ import { priceSocketService } from '../utils/priceSocket';
 import { KEEPER_URL_ARC } from '../constants';
 import { GlobalTradeScroller } from './GlobalTradeScroller';
 import { FlipClock, ProgressBeam, ResolvingOutcome, TradeOutcome, PriceMeterTicker } from './TradingWidget';
-import { isTradeSettled, isTradeInFlight, isTradeOverdue, isWinningTrade, tradeShares } from '../utils/tradeStatus';
+import { isTradeSettled, isTradeInFlight, isTradeOverdue, isWinningTrade } from '../utils/tradeStatus';
 
 const LOGO_MAP = {
   eth: '/logos/eth.png',
@@ -1551,8 +1551,6 @@ export default function MobileTradeView({
                 entryPrice={settledTrade.entryPrice}
                 exitPrice={settledTrade.settlementPrice || settledTrade.exitPrice}
                 symbol={settledTrade.symbol}
-                shares={tradeShares(settledTrade).shares}
-                sharePrice={tradeShares(settledTrade).price}
               />
             ) : null}
           </motion.div>

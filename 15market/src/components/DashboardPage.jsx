@@ -4,12 +4,12 @@ import * as ethers from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
 import { avatarFileValid } from "../utils/validate";
-import { Check, Trophy, Activity, DollarSign, Award, Target, BarChart2, User, Settings, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, TrendingUp, TrendingDown, Zap, Shield, Globe, MessageSquare, AlertCircle, Copy, RotateCw, ChevronRight, ChevronLeft, Nfc, Send, ArrowDownLeft, Wallet, Bell, Megaphone, Calendar, ChevronDown, ChevronUp, Smile, Coins, RefreshCcw, Share2, Mail, Download, X, Menu, Bot, Gift, LifeBuoy } from "lucide-react";
+import { Check, Trophy, Activity, DollarSign, Award, Target, BarChart2, User, Settings, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, TrendingUp, TrendingDown, Zap, Shield, Globe, MessageSquare, AlertCircle, Copy, RotateCw, ChevronRight, ChevronLeft, Nfc, Send, ArrowDownLeft, Wallet, Bell, Megaphone, Calendar, ChevronDown, ChevronUp, Smile, Coins, Share2, Mail, Download, X, Menu, Bot, Gift, LifeBuoy } from "lucide-react";
 import MessagingSystem from "./MessagingSystem";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine } from 'recharts';
 import { LatencyMeter } from "./LatencyMeter";
 import ArcABI from "../abi/ArcPrediction.json";
-import { KEEPER_URL_ARC, ARC_CONTRACT_ADDRESS, ARC_RPC, ADMIN_TOKEN } from "../constants";
+import { KEEPER_URL_ARC, ARC_CONTRACT_ADDRESS, ARC_RPC } from "../constants";
 import { socketService } from "../utils/socket";
 import NotifyFlash from "./NotifyFlash";
 import { parseEther } from "viem";
@@ -101,13 +101,13 @@ const AnimatedTrendingUp = ({ size = 14, className = '' }) => (
     </motion.div>
 );
 
-const AnimatedRefresh = ({ size = 12, className = '' }) => (
+const AnimatedLive = ({ size = 12, className = '' }) => (
     <motion.div
-        animate={{ rotate: [0, 360] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+        animate={{ opacity: [1, 0.35, 1] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         style={{ display: 'inline-flex' }}
     >
-        <RefreshCcw size={size} className={className} />
+        <Activity size={size} className={className} />
     </motion.div>
 );
 const AnimatedZap = ({ size = 14, className = '' }) => (
@@ -141,6 +141,46 @@ function useCountUp(target, duration = 1400) {
     return value;
 }
 
+// ─── P&L PERIOD SELECTOR ──────────────────────────────────────────────────────
+// Circular D/W/M/Y/ALL buttons for the P&L panel header (top-right). The
+// parent controls selection; everything (chart, net P&L, range cards) derives
+// from the same range.
+const PNL_RANGE_OPTIONS = [
+    { id: 'd', label: 'D', title: 'Daily P&L', cardLabel: '24H' },
+    { id: 'w', label: 'W', title: 'Weekly P&L', cardLabel: '7D' },
+    { id: 'm', label: 'M', title: 'Monthly P&L', cardLabel: '30D' },
+    { id: 'y', label: 'Y', title: 'Yearly P&L', cardLabel: '1Y' },
+    { id: 'all', label: 'ALL', title: 'All Time P&L', cardLabel: 'All-Time' }
+];
+const pnlRangeLabel = (id) => PNL_RANGE_OPTIONS.find(o => o.id === id)?.cardLabel || 'All-Time';
+
+function PnlRangeButtons({ value, onChange, isLight }) {
+    return (
+        <div className="flex items-center gap-1 flex-none">
+            {PNL_RANGE_OPTIONS.map(o => {
+                const active = value === o.id;
+                return (
+                    <button
+                        key={o.id}
+                        onClick={() => onChange(o.id)}
+                        title={o.title}
+                        aria-pressed={active}
+                        className={`w-6 h-6 rounded-full text-[7px] font-black uppercase tracking-[0.12em] transition-all leading-none flex items-center justify-center ${
+                            active
+                                ? 'bg-[#0E4D30] text-white shadow-[0_2px_8px_rgba(14,77,48,0.45)] scale-110'
+                                : isLight
+                                    ? 'text-black/45 bg-black/[0.05] hover:text-black hover:bg-black/10'
+                                    : 'text-white/40 bg-white/5 hover:text-white hover:bg-white/10'
+                        }`}
+                    >
+                        {o.label}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onDeposit, onWithdraw, treasuryBalance,
     autoSignerFees,
     userProfile,
@@ -159,7 +199,8 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
     // Referral program master switch (node-side). While OFF the referral
     // page and its icon are completely absent from the user's UI.
     referralLive = false,
-    onHelp
+    onHelp,
+    signMessage
 }) {
     const isLight = theme === 'light';
     const { isConnected, address, connector } = useAccount();
@@ -185,6 +226,10 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         recentTrades: []
     });
     const [userHistory, setUserHistory] = useState([]);
+    // Trade PnL period filter — D/W/M/Y/ALL shown as circular buttons on the
+    // P&L panel's top-right corner. The chart + numbers derive from exactly
+    // the same filtered set so everything stays consistent.
+    const [pnlRange, setPnlRange] = useState('all'); // d | w | m | y | all
     const [isLoading, setIsLoading] = useState(true);
     const [localWithdrawAmount, setLocalWithdrawAmount] = useState("");
     const [modalConfig, setModalConfig] = useState(null); // { title: string, message: string, onConfirm: function }
@@ -238,7 +283,15 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         setNotifications([]);
         if (address) {
             try {
-                await fetch(`${KEEPER_URL_ARC}/notifications/${address.toLowerCase()}`, { method: 'DELETE' });
+                // DELETE is identity-mutating on the node — sign it so nobody
+                // else can wipe this wallet's notification history.
+                const msg = `--- 15MARKET PROTOCOL ---\nACTION: NOTIFICATIONS CLEAR\nADDRESS: ${address.toLowerCase()}\nTIMESTAMP: ${Date.now()}`;
+                const signature = signMessage ? await signMessage(msg) : null;
+                await fetch(`${KEEPER_URL_ARC}/notifications/${address.toLowerCase()}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg, signature })
+                });
             } catch (e) {
                 console.error("Failed to clear notifications:", e);
             }
@@ -269,14 +322,26 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         const code = urlParams.get('code');
         
         if (code && address) {
-            fetch(`${KEEPER_URL_ARC}/auth/discord`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code, address })
-            })
-            .then(res => res.json())
+            // Link Discord to this account — the backend requires a signed
+            // proof for the link, so the very same code cannot be pointed at
+            // someone else's profile.
+            (async () => {
+                try {
+                    const msg = `--- 15MARKET PROTOCOL ---\nACTION: DISCORD LINK\nADDRESS: ${address.toLowerCase()}\nTIMESTAMP: ${Date.now()}`;
+                    const msgSig = signMessage ? await signMessage(msg) : null;
+                    return await fetch(`${KEEPER_URL_ARC}/auth/discord`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code, address, message: msg, signature: msgSig })
+                    });
+                } catch (e) {
+                    console.error('Failed to link discord:', e);
+                    return null;
+                }
+            })()
+            .then(res => res ? res.json() : null)
             .then(data => {
-                if (data.success) {
+                if (data && data.success) {
                     window.history.replaceState({}, document.title, window.location.pathname);
                     setToast("Discord Linked Successfully!");
                     setTimeout(() => window.location.reload(), 1000);
@@ -464,10 +529,14 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         }
     };
 
-    // Cumulative PnL stats derived from authoritative backend trade history
+    // Cumulative PnL stats derived from authoritative backend trade history,
+    // scoped to the selected period (D/W/M/Y/ALL circular buttons top-right).
     const pnlStats = useMemo(() => {
+        const RANGE_MS = { d: 86400000, w: 7 * 86400000, m: 30 * 86400000, y: 365 * 86400000 };
+        const rangeCut = pnlRange === 'all' ? 0 : Date.now() - (RANGE_MS[pnlRange] || 0);
         const trades = [...userHistory]
             .filter(t => t && (t.status || t.won !== undefined))
+            .filter(t => !rangeCut || Number(t.timestamp || t.settledAt || t.createdAt || 0) >= rangeCut)
             .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
         let allTimeProfit = 0;
@@ -503,7 +572,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
         const maxVal = Math.max(...pValues, 0.001);
         const minVal = Math.min(...pValues, -0.001);
         return { chartData: finalChartData, maxAbs: finalMaxAbs, allTimeProfit, allTimeLoss, netPnl, maxVal, minVal, hasTrades };
-    }, [userHistory]);
+    }, [userHistory, pnlRange]);
 
     const animNetPnl = useCountUp(pnlStats.netPnl || 0);
 
@@ -934,15 +1003,18 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                     {/* PROFIT & LOSS GRAPH */}
                     <div className="flex-none">
                         <div className="db-card p-4 flex flex-col h-[160px] relative overflow-hidden">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                    <AnimatedTrendingUp size={12} className="text-[#0E4D30]"/>
-                                    <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>P&amp;L</span>
+                            <div className="flex items-center justify-between mb-2 gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <AnimatedTrendingUp size={12} className="text-[#0E4D30] flex-none"/>
+                                    <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest whitespace-nowrap`}>P&amp;L</span>
                                 </div>
-                                <span className={`text-xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#0E4D30]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
-                                    {pnlStats.netPnl >= 0 ? '+' : ''}{animNetPnl.toFixed(2)}
-                                    <span className="text-[10px] font-bold ml-1 opacity-60">USDC</span>
-                                </span>
+                                <div className="flex items-center gap-2 flex-none">
+                                    <PnlRangeButtons value={pnlRange} onChange={setPnlRange} isLight={isLight} />
+                                    <span className={`text-xl font-black tabular-nums leading-none ${pnlStats.netPnl >= 0 ? 'text-[#0E4D30]' : 'text-[#FF6B6B]'}`} style={{ fontFamily: '"Comfortaa", cursive', fontWeight: 900 }}>
+                                        {pnlStats.netPnl >= 0 ? '+' : ''}{animNetPnl.toFixed(2)}
+                                        <span className="text-[10px] font-bold ml-1 opacity-60">USDC</span>
+                                    </span>
+                                </div>
                             </div>
                             <div className="flex-1 min-h-0 -mx-2">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -976,14 +1048,14 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <div className="db-card-alt p-4 flex flex-col flex-1 min-h-0">
                             <div className="flex items-center justify-between mb-3 flex-none">
                                 <div className="flex items-center gap-2">
-                                    <AnimatedRefresh size={12} className="text-[#0E4D30]"/>
+                                    <AnimatedLive size={12} className="text-[#0E4D30]"/>
                                     <span className={`text-[8px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Transactions</span>
                                 </div>
                             </div>
                             <div className="flex-1 tx-scroll flex flex-col gap-3">
                                 {(!transactionHistory||transactionHistory.length===0) ? (
                                     <div className="flex-1 flex flex-col items-center justify-center opacity-30 text-center gap-2">
-                                        <AnimatedRefresh size={16} className={isLight ? 'text-black/20' : 'text-white/20'}/>
+                                        <AnimatedLive size={16} className={isLight ? 'text-black/20' : 'text-white/20'}/>
                                         <div className={`text-[8px] font-bold uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>No recent activity</div>
                                     </div>
                                 ) : transactionHistory.slice(0, 10).map((tx,i) => (
@@ -1091,11 +1163,12 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                         <div className="grid grid-cols-2 gap-4 flex-1 min-h-0 pb-1">
                             {/* PnL Graph */}
                             <div className="db-card p-5 flex flex-col min-h-0">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-between mb-3 gap-2">
+                                    <div className="flex items-center gap-2 flex-none">
                                         <AnimatedTrendingUp size={14} className="text-[#0E4D30]"/>
-                                        <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>P&amp;L</span>
+                                        <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest whitespace-nowrap`}>P&amp;L</span>
                                     </div>
+                                    <PnlRangeButtons value={pnlRange} onChange={setPnlRange} isLight={isLight} />
                                 </div>
                                 {/* Chart — symmetric domain means y=0 is always at exactly 50% height, so gradient split is always 50% */}
                                 <div className="flex-1 min-h-0 -mx-2">
@@ -1137,14 +1210,14 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             <div className="db-card-alt p-5 flex flex-col min-h-0">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2">
-                                        <AnimatedRefresh size={14} className="text-[#0E4D30]"/>
+                                        <AnimatedLive size={14} className="text-[#0E4D30]"/>
                                         <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/40'} uppercase tracking-widest`}>Transactions</span>
                                     </div>
                                 </div>
                                 <div className="flex-1 tx-scroll flex flex-col gap-4">
                                     {(!transactionHistory||transactionHistory.length===0) ? (
                                         <div className="flex-1 flex flex-col items-center justify-center opacity-30 text-center gap-2">
-                                            <AnimatedRefresh size={20} className={isLight ? 'text-black/20' : 'text-white/20'}/>
+                                            <AnimatedLive size={20} className={isLight ? 'text-black/20' : 'text-white/20'}/>
                                             <div className={`text-[9px] font-bold uppercase tracking-widest ${isLight ? 'text-black/40' : 'text-white/40'}`}>No recent activity</div>
                                         </div>
                                     ) : transactionHistory.slice(0,5).map((tx,i) => (
@@ -1395,10 +1468,12 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                     ) : (
                                         <button onClick={async () => {
                                             try {
+                                                const msg = `--- 15MARKET PROTOCOL ---\nACTION: DISCORD UNLINK\nADDRESS: ${address.toLowerCase()}\nTIMESTAMP: ${Date.now()}`;
+                                                const msgSig = signMessage ? await signMessage(msg) : null;
                                                 await fetch(`${KEEPER_URL_ARC}/auth/discord/unlink`, {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ address })
+                                                    body: JSON.stringify({ address, message: msg, signature: msgSig })
                                                 });
                                                 window.location.reload();
                                             } catch (e) {}
@@ -1479,7 +1554,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                 <div className="text-xl font-black text-[#0E4D30] leading-none">{derivedStats.totalWins}</div>
                                             </div>
                                             <div className={`flex-1 rounded-2xl p-3 ${isLight ? 'bg-black/[0.02] border border-black/[0.05]' : 'bg-white/[0.04] border border-white/[0.06]'}`}>
-                                                <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>All-Time PnL</div>
+                                                <div className={`text-[7px] font-black uppercase tracking-[0.2em] mb-1 ${isLight ? 'text-[#133a2a]/40' : 'text-white/30'}`}>{pnlRangeLabel(pnlRange)} PnL</div>
                                                 <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#0E4D30]' : 'text-[#FF6B6B]'}`}>
                                                     {pnlStats.netPnl >= 0 ? '+' : ''}{pnlStats.netPnl.toFixed(2)}
                                                 </div>
@@ -1553,7 +1628,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                                                     <div className="text-xl font-black text-[#0E4D30] leading-none">{derivedStats.totalWins}</div>
                                                 </div>
                                                 <div className="flex-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] p-3">
-                                                    <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">All-Time PnL</div>
+                                                    <div className="text-[7px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">{pnlRangeLabel(pnlRange)} PnL</div>
                                                     <div className={`text-xl font-black leading-none ${pnlStats.netPnl >= 0 ? 'text-[#0E4D30]' : 'text-[#FF6B6B]'}`}>
                                                         {pnlStats.netPnl >= 0 ? '+' : ''}{pnlStats.netPnl.toFixed(2)}
                                                     </div>
@@ -1672,7 +1747,7 @@ export function DashboardPage({ onBack, onAdmin, sessionBalance, evmBalance, onD
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className={`fixed top-0 right-0 w-[65%] max-w-[300px] h-full z-[9999] rounded-l-[32px] flex flex-col gap-3 p-6 pt-24 ${isLight ? 'bg-white border-l border-[#0E4D30]/20' : 'bg-[#0a0a0a] border-l border-white/10'} overflow-hidden`}
+                            className={`fixed top-0 right-0 w-[78%] max-w-[360px] h-full z-[9999] rounded-l-[32px] flex flex-col gap-3 p-6 pt-24 ${isLight ? 'bg-white border-l border-[#0E4D30]/20' : 'bg-[#0a0a0a] border-l border-white/10'} overflow-hidden`}
                             style={{ boxShadow: isLight ? '0 0 50px rgba(0, 0, 0, 0.18), 0 0 80px rgba(14,77,48, 0.20)' : '0 0 60px rgba(0, 0, 0, 0.65), 0 0 90px rgba(14,77,48, 0.35)' }}
                         >
                             {isLight && (

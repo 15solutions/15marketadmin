@@ -138,7 +138,15 @@ function listAll() {
 
 function listFor(address) {
     const addr = String(address || '').toLowerCase();
-    return requests.filter(r => r.address === addr).map(r => ({ ...r }));
+    // The route is address-in-URL, no session tokens — so the bank account
+    // number travels masked. Full digits stay unreachable without the admin
+    // permissioned /admin/fiat view.
+    return requests.filter(r => r.address === addr).map(r => ({
+        ...r,
+        accountNumber: r.accountNumber
+            ? `${'*'.repeat(Math.max(0, String(r.accountNumber).length - 4))}${String(r.accountNumber).slice(-4)}`
+            : r.accountNumber
+    }));
 }
 
 function get(id) {

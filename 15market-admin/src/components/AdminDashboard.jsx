@@ -21,6 +21,7 @@ import {
     TrendingUp,
     DollarSign,
     Users,
+    Plus,
     Calendar,
     Search,
     Ban,
@@ -53,7 +54,7 @@ import {
     Droplets
 } from "lucide-react";
 import { KEEPER_URL_ARC } from "../constants";
-import { adminFetch, clearSession } from "../utils/adminAuth";
+import { adminFetch, clearSession, getSession } from "../utils/adminAuth";
 import { GlobalTradeScroller } from "./GlobalTradeScroller";
 import { socketService } from "../utils/socket";
 import { COUNTRY_CENTER } from "./ui/places";
@@ -458,6 +459,40 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     });
     const [wdSection, setWdSection] = useState('participants');
 
+    // ── Auth context (Supabase-Auth admin) ──────────────────────────────
+    const isRoot = auth?.isRoot === true || auth?.role === 'root';
+    const adminPerms = auth?.permissions || [];
+    const hasPerm = (p) => isRoot || adminPerms.includes('*') || adminPerms.includes(p);
+    const canRequests = hasPerm('ref.withdrawals');
+    const canReferral = hasPerm('ref.manage');
+    const canUsers = hasPerm('users.manage');
+    const canFiat = hasPerm('users.manage');
+    const canMail = hasPerm('emails.send');
+    const canSettings = hasPerm('platform.settings');
+    const canBroadcast = hasPerm('broadcast.send');
+
+    // Sidebar: EVERY section is permission-gated. A role handed exactly ONE
+    // section gets a clean DEDICATED page for that task alone — no sidebar,
+    // no tab bar, none of the other dashboards. Two or more sections get a
+    // nav that lists only what the role owns.
+    const canReferrals = canRequests || canReferral;
+    const visibleNav = NAV.filter(t =>
+        t.key === 'overview' ? hasPerm('dashboard.overview')
+            : t.key === 'analytics' ? hasPerm('dashboard.analytics')
+            : t.key === 'users' ? canUsers
+            : t.key === 'fiat' ? canFiat
+            : t.key === 'mail' ? canMail
+            : t.key === 'referrals' ? canReferrals
+            : t.key === 'broadcast' ? canBroadcast
+            : t.key === 'siem' ? hasPerm('dashboard.siem')
+            : t.key === 'security' ? hasPerm('dashboard.security')
+            : t.key === 'liquidity' ? hasPerm('admin.liquidity')
+            : true
+    );
+    const dedicatedMode = visibleNav.length <= 1;
+    // Fall back to the FIRST section this role actually owns.
+    const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : (visibleNav[0]?.key || 'overview');
+
     // ---- Referral Program switch (go-live + commissions) ----
     // The switch mirrors platformSettings; the draft inputs let the operator
     // type the deposit / trade commissions that must exist before the
@@ -474,21 +509,38 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         }));
     }, [platformSettings.referralEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Entering the Referral section always re-reads the node's authoritative
+    // program state (switch position + saved commissions), so the console
+    // never shows a stale switch after another admin changed it.
+    useEffect(() => {
+        if (activeNav !== 'referrals' && adminTab !== 'referrals') return;
+        let gone = false;
+        (async () => {
+            try {
+                const res = await adminFetch(`${KEEPER_URL_ARC}/settings`);
+                if (!res.ok || gone) return;
+                const s = await res.json();
+                setPlatformSettings(prev => ({ ...prev, ...s }));
+            } catch (e) { /* node unreachable - drawer state stays */ }
+        })();
+        return () => { gone = true; };
+    }, [activeNav, adminTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const saveReferralProgram = async (enable) => {
-        if (refProgramBusy) return;
+        if (refProgramBusy) return false;
         const dep = String(refProgramDraft.depositPct).trim();
         const vol = String(refProgramDraft.volumePct).trim();
         if (enable && (dep === '' || vol === '')) {
             notify('Specify both referral commissions before the program can go live', 'error');
-            return;
+            return false;
         }
         if (dep !== '' && !(Number(dep) >= 0 && Number(dep) <= 50 && Number.isFinite(Number(dep)))) {
             notify('Deposit commission must be between 0 and 50', 'error');
-            return;
+            return false;
         }
         if (vol !== '' && !(Number(vol) >= 0 && Number(vol) <= 50 && Number.isFinite(Number(vol)))) {
             notify('Trade commission must be between 0 and 50', 'error');
-            return;
+            return false;
         }
         setRefProgramBusy(true);
         try {
@@ -505,14 +557,16 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                 let msg = 'Referral program switch failed on the node';
                 try { const err = await res.json(); if (err && err.error) msg = err.error; } catch (e) {}
                 notify(msg, 'error');
-                return;
+                return false;
             }
             const saved = await res.json();
             setPlatformSettings(prev => ({ ...prev, ...saved }));
             try { localStorage.setItem('15market_citadel_settings', JSON.stringify({ ...platformSettings, ...saved })); } catch (e) {}
             notify(enable ? 'Referral program is now LIVE for users' : 'Referral program is now OFF - hidden from users', 'success');
+            return true;
         } catch (e) {
             notify(e.message || 'Referral program switch failed', 'error');
+            return false;
         } finally {
             setRefProgramBusy(false);
         }
@@ -683,6 +737,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     // Real-time Event Subscriptions
     useEffect(() => {
         socketService.connect();
+        // Admin-only telemetry rides the server-side "admins" room — this
+        // socket presents its Supabase bearer token to be admitted (read live
+        // on every (re)connect so the session stays current).
+        socketService.joinAdmin(() => getSession()?.accessToken || null);
 
         // 1. Metrics pulse — keeper broadcasts the ops payload every 10s and
         //    once on connect (dashboard_stats).
@@ -929,7 +987,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         // defaults until a reload.
         const fetchStatsRest = async () => {
             try {
-                const res = await fetch(`${KEEPER_URL_ARC}/admin/stats`);
+                const res = await adminFetch(`${KEEPER_URL_ARC}/admin/stats`);
                 if (res.ok) applyStats(await res.json());
             } catch (e) {}
         };
@@ -961,7 +1019,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         //    "Resolving…" forever. Never clobbers live socket rows.
         const fetchHistory = async () => {
             try {
-                const histRes = await fetch(`${KEEPER_URL_ARC}/admin/trades`);
+                const histRes = await adminFetch(`${KEEPER_URL_ARC}/admin/trades`);
                 if (histRes.ok) {
                     const histData = await histRes.json();
                     (histData || []).slice(0, 20).forEach(h => {
@@ -1216,61 +1274,8 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         } finally { setBusyBroadcastId(null); }
     };
 
-    // ── Auth context (Supabase-Auth admin) ──────────────────────────────
-    const isRoot = auth?.isRoot === true || auth?.role === 'root';
-    const adminPerms = auth?.permissions || [];
-    const hasPerm = (p) => isRoot || adminPerms.includes('*') || adminPerms.includes(p);
-    const canRequests = hasPerm('ref.withdrawals');
-    const canReferral = hasPerm('ref.manage');
-    const canUsers = hasPerm('users.manage');
-    const canFiat = hasPerm('users.manage');
-    const canMail = hasPerm('emails.send');
-    const canSettings = hasPerm('platform.settings');
-    const canBroadcast = hasPerm('broadcast.send');
-
-    // Sidebar: EVERY section is permission-gated. A role handed exactly ONE
-    // section gets a clean DEDICATED page for that task alone — no sidebar,
-    // no tab bar, none of the other dashboards. Two or more sections get a
-    // nav that lists only what the role owns.
-    const canReferrals = canRequests || canReferral;
-    const visibleNav = NAV.filter(t =>
-        t.key === 'overview' ? hasPerm('dashboard.overview')
-            : t.key === 'analytics' ? hasPerm('dashboard.analytics')
-            : t.key === 'users' ? canUsers
-            : t.key === 'fiat' ? canFiat
-            : t.key === 'mail' ? canMail
-            : t.key === 'referrals' ? canReferrals
-            : t.key === 'broadcast' ? canBroadcast
-            : t.key === 'siem' ? hasPerm('dashboard.siem')
-            : t.key === 'security' ? hasPerm('dashboard.security')
-            : t.key === 'liquidity' ? hasPerm('admin.liquidity')
-            : true
-    );
-    const dedicatedMode = visibleNav.length <= 1;
-    // Fall back to the FIRST section this role actually owns.
-    const activeNav = visibleNav.some(t => t.key === adminTab) ? adminTab : (visibleNav[0]?.key || 'overview');
-
-    // (Declared AFTER activeNav on purpose: its dependency array reads
-    // activeNav during render, and a const read before its declaration throws
-    // "Cannot access 'activeNav' before initialization" the moment the
-    // dashboard mounts.)
-    // Entering the Referral section always re-reads the node's authoritative
-    // program state (switch position + saved commissions), so the console
-    // never shows a stale switch after another admin changed it.
-    useEffect(() => {
-        if (activeNav !== 'referrals' && adminTab !== 'referrals') return;
-        let gone = false;
-        (async () => {
-            try {
-                const res = await adminFetch(`${KEEPER_URL_ARC}/settings`);
-                if (!res.ok || gone) return;
-                const s = await res.json();
-                setPlatformSettings(prev => ({ ...prev, ...s }));
-            } catch (e) { /* node unreachable - drawer state stays */ }
-        })();
-        return () => { gone = true; };
-    }, [activeNav, adminTab]); // eslint-disable-line react-hooks/exhaustive-deps
-
+    // (Auth/permission context now lives up with the other state — hooks above
+    // needed it too, and const-order matters in this function component.)
     // Broadcast ledger: load when the tab opens, refresh on any fresh socket
     // pulse (a transmission/edit/withdrawal from anywhere re-fetches
     // instantly), and tick the flip clocks once per second while mounted.
@@ -1705,6 +1710,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
     const [rosterBusy, setRosterBusy] = useState(false);
     const [newAdmin, setNewAdmin] = useState({ email: '', password: '', role: 'moderator', permissions: ['ref.withdrawals'] });
     const [createAdminBusy, setCreateAdminBusy] = useState(false);
+    const [selectedAdmin, setSelectedAdmin] = useState(null); // team member whose detail overlay is open
+    // Referral program "go live" dialog (commission form, hidden behind the switch)
+    const [showRefLive, setShowRefLive] = useState(false);
     const [showCreateAdmin, setShowCreateAdmin] = useState(false);
 
     const fetchAdminRoster = async () => {
@@ -1814,6 +1822,190 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
         { tag: 'dashboard.security', label: 'Security' }
     ];
 
+    // ── ADMIN / MODERATOR DETAIL ──────────────────────────────────────────
+    // Desktop → centered dialog box with the member's role + permissions.
+    // Mobile  → full page (top logo navbar, bottom sections navbar) instead
+    // of a cramped dialog. Root rows are viewable but immutable by design.
+    const AdminDetailOverlay = () => {
+        const row = selectedAdmin;
+        if (!row) return null;
+        const isRootRow = row.role === 'root';
+        const hasAll = (row.permissions || []).includes('*');
+        const permActive = (tag) => hasAll || (row.permissions || []).includes(tag);
+
+        const body = (
+            <div className="flex flex-col gap-5">
+                <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-[#0E4D30] flex items-center justify-center text-white text-[13px] font-black uppercase flex-none">
+                        {(row.email || '??').slice(0, 2)}
+                    </div>
+                    <div className="min-w-0">
+                        <div className={`text-[11px] font-black break-all leading-snug ${isLight ? 'text-black' : 'text-white'}`}>{row.email}</div>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            {isRootRow ? (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 text-[7px] font-black uppercase tracking-widest">Root · Full access</span>
+                            ) : (
+                                <span className={`px-2 py-0.5 rounded-full border text-[7px] font-black uppercase tracking-widest ${row.role === 'admin' ? 'bg-[#0E4D30]/10 text-[#0E4D30] border-[#0E4D30]/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>{row.role}</span>
+                            )}
+                            {row.suspended && (
+                                <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest">Suspended</span>
+                            )}
+                            {!row.suspended && !isRootRow && (
+                                <span className="px-2 py-0.5 rounded-full bg-[#0E4D30]/10 text-[#0E4D30] border border-[#0E4D30]/25 text-[7px] font-black uppercase tracking-widest">Active</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Role */}
+                {!isRootRow && (
+                    <div>
+                        <div className={`text-[8px] font-black uppercase tracking-[0.22em] mb-1.5 ${isLight ? 'text-black/40' : 'text-white/40'}`}>Role</div>
+                        <div className={`flex rounded-2xl border overflow-hidden ${isLight ? 'border-black/10' : 'border-white/10'}`}>
+                            {[['moderator', 'Moderator'], ['admin', 'Admin']].map(([r, l]) => {
+                                const active = row.role === r;
+                                return (
+                                    <button
+                                        key={r}
+                                        onClick={() => setAdminRole(row, r)}
+                                        className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest transition-all ${active ? 'bg-[#0E4D30] text-white' : isLight ? 'bg-white text-black/45 hover:text-black' : 'bg-white/5 text-white/45 hover:text-white'}`}
+                                    >
+                                        {l}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* Permissions */}
+                <div>
+                    <div className={`text-[8px] font-black uppercase tracking-[0.22em] mb-1.5 ${isLight ? 'text-black/40' : 'text-white/40'}`}>Permissions</div>
+                    <div className="flex flex-col gap-1.5 max-h-[300px] overflow-y-auto no-scrollbar pr-0.5">
+                        {GRANTABLE_PERMS.map(p => {
+                            const active = permActive(p.tag);
+                            const locked = isRootRow;
+                            return (
+                                <button
+                                    key={p.tag}
+                                    disabled={locked}
+                                    onClick={() => setAdminPermission(row, p.tag)}
+                                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${active ? 'bg-[#0E4D30]/10 border-[#0E4D30]/40' : isLight ? 'bg-black/[0.02] border-black/10' : 'bg-white/[0.03] border-white/10'} ${locked ? 'opacity-70 cursor-default' : 'active:scale-[0.99]'}`}
+                                >
+                                    <span className={`w-4 h-4 rounded-md border flex-none flex items-center justify-center ${active ? 'bg-[#0E4D30] border-[#0E4D30] text-white' : isLight ? 'border-black/25' : 'border-white/20'}`}>
+                                        {active && <Check size={10} strokeWidth={3} />}
+                                    </span>
+                                    <span className={`text-[9px] font-black uppercase tracking-widest flex-1 min-w-0 ${isLight ? 'text-black' : 'text-white'}`}>{p.label}</span>
+                                    <span className={`text-[7px] font-mono opacity-40 flex-none ${isLight ? 'text-black' : 'text-white'}`}>{p.tag}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Danger zone */}
+                {!isRootRow && (
+                    <div className="flex items-center gap-2 pt-1">
+                        <button
+                            onClick={() => setAdminSuspension(row, !row.suspended)}
+                            className={`flex-1 py-3 rounded-2xl border text-[9px] font-black uppercase tracking-widest transition-all ${row.suspended ? 'bg-[#0E4D30] text-white border-[#0E4D30] hover:brightness-110' : 'bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20'}`}
+                        >
+                            {row.suspended ? 'Reinstate' : 'Suspend'}
+                        </button>
+                        <button
+                            onClick={() => { removeAdmin(row); setSelectedAdmin(null); }}
+                            className="flex-1 py-3 rounded-2xl border bg-red-500 text-white border-red-500 text-[9px] font-black uppercase tracking-widest hover:brightness-110 transition-all"
+                        >
+                            Remove
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+
+        return (
+            <>
+                {/* DESKTOP (md+) — centered dialog box */}
+                <div className="hidden md:flex fixed inset-0 z-[80] items-center justify-center p-6" aria-modal="true" role="dialog">
+                    <motion.div
+                        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setSelectedAdmin(null)}
+                    />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+                        className={`relative w-full max-w-md rounded-3xl border p-6 max-h-[85vh] overflow-y-auto no-scrollbar ${isLight ? 'bg-white border-[#0E4D30]/20 shadow-2xl' : 'bg-[#111111] border-white/10 shadow-2xl'}`}
+                    >
+                        <button
+                            onClick={() => setSelectedAdmin(null)}
+                            className={`absolute top-4 right-4 p-1.5 rounded-lg transition-colors ${isLight ? 'text-black/40 hover:text-black' : 'text-white/40 hover:text-white'}`}
+                            aria-label="Close"
+                        >
+                            <X size={16} />
+                        </button>
+                        {body}
+                    </motion.div>
+                </div>
+
+                {/* MOBILE (<md) — full page: top logo navbar, bottom sections navbar
+                    (same chrome as the rest of the mobile console) */}
+                <div className={`md:hidden fixed inset-0 z-[80] flex flex-col ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}>
+                    {/* Top navbar */}
+                    <div className={`flex-none flex items-center gap-3 px-4 py-2.5 z-10 ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`}>
+                        <button
+                            onClick={() => setSelectedAdmin(null)}
+                            className={`p-2 rounded-xl transition-all active:scale-95 ${isLight ? 'text-black/50 hover:text-black hover:bg-black/5' : 'text-white/50 hover:text-white hover:bg-white/5'}`}
+                            aria-label="Back"
+                        >
+                            <ArrowLeft size={17} />
+                        </button>
+                        <img
+                            src={isLight ? '/goblogo.png' : '/gowlogo.png'}
+                            alt="15market"
+                            className="h-[24px] w-[86px] object-cover object-center flex-none"
+                        />
+                        <span className={`w-px h-6 flex-none ${isLight ? 'bg-black/10' : 'bg-white/15'}`} />
+                        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#0E4D30] truncate">Team</span>
+                        <div className="ml-auto">
+                            <ThemeToggle compact theme={themeState} onToggle={toggleTheme} />
+                        </div>
+                    </div>
+
+                    {/* Scrollable detail body */}
+                    <div className="flex-1 overflow-y-auto no-scrollbar px-5 pt-4 pb-4 z-10">
+                        {body}
+                    </div>
+
+                    {/* Bottom navbar — the sections, same as the mobile console */}
+                    <div className={`flex-none z-10 ${isLight ? 'bg-[#F4F7F5]' : 'bg-[#050505]'}`} style={{ paddingBottom: 'max(0.35rem, env(safe-area-inset-bottom))' }}>
+                        <div className="flex items-stretch px-1.5 pt-1.5 overflow-x-auto no-scrollbar snap-x snap-mandatory">
+                            {visibleNav.map((t) => {
+                                const Icon = t.icon;
+                                const activeTab = activeNav === t.key;
+                                return (
+                                    <button
+                                        key={t.key}
+                                        onClick={() => { setSelectedAdmin(null); selectSection(t.key); }}
+                                        className={`relative flex-none w-[96px] shrink-0 snap-start flex flex-col items-center gap-1 py-3 rounded-2xl transition-all active:scale-95 ${activeTab ? 'text-[#0E4D30]' : isLight ? 'text-black/40' : 'text-white/40'}`}
+                                    >
+                                        {activeTab && <span className="absolute top-0 h-[3px] w-8 rounded-full bg-[#0E4D30]" />}
+                                        <Icon size={22} className="flex-none" />
+                                        <span className="text-[9px] font-black uppercase tracking-widest truncate max-w-full">{t.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </>
+        );
+    };
+
     const AdminCard = ({ title, icon: Icon, children, accent = "#0E4D30" }) => (
         // Glow language copied from the user side: the card lifts off the
         // canvas with a green bloom (dark) / layered soft shadows (light).
@@ -1852,7 +2044,7 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
             {!dedicatedMode && (<nav
                 className={`relative z-50 flex-none hidden md:flex flex-col border-r backdrop-blur-3xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-[76px]'} ${isLight ? 'bg-[#F4F7F5] border-[#0E4D30]/15' : 'bg-[#0A0A0A]/70 border-white/5'}`}>
                 {/* Brand head — same wordmark as the user side, ADMIN beside it */}
-                <div className="flex-none px-4 pt-5 pb-4 flex items-center gap-3 overflow-hidden">
+                <div className="flex-none px-4 pt-3.5 pb-3 flex items-center gap-3 overflow-hidden">
                     {sidebarOpen ? (
                         <>
                             <img
@@ -1872,8 +2064,9 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     )}
                 </div>
 
-                {/* Sections */}
-                <div className="flex-1 flex flex-col gap-1.5 px-3 pt-2 overflow-y-auto no-scrollbar min-h-0">
+                {/* Sections — dense by design: every entry sits inside one
+                    screen without scrolling at common desktop heights */}
+                <div className="flex-1 flex flex-col gap-1 px-3 pt-1 overflow-y-auto no-scrollbar min-h-0">
                     {visibleNav.map(t => {
                         const Icon = t.icon;
                         const active = activeNav === t.key;
@@ -1883,15 +2076,15 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 key={t.key}
                                 onClick={() => selectSection(t.key)}
                                 title={sidebarOpen ? undefined : t.label}
-                                className={`flex items-center gap-3 px-3.5 py-3.5 rounded-2xl text-left transition-all active:scale-[0.98] ${active
+                                className={`flex items-center gap-3 px-3 py-2 rounded-2xl text-left transition-all active:scale-[0.98] ${active
                                     ? 'bg-[#0E4D30] text-white shadow-lg shadow-[#0E4D30]/25'
                                     : isLight ? 'text-black/50 hover:text-black hover:bg-black/[0.04]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                             >
                                 <Icon size={17} className="flex-none" />
                                 {sidebarOpen && (
                                     <span className="flex-1 min-w-0">
-                                        <span className="block text-[10px] font-black uppercase tracking-widest truncate">{t.label}</span>
-                                        <span className={`block text-[7px] font-bold uppercase tracking-widest mt-0.5 truncate ${active ? 'text-white/60' : 'opacity-30'}`}>{t.hint}</span>
+                                        <span className="block text-[9px] font-black uppercase tracking-widest truncate">{t.label}</span>
+                                        <span className={`block text-[6px] font-bold uppercase tracking-widest mt-0.5 truncate [@media(max-height:840px)]:hidden ${active ? 'text-white/60' : 'opacity-30'}`}>{t.hint}</span>
                                     </span>
                                 )}
                                 {badge > 0 && (
@@ -1902,34 +2095,38 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     })}
                 </div>
 
-                {/* Bottom rail: theme switch + collapse toggle + identity */}
-                <div className={`flex-none p-3 flex flex-col gap-1.5 border-t ${isLight ? 'border-black/5' : 'bg-transparent border-white/5'}`}>
-                    {sidebarOpen ? (
-                        <div className="flex items-center px-3 py-1">
-                            <ThemeToggle compact theme={themeState} onToggle={toggleTheme} />
-                        </div>
-                    ) : (
+                {/* Icon row: theme switch + collapse/extend — always exactly
+                    one line, same visual weight, whether the menu is expanded
+                    or collapsed */}
+                <div className={`flex-none p-2 flex flex-col gap-1 border-t ${isLight ? 'border-black/5' : 'bg-transparent border-white/5'}`}>
+                    <div className="flex items-center justify-center gap-2 h-8">
+                        {sidebarOpen ? (
+                            <div className="flex items-center justify-center w-8 h-8 flex-none">
+                                <ThemeToggle compact theme={themeState} onToggle={toggleTheme} />
+                            </div>
+                        ) : (
+                            <button
+                                onClick={toggleTheme}
+                                title="Switch theme"
+                                className={`p-2 rounded-xl transition-all active:scale-95 ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                            >
+                                {isLight ? <Moon size={14} /> : <Sun size={14} />}
+                            </button>
+                        )}
                         <button
-                            onClick={toggleTheme}
-                            title="Switch theme"
-                            className={`self-center p-2.5 rounded-xl transition-all active:scale-95 ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                            onClick={toggleSidebar}
+                            title={sidebarOpen ? 'Collapse menu' : 'Expand menu'}
+                            className={`p-2 rounded-xl transition-all active:scale-95 ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                         >
-                            {isLight ? <Moon size={14} /> : <Sun size={14} />}
+                            {sidebarOpen ? <ChevronsLeft size={15} /> : <ChevronsRight size={15} />}
                         </button>
-                    )}
-                    <button
-                        onClick={toggleSidebar}
-                        title={sidebarOpen ? 'Collapse menu' : 'Expand menu'}
-                        className={`self-center p-2.5 rounded-xl transition-all active:scale-95 ${isLight ? 'text-black/40 hover:text-black hover:bg-black/[0.04]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
-                    >
-                        {sidebarOpen ? <ChevronsLeft size={15} /> : <ChevronsRight size={15} />}
-                    </button>
+                    </div>
                     {auth?.email && (
                         <div
                             title={auth.email}
-                            className={`flex items-center gap-3 px-2 py-2 rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-[#0E4D30]/20' : 'bg-white/5 border-white/5'}`}
+                            className={`flex items-center gap-3 px-2 py-1.5 rounded-2xl border overflow-hidden ${isLight ? 'bg-white border-[#0E4D30]/20' : 'bg-white/5 border-white/5'}`}
                         >
-                            <div className="w-8 h-8 rounded-xl bg-[#0E4D30] flex items-center justify-center text-white text-[10px] font-black uppercase flex-none">
+                            <div className="w-7 h-7 rounded-xl bg-[#0E4D30] flex items-center justify-center text-white text-[9px] font-black uppercase flex-none">
                                 {auth.email.slice(0, 2)}
                             </div>
                             {sidebarOpen && (
@@ -2190,12 +2387,18 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     fills the screen: no page scroll */}
                 {activeNav === 'security' && (canSettings || isRoot) && (
                     <div className="w-full flex flex-col min-w-0 flex-1">
-                        {/* header + tab switch, boxless like the other sections */}
-                        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-                            <p className={`text-[8px] font-black uppercase tracking-widest opacity-40 ${isLight ? 'text-black' : 'text-white'}`}>
-                                Identity: Supabase Auth · permissions are granular · protocols propagate live
-                            </p>
-                            <div className={`flex items-center gap-1 p-1 rounded-2xl border ${isLight ? 'bg-black/[0.03] border-black/10' : 'bg-white/5 border-white/5'}`}>
+                        {/* header + tab switch — hairline strip like the other sections */}
+                        <div className={`w-full flex items-center gap-2 py-2 px-1 border-y flex-wrap mb-3 ${isLight ? 'border-black/10 bg-black/[0.02]' : 'border-white/10 bg-white/[0.02]'}`}>
+                            <div className="flex items-center gap-2 min-w-0 flex-none">
+                                <div className="w-7 h-7 rounded-lg bg-[#0E4D30]/10 text-[#0E4D30] flex items-center justify-center flex-none">
+                                    <Shield size={14} />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className={`text-[11px] sm:text-[12px] font-black uppercase tracking-[0.16em] leading-none whitespace-nowrap ${isLight ? 'text-black' : 'text-white'}`}>Security</div>
+                                    <div className="text-[6px] font-black uppercase tracking-widest opacity-40 mt-0.5 hidden sm:block">Supabase Auth · granular permissions · live protocols</div>
+                                </div>
+                            </div>
+                            <div className={`ml-auto flex items-center gap-1 p-1 rounded-2xl border ${isLight ? 'bg-black/[0.03] border-black/10' : 'bg-white/5 border-white/5'}`}>
                                 {isRoot && (
                                     <button
                                         onClick={() => selectSecTab('team')}
@@ -2218,12 +2421,25 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                         {/* TAB — ADMINS & MODERATORS (root only) */}
                         {secTab === 'team' && isRoot && (
                         <div className="flex flex-col gap-3 min-h-0 flex-1">
-                            <div className="flex items-center justify-end">
+                            <div className={`w-full flex items-center gap-3 py-2 px-1 border-y flex-wrap ${isLight ? 'border-black/10 bg-black/[0.02]' : 'border-white/10 bg-white/[0.02]'}`}>
+                                <div className="flex items-center gap-2 min-w-0 flex-none">
+                                    <div className="w-7 h-7 rounded-lg bg-[#0E4D30]/10 text-[#0E4D30] flex items-center justify-center flex-none">
+                                        <Users size={14} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className={`text-[11px] sm:text-[12px] font-black uppercase tracking-[0.16em] leading-none whitespace-nowrap ${isLight ? 'text-black' : 'text-white'}`}>Admins &amp; Moderators</div>
+                                        <div className="text-[6px] font-black uppercase tracking-widest opacity-40 mt-0.5 hidden sm:block">Root toggles the roster · every action is audited</div>
+                                    </div>
+                                </div>
+                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 ${isLight ? 'bg-black/5 text-black/50' : 'bg-white/5 text-white/50'}`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#0E4D30]" />
+                                    {adminRoster.length} on team
+                                </span>
                                 <button
                                     onClick={() => setShowCreateAdmin(v => !v)}
-                                    className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${showCreateAdmin ? 'bg-white/5 border border-white/10 text-white/60' : 'bg-[#0E4D30] text-white hover:brightness-110'}`}
+                                    className={`ml-auto px-3 sm:px-4 py-1.5 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${showCreateAdmin ? 'bg-white/5 border border-white/10 text-white/60' : 'bg-[#0E4D30] text-white hover:brightness-110'}`}
                                 >
-                                    {showCreateAdmin ? 'Close form' : '+ New admin / mod'}
+                                    {showCreateAdmin ? 'Close form' : <><Plus size={12} className="inline-block" /> New admin / mod</>}
                                 </button>
                             </div>
 
@@ -2293,61 +2509,27 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                                 ) : adminRoster.map(row => {
                                     const isRootRow = row.role === 'root';
                                     return (
-                                        <div key={row.id} className={`py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2 ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.05]'}`}>
-                                            <div className="min-w-0">
-                                                <div className={`text-[10px] font-black uppercase flex items-center gap-2 ${isLight ? 'text-black' : 'text-white'}`}>
-                                                    {row.email}
-                                                    {isRootRow ? (
-                                                        <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 text-[7px] font-black uppercase tracking-widest">Root</span>
-                                                    ) : (
-                                                        <span className={`px-2 py-0.5 rounded-full border text-[7px] font-black uppercase tracking-widest ${row.role === 'admin' ? 'bg-[#0E4D30]/10 text-[#0E4D30] border-[#0E4D30]/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>{row.role}</span>
-                                                    )}
-                                                    {row.suspended && (
-                                                        <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest">Suspended</span>
-                                                    )}
-                                                </div>
-                                                <div className={`text-[8px] font-bold uppercase font-mono opacity-40 mt-0.5 ${isLight ? 'text-black' : 'text-white'}`}>
-                                                    {(row.permissions || []).includes('*') ? 'All permissions' : (row.permissions || []).map(p => GRANTABLE_PERMS.find(g => g.tag === p)?.label || p).join(' · ') || '—'}
-                                                </div>
-                                            </div>
-                                            {!isRootRow ? (
-                                                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                                                    {GRANTABLE_PERMS.map(p => {
-                                                        const active = (row.permissions || []).includes(p.tag);
-                                                        return (
-                                                            <button
-                                                                key={p.tag}
-                                                                onClick={() => setAdminPermission(row, p.tag)}
-                                                                title={p.label}
-                                                                className={`px-2 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-wide transition-all ${active ? 'bg-[#0E4D30]/15 text-[#0E4D30] border-[#0E4D30]/40' : isLight ? 'bg-black/[0.03] border-black/10 text-black/25 hover:text-black/50' : 'bg-white/5 border-white/10 text-white/25 hover:text-white/50'}`}
-                                                            >
-                                                                {active && <Check size={8} className="inline mr-0.5" />} {p.tag.split('.')[1]}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                    <button
-                                                        onClick={() => setAdminRole(row, row.role === 'admin' ? 'moderator' : 'admin')}
-                                                        className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${isLight ? 'bg-black/[0.03] border-black/10 text-black/40' : 'bg-white/5 border-white/10 text-white/40'}`}
-                                                    >
-                                                        {row.role === 'admin' ? '→ Mod' : '→ Admin'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setAdminSuspension(row, !row.suspended)}
-                                                        className={`px-2.5 py-1.5 rounded-lg border text-[7px] font-black uppercase tracking-widest transition-all ${row.suspended ? 'bg-[#0E4D30] text-white border-[#0E4D30]' : 'bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20'}`}
-                                                    >
-                                                        {row.suspended ? 'Unsuspend' : 'Suspend'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => removeAdmin(row)}
-                                                        className="px-2.5 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <span className={`shrink-0 text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>Locked</span>
-                                            )}
-                                        </div>
+                                        <button
+                                            key={row.id}
+                                            onClick={() => setSelectedAdmin(row)}
+                                            aria-haspopup="dialog"
+                                            className={`w-full py-3 flex items-center gap-3 sm:gap-4 px-1 transition-colors group/row ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.05]'}`}
+                                        >
+                                            {/* Inline: ONLY email + role label (Suspended
+                                                badge when relevant) — one line, both themes */}
+                                            <span className={`min-w-0 flex-1 flex items-center gap-2.5 text-left`}>
+                                                <span className={`text-[10px] sm:text-[11px] font-black uppercase truncate ${isLight ? 'text-black' : 'text-white'}`}>{row.email}</span>
+                                                {isRootRow ? (
+                                                    <span className="flex-none px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 text-[7px] font-black uppercase tracking-widest">Root</span>
+                                                ) : (
+                                                    <span className={`flex-none px-2 py-0.5 rounded-full border text-[7px] font-black uppercase tracking-widest ${row.role === 'admin' ? 'bg-[#0E4D30]/10 text-[#0E4D30] border-[#0E4D30]/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>{row.role}</span>
+                                                )}
+                                                {row.suspended && (
+                                                    <span className="flex-none px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/30 text-[7px] font-black uppercase tracking-widest">Suspended</span>
+                                                )}
+                                            </span>
+                                            <ChevronRight size={14} className={`flex-none transition-all ${isLight ? 'text-black/30 group-hover/row:text-black/60' : 'text-white/30 group-hover/row:text-white/60'}`} />
+                                        </button>
                                     );
                                 })}
                             </div>
@@ -3240,26 +3422,48 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                             ))}
                         </div>
 
-                        {/* Head */}
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-[#0E4D30]/10 text-[#0E4D30] flex items-center justify-center">
-                                    <Droplets size={15} />
-                                </div>
-                                <div>
-                                    <div className={`text-lg font-black tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Treasury Liquidity</div>
-                                    <div className={`text-[8px] font-black uppercase tracking-widest opacity-40 truncate max-w-[320px]`}>
-                                        {liq?.treasuryAddress ? `Treasury ${liq.treasuryAddress.slice(0, 6)}…${liq.treasuryAddress.slice(-4)} → operator ${liq.operatorAddress ? `${liq.operatorAddress.slice(0, 6)}…${liq.operatorAddress.slice(-4)}` : '—'}` : 'Chain read pending'}
+                            {/* ── Head — referral-style hairline strip: title on the
+                                left, Contract + Parent wallets truncated with copy
+                                icons on the same line, refresh at the far right.
+                                Replaces the two big address cards below. */}
+                            <div className={`w-full flex items-center gap-2 sm:gap-3 py-2 px-1 border-y flex-row flex-wrap ${isLight ? 'border-black/10 bg-black/[0.02]' : 'border-white/10 bg-white/[0.02]'}`}>
+                                <div className="flex items-center gap-2 min-w-0 flex-none">
+                                    <div className="w-7 h-7 rounded-lg bg-[#0E4D30]/10 text-[#0E4D30] flex items-center justify-center flex-none">
+                                        <Droplets size={14} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className={`text-[11px] sm:text-[12px] font-black uppercase tracking-[0.16em] leading-none whitespace-nowrap ${isLight ? 'text-black' : 'text-white'}`}>Treasury Liquidity</div>
+                                        <div className="text-[6px] font-black uppercase tracking-widest opacity-40 mt-0.5 hidden sm:block">Live chain read</div>
                                     </div>
                                 </div>
+                                {[
+                                    { label: 'Contract', value: liq?.treasuryAddress, accent: '#0E4D30' },
+                                    { label: 'Parent', value: liq?.operatorAddress, accent: '#3b82f6' }
+                                ].map((a, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => {
+                                            if (!a.value) return;
+                                            navigator.clipboard.writeText(a.value);
+                                            notify(`${a.label} address copied`, 'success');
+                                        }}
+                                        title={a.value ? `Copy the full ${a.label.toLowerCase()} address` : 'Waiting on the chain read'}
+                                        className={`flex items-center gap-1.5 min-w-0 pl-1.5 pr-2 py-1.5 rounded-lg border transition-all ${a.value ? (isLight ? 'bg-white/60 border-black/10 hover:border-[#0E4D30]' : 'bg-white/5 border-white/10 hover:border-white/25') : 'opacity-50 pointer-events-none border-transparent'}`}
+                                    >
+                                        <span className={`text-[7px] font-black uppercase tracking-[0.14em] flex-none`} style={{ color: a.accent }}>{a.label}</span>
+                                        <span className={`text-[9px] sm:text-[10px] font-mono font-bold truncate max-w-[92px] sm:max-w-[190px] lg:max-w-[230px] ${isLight ? 'text-black' : 'text-white'}`}>
+                                            {a.value ? `${a.value.slice(0, 6)}…${a.value.slice(-4)}` : 'Reading chain…'}
+                                        </span>
+                                        {a.value && <Copy size={10} className={`flex-none opacity-40 ${isLight ? 'text-black' : 'text-white'}`} />}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={fetchLiquidity}
+                                    className={`flex-none ml-auto px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
+                                >
+                                    <span className="inline-flex items-center gap-1.5"><RefreshCw size={11} className={liqBusy ? 'animate-spin' : ''} /> Refresh</span>
+                                </button>
                             </div>
-                            <button
-                                onClick={fetchLiquidity}
-                                className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border transition-colors ${isLight ? 'border-black/15 hover:bg-black/5' : 'border-white/15 hover:bg-white/5'}`}
-                            >
-                                <span className="inline-flex items-center gap-2"><RefreshCw size={11} className={liqBusy ? 'animate-spin' : ''} /> Refresh</span>
-                            </button>
-                        </div>
 
                         {/* Unreachable — same honesty rule as the SIEM feed */}
                         {liqError && (
@@ -3638,61 +3842,111 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     </div>
                 )}
 
-                {/* Referral Program — GO-LIVE switch + program commissions.
-                    Users (page + icon) only see the referral program while
-                    the switch is live; going live refuses until both
-                    commissions are specified - the node enforces it too. */}
+                {/* Referral Program — a hairline row across the page (no card):
+                    title · Live/Off · switch on the right. Tap the switch to go
+                    OFF instantly, or to go live — going live asks for both
+                    commissions in a centered dialog (users only ever see the
+                    program while the switch is live; the node enforces the
+                    commission gate too). */}
                 {activeNav === 'referrals' && (
-                    <div className={`w-full mb-6 rounded-3xl border p-5 flex flex-col gap-5 ${isLight ? 'bg-white/70 border-black/10' : 'bg-[#0E4D30]/10 border-white/10'}`}>
-                        <div className="flex items-start justify-between gap-4 flex-wrap">
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-3 flex-wrap">
-                                    <span className="text-[13px] font-black uppercase tracking-[0.2em]">Referral program</span>
-                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 ${platformSettings.referralEnabled ? 'bg-[#0E4D30] text-white shadow-lg shadow-[#0E4D30]/20' : isLight ? 'bg-black/5 text-black/50' : 'bg-white/5 text-white/50'}`}>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${platformSettings.referralEnabled ? 'bg-white' : isLight ? 'bg-black/40' : 'bg-white/40'}`} />
-                                        {platformSettings.referralEnabled ? 'Live' : 'Off'}
-                                    </span>
-                                </div>
-                                <p className={`text-[11px] font-semibold mt-1.5 max-w-xl leading-relaxed ${isLight ? 'text-black/50' : 'text-white/50'}`}>
-                                    {platformSettings.referralEnabled
-                                        ? `Live for all users - deposit commission ${platformSettings.referralDepositPct ?? '—'}% · trade commission ${platformSettings.referralVolumePct ?? '—'}%`
-                                        : 'Off - users cannot see the referral page or icon until you go live with commissions set below.'}
-                                </p>
+                    <div className={`w-full flex items-center gap-3 py-2.5 px-1 mb-6 border-y ${isLight ? 'border-black/10 bg-black/[0.02]' : 'border-white/10 bg-white/[0.02]'}`}>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="text-[11px] font-black uppercase tracking-[0.18em] whitespace-nowrap">Referral program</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 ${platformSettings.referralEnabled ? 'bg-[#0E4D30] text-white' : isLight ? 'bg-black/5 text-black/50' : 'bg-white/5 text-white/50'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${platformSettings.referralEnabled ? 'bg-white' : isLight ? 'bg-black/40' : 'bg-white/40'}`} />
+                                {platformSettings.referralEnabled ? 'Live' : 'Off'}
+                            </span>
+                        </div>
+                        {platformSettings.referralEnabled && (
+                            <button
+                                onClick={() => setShowRefLive(true)}
+                                className={`text-[8px] font-black uppercase tracking-widest border rounded-full px-2.5 py-1 transition-all ${isLight ? 'text-black/50 border-black/15 hover:text-black hover:border-black/30' : 'text-white/50 border-white/15 hover:text-white hover:border-white/30'}`}
+                            >
+                                {refProgramDraft.depositPct || '—'}% · {refProgramDraft.volumePct || '—'}%
+                            </button>
+                        )}
+                        <button
+                            onClick={() => {
+                                if (platformSettings.referralEnabled) {
+                                    saveReferralProgram(false);
+                                } else {
+                                    setShowRefLive(true);
+                                }
+                            }}
+                            disabled={refProgramBusy}
+                            aria-pressed={!!platformSettings.referralEnabled}
+                            title={platformSettings.referralEnabled ? 'Turn the referral program off' : 'Go live (commissions required)'}
+                            className={`relative w-[46px] h-[24px] rounded-full border transition-all flex items-center ml-auto shrink-0 ${platformSettings.referralEnabled ? 'bg-[#0E4D30] border-[#0E4D30]' : isLight ? 'bg-black/10 border-black/15' : 'bg-white/10 border-white/15'} ${refProgramBusy ? 'opacity-60 pointer-events-none' : ''}`}
+                        >
+                            <span className={`absolute top-[2.5px] w-[17px] h-[17px] rounded-full bg-white shadow transition-all ${platformSettings.referralEnabled ? 'left-[25px]' : 'left-[3px]'}`} />
+                        </button>
+                    </div>
+                )}
+
+                {/* Referral Program — go-live / adjust commissions dialog:
+                    CENTERED on desktop AND mobile. Enabling requires both
+                    commissions; the node enforces the same gate. */}
+                {showRefLive && (
+                    <div className="fixed inset-0 z-[75] flex items-center justify-center p-5">
+                        <motion.div
+                            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowRefLive(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.92, y: 18 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                            transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+                            className={`relative w-full max-w-sm rounded-3xl border p-6 ${isLight ? 'bg-white border-[#0E4D30]/20 shadow-2xl' : 'bg-[#111111] border-white/10 shadow-2xl'}`}
+                        >
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-sm font-black uppercase tracking-[0.18em]">{platformSettings.referralEnabled ? 'Adjust commissions' : 'Go live'}</span>
+                                <button
+                                    onClick={() => setShowRefLive(false)}
+                                    className={`p-1.5 rounded-lg transition-colors ${isLight ? 'text-black/40 hover:text-black' : 'text-white/40 hover:text-white'}`}
+                                    aria-label="Close"
+                                >
+                                    <X size={16} />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => saveReferralProgram(!platformSettings.referralEnabled)}
-                                disabled={refProgramBusy}
-                                aria-pressed={!!platformSettings.referralEnabled}
-                                title={platformSettings.referralEnabled ? 'Turn the referral program off' : 'Go live (commissions required)'}
-                                className={`relative w-[64px] h-[30px] rounded-full border transition-all flex items-center shrink-0 ${platformSettings.referralEnabled ? 'bg-[#0E4D30] border-[#0E4D30]' : isLight ? 'bg-black/10 border-black/15' : 'bg-white/10 border-white/15'} ${refProgramBusy ? 'opacity-60 pointer-events-none' : ''}`}
-                            >
-                                <span className={`absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white shadow transition-all ${platformSettings.referralEnabled ? 'left-[37px]' : 'left-[4px]'} ${isLight && !platformSettings.referralEnabled ? 'bg-white' : ''}`} />
-                            </button>
-                        </div>
-                        <div className="flex items-end gap-3 flex-wrap">
-                            {[
-                                ['depositPct', 'Deposit commission %'],
-                                ['volumePct', 'Trade commission %']
-                            ].map(([k, l]) => (
-                                <label key={k} className="flex flex-col gap-1.5 min-w-[180px]">
-                                    <span className={`text-[9px] font-black uppercase tracking-widest ${isLight ? 'text-black/50' : 'text-white/50'}`}>{l}</span>
-                                    <input
-                                        type="number" min="0" max="50" step="0.1"
-                                        value={refProgramDraft[k]}
-                                        onChange={(e) => setRefProgramDraft(prev => ({ ...prev, [k]: e.target.value }))}
-                                        placeholder="10"
-                                        className={`w-full px-3 py-2.5 rounded-xl border text-[13px] font-mono font-bold outline-none transition-all ${isLight ? 'bg-white border-black/10 text-black focus:border-[#0E4D30]' : 'bg-black/30 border-white/10 text-white focus:border-[#0E4D30]'}`}
-                                    />
-                                </label>
-                            ))}
-                            <button
-                                onClick={() => saveReferralProgram(platformSettings.referralEnabled)}
-                                disabled={refProgramBusy}
-                                className={`px-4 py-2.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${isLight ? 'bg-white border-black/10 text-black hover:border-[#0E4D30] hover:text-[#0E4D30]' : 'bg-white/5 border-white/10 text-white/70 hover:text-white'} ${refProgramBusy ? 'opacity-60 pointer-events-none' : ''}`}
-                            >
-                                Save commissions
-                            </button>
-                        </div>
+                            <p className={`text-[11px] leading-snug mb-5 ${isLight ? 'text-black/50' : 'text-white/50'}`}>
+                                {platformSettings.referralEnabled
+                                    ? 'Changing these updates what referrers earn from now on.'
+                                    : 'Set both commissions, then go live — the program becomes visible to all users the moment you confirm.'}
+                            </p>
+                            <div className="flex gap-3 mb-5">
+                                {['depositPct', 'volumePct'].map((k, i) => (
+                                    <label key={k} className="flex-1">
+                                        <span className={`block text-[8px] font-black uppercase tracking-widest mb-1.5 ${isLight ? 'text-black/45' : 'text-white/45'}`}>{i === 0 ? 'Deposit %' : 'Trade %'}</span>
+                                        <input
+                                            type="number" min="0" max="50" step="0.1" autoFocus={i === 0}
+                                            value={refProgramDraft[k]}
+                                            onChange={(e) => setRefProgramDraft(prev => ({ ...prev, [k]: e.target.value }))}
+                                            placeholder="10"
+                                            className={`w-full px-4 py-3 rounded-2xl border text-lg font-mono font-bold outline-none transition-all ${isLight ? 'bg-[#F4F7F5] border-black/10 text-black focus:border-[#0E4D30]' : 'bg-black/40 border-white/10 text-white focus:border-[#0E4D30]'}`}
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowRefLive(false)}
+                                    className={`flex-1 py-3 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all ${isLight ? 'bg-white border-black/10 text-black/60 hover:text-black' : 'bg-white/5 border-white/10 text-white/60 hover:text-white'}`}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    disabled={refProgramBusy}
+                                    onClick={async () => { const ok = await saveReferralProgram(true); if (ok) setShowRefLive(false); }}
+                                    className={`flex-1 py-3 rounded-2xl bg-[#0E4D30] text-white text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all disabled:opacity-40 ${refProgramBusy ? 'opacity-60 pointer-events-none' : ''}`}
+                                >
+                                    {refProgramBusy ? 'Working…' : platformSettings.referralEnabled ? 'Save' : 'Go live'}
+                                </button>
+                            </div>
+                        </motion.div>
                     </div>
                 )}
 
@@ -4178,6 +4432,10 @@ export function AdminDashboard({ onBack, theme, notify, platformSettings: initia
                     15market_v2.4.0
                 </div>
             </footer>
+
+            {/* Admin / moderator detail — centered dialog on desktop, a full
+                page (top logo navbar + bottom sections navbar) on mobile */}
+            {selectedAdmin && <AdminDetailOverlay />}
 
             </div>
         </div>

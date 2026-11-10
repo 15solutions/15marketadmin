@@ -1,7 +1,7 @@
 const { ethers } = require('ethers');
 require('dotenv').config();
 
-const ARC_RPC = "https://arc-testnet.g.alchemy.com/v2/gmklUsP-qeITLeu6a8Pw1wHfTvfLQpJJ";
+const ARC_RPC = process.env.ARC_RPC || "https://rpc.testnet.arc.io";
 const CONTRACT_ADDRESS = process.env.ARC_CONTRACT_ADDRESS || "0x4AD92eAFb8867f4d5c95dcB7eDc922E30B3bc1C8";
 
 async function checkContractBalance() {

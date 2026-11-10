@@ -69,7 +69,11 @@ async function supabasePatch(table, matchPath, columns) {
 
 /** Select rows; returns an array, or null when Supabase is off/unreachable. */
 async function supabaseSelect(query) {
-    const res = await supabaseFetch(`/rest/v1/${query}`, {
+    // Decide once: accept BOTH `'transactions?select=...'` (canonical) and a
+    // legacy `/rest/v1/transactions?...` form so doubled prefixes cannot
+    // happen again (ledger/notifications were 404ing on exactly that).
+    const q = String(query || '').replace(/^\/?(rest\/v1\/)+/, '');
+    const res = await supabaseFetch(`/rest/v1/${q}`, {
         method: 'GET',
         headers: { Accept: 'application/json' }
     });

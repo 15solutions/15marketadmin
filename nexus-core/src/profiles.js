@@ -879,7 +879,8 @@ class ProfileService {
             // all three rather than letting one unknown column 400 the row.
             const res = await supabaseRequest('/rest/v1/profiles?select=country,first_name,last_name&limit=1', { timeout: 20000 });
             this.sbCountryAvailable = res.ok;
-            if (!res.ok) console.warn('[Supabase] country/name columns missing — run supabase/migrations/006_profile_country.sql and 007_profile_names.sql. Those fields skip sync until then.');
+            if (!res.ok) console.warn('[Supabase] country/name columns missing — run supabase/migrations/006_profile_country.sql and 007_profile_names.sql. Those fields skip sync until then. THE ADMIN COUNTRIES METRIC RUNS ON THIS COLUMN.');
+            else console.log('[Supabase] country/name columns present (006/007) — country sync + users-by-country metric active');
         } catch (e) {
             this.sbCountryAvailable = null; // retry on next boot, don't latch
             console.warn('[Supabase] country probe failed:', e.message);

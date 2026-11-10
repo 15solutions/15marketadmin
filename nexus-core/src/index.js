@@ -40,7 +40,36 @@ const OddsEngine = require('./services/OddsEngine');
 const priceService = require('./services/priceService');
 const settlementPriceService = require('./services/settlementPriceService');
 const chainReconciler = require('./services/chainReconciler');
-const { requireAdminAuth, requirePerm, requireAnyPerm, requireRoot, handleAdminAuthStatus, handleAdminBootstrap, handleAdminMe, handleAdminList, handleAdminCreate, handleAdminUpdate, handleAdminDelete } = require('./security');
+const { requireAdminAuth, requirePerm, requireAnyPerm, requireRoot, handleAdminAuthStatus, handleAdminBootstrap, handleAdminMe, handleAdminList, handleAdminCreate, handleAdminUpdate, handleAdminDelete, verifyAddressSignature, verifyDepositTx, sanitizeProfile, encryptSecret, decryptSecret, isEncrypted, verifyAdminSocketToken } = require('./security');
+
+// Hard gate for key custody: until KEY_ENCRYPTION_SECRET is configured on
+// the server, private keys must not be stashed at all — a silent plaintext
+// write is a silent breach.
+const keyCustodyConfigured = () => !!process.env.KEY_ENCRYPTION_SECRET;
+
+/**
+ * WALLETS SIGN WITH INTENT — every money-moving user route verifies a signed
+ * message that (a) recovers to the acting address, (b) names the specific
+ * action/destination in the message text, and (c) carries a fresh TIMESTAMP
+ * line so a captured signature cannot be replayed later (10-minute window).
+ * Returns null when the signature checks out, otherwise a short error string.
+ */
+const AUTH_SIG_WINDOW_MS = 10 * 60 * 1000;
+function verifyFreshOwnership(address, message, signature, mustInclude = []) {
+    if (!address || !message || !signature) return 'Signature required (challenge signing failed in the app)';
+    if (!verifyAddressSignature(address, message, signature)) return 'Invalid signature: address mismatch';
+    const msg = String(message);
+    const tsMatch = /TIMESTAMP: ?(\d+)/.exec(msg);
+    const ts = tsMatch ? Number(tsMatch[1]) : 0;
+    if (!ts || Math.abs(Date.now() - ts) > AUTH_SIG_WINDOW_MS) {
+        return 'Signature expired — approve the request again in the app';
+    }
+    for (const needle of mustInclude) {
+        const n = String(needle || '').trim();
+        if (n && !msg.toLowerCase().includes(n.toLowerCase())) return `Signature does not cover this request`;
+    }
+    return null;
+}
 
 // --- DYNAMICALLY DERIVED SOLANA RELAYER ADDRESS ---
 let derivedSolanaRelayerAddress = '11111111111111111111111111111111'; // default fallback
@@ -102,7 +131,7 @@ notificationService.initNotifications();
 const siem = require('./siem');
 const dailyChange = require('./dailyChange');
 // Every HIGH/CRITICAL SIEM alert reaches open admin dashboards live.
-siem.setBroadcaster((event) => io.emit('siem_alert', event));
+siem.setBroadcaster((event) => io.to('admins').emit('siem_alert', event));
 
 // Behind the production proxy the direct socket address is the LB — the
 // forwarded client address is the real caller for both gatekeepers below.
@@ -338,12 +367,19 @@ app.post('/admin/auth/login', async (req, res) => {
 
         // TWO-FACTOR: hold the verified session in the challenge — it is not
         // released until the emailed code proves control of the admin mailbox.
+        // The plaintext code NEVER rests in memory or storage: only a salted
+        // SHA-256 lives in the challenge, and the outbox mirror carries the
+        // email with the code redacted — the mailbox is the sole place the
+        // code exists in readable form.
         const adminEmail = String(email).trim().toLowerCase();
         const code = crypto2fa.randomInt(100000, 1000000).toString();
+        const codeSalt = crypto2fa.randomBytes(8).toString('hex');
+        const codeHash = crypto2fa.createHash('sha256').update(codeSalt + code).digest('hex');
         const challengeId = crypto2fa.randomBytes(18).toString('hex');
         const challenge = {
             email: adminEmail,
-            code,
+            codeSalt,
+            codeHash,
             attempts: 0,
             expiresAt: Date.now() + ADMIN_OTP_TTL,
             lastResend: Date.now(),
@@ -390,7 +426,13 @@ app.post('/admin/auth/otp/verify', async (req, res) => {
     }
     const maskEmail = String(ch.email).replace(/^(.{2}).*(@.*)$/, '$1***$2');
     const norm = String(code || '').replace(/\D/g, '');
-    if (norm.length !== 6 || norm !== ch.code) {
+    // Timing-safe compare against the challenge's salted hash — the plaintext
+    // code never exists in node memory beyond the moment of emailing.
+    const suppliedHash = norm.length === 6
+        ? crypto2fa.createHash('sha256').update(`${ch.codeSalt}${norm}`).digest()
+        : crypto2fa.randomBytes(32);
+    const expectedHash = Buffer.from(ch.codeHash, 'hex');
+    if (norm.length !== 6 || !crypto2fa.timingSafeEqual(suppliedHash, expectedHash)) {
         ch.attempts += 1;
         siem.trackAdminAuthFailure(ip, { email: maskEmail, via: '/admin/auth/otp/verify' });
         const attemptsLeft = Math.max(0, ADMIN_OTP_MAX_ATTEMPTS - ch.attempts);
@@ -431,6 +473,8 @@ app.post('/admin/auth/otp/resend', async (req, res) => {
         return res.status(429).json({ error: 'Hold on — the last code was just sent.' });
     }
     ch.code = crypto2fa.randomInt(100000, 1000000).toString();
+    ch.codeSalt = crypto2fa.randomBytes(8).toString('hex');
+    ch.codeHash = crypto2fa.createHash('sha256').update(ch.codeSalt + ch.code).digest('hex');
     ch.lastResend = Date.now();
     try {
         await notificationService.sendOtpEmail(ch.email, ch.code);
@@ -478,7 +522,7 @@ app.post('/admin/siem/block', requirePerm('dashboard.siem'), (req, res) => {
         reason: String(req.body?.reason || '').slice(0, 200)
     });
     if (!out.ok) return res.status(400).json({ error: out.error });
-    io.emit('siem_ip_blocked', { ip });
+    io.to('admins').emit('siem_ip_blocked', { ip });
     res.json({ ok: true, blockedIPs: out.blocked });
 });
 
@@ -487,7 +531,7 @@ app.post('/admin/siem/unblock', requirePerm('dashboard.siem'), (req, res) => {
     if (!ip) return res.status(400).json({ error: 'IP required' });
     const out = siem.unblockIP(ip, { by: req.admin?.email || 'admin' });
     if (!out.ok) return res.status(404).json({ error: out.error });
-    io.emit('siem_ip_unblocked', { ip });
+    io.to('admins').emit('siem_ip_unblocked', { ip });
     res.json({ ok: true, blockedIPs: out.blocked });
 });
 
@@ -518,7 +562,7 @@ app.post('/admin/liquidity/drain', requirePerm('admin.liquidity'), async (req, r
             severity: 'critical',
             message: `Treasury drained: ${out.drained} USDC → operator ${out.to.slice(0, 6)}…${out.to.slice(-4)} by ${req.admin?.email || 'admin'} (tx ${String(out.hash).slice(0, 12)}…)`
         });
-        io.emit('treasury_update');
+        io.to('admins').emit('treasury_update');
         res.json(out);
     } catch (e) {
         res.status(400).json({ error: e.message });
@@ -533,7 +577,7 @@ app.post('/admin/liquidity/send', requirePerm('admin.liquidity'), async (req, re
             severity: 'high',
             message: `Treasury send: ${out.amount} USDC → ${out.to.slice(0, 6)}…${out.to.slice(-4)} by ${req.admin?.email || 'admin'} (tx ${String(out.hash).slice(0, 12)}…)`
         });
-        io.emit('treasury_update');
+        io.to('admins').emit('treasury_update');
         res.json(out);
     } catch (e) {
         res.status(400).json({ error: e.message });
@@ -650,6 +694,15 @@ app.post('/fiat/withdraw/:address', async (req, res) => {
     const source = String(req.body?.source || '').toLowerCase();
     const amount = Number(req.body?.amount);
 
+    // SIGNATURE: the fiat payout files a real money claim — without a fresh
+    // signature from the wallet interior anyone could sweep another user's
+    // session wallet into the vault. The message must name the amount.
+    {
+        const { signature, message } = req.body;
+        const sigError = verifyFreshOwnership(addr, message, signature, ['FIAT WITHDRAWAL', `AMOUNT: ${amount}`]);
+        if (sigError) return res.status(401).json({ error: sigError });
+    }
+
     // ── The money actually moves here ─────────────────────────────────────
     // trading → the server (which owns the derived session wallet) sweeps the
     // USDC to the fiat vault and only then debits the ledger: nothing ever
@@ -690,12 +743,24 @@ app.post('/fiat/withdraw/:address', async (req, res) => {
         if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
             return res.status(400).json({ error: 'Missing vault transfer receipt — confirm the transfer in your wallet first' });
         }
+        // ON-CHAIN PROOF: the attached tx must actually be a transfer INTO the
+        // fiat vault for (at least) the requested amount — status alone is not
+        // enough, or any random tx hash of any kind would pass as "escrowed".
         try {
-            const receipt = await rpc.waitForReceipt(txHash, 4, 2500);
-            if (receipt && receipt.status !== 1) {
-                return res.status(400).json({ error: 'Your vault transfer failed on-chain — no request was filed' });
+            const directProvider = rpc.providers[0];
+            const verdict = await verifyDepositTx(
+                directProvider, txHash,
+                addr,                                   // expectedFrom — the wallet itself
+                FIAT_ESCROW_ADDRESS,                    // recipient must be the fiat vault specifically
+                amount,
+                { tolerance: 0.02 }
+            );
+            if (!verdict.verified) {
+                return res.status(400).json({ error: `Vault transfer not verifiable: ${verdict.reason || 'receipt mismatch'}` });
             }
-        } catch { /* receipt not yet visible — accept, the request notes it */ }
+        } catch (e) {
+            return res.status(400).json({ error: 'Vault transfer not verifiable right now — resend once the receipt is confirmed' });
+        }
         escrowTx = txHash;
     }
 
@@ -729,7 +794,7 @@ app.post('/fiat/withdraw/:address', async (req, res) => {
         ip,
         meta: { request: out.request.id, address: addr, source, amount: out.request.amount, bank: out.request.bankName, escrowTx }
     });
-    io.emit('fiat_withdrawal_new', { id: out.request.id, address: addr });
+    io.to('admins').emit('fiat_withdrawal_new', { id: out.request.id, address: addr });
     io.to(addr).emit('fiat_withdrawal_update', { id: out.request.id, status: 'pending' });
     notificationService.notifyUser(addr, 'Fiat Withdrawal Request Submitted',
         `Your request to withdraw ${out.request.amount} USDC (local fiat payout) from your ${source} wallet has been submitted. The funds are already in the platform vault — the team will review your request shortly.`,
@@ -819,7 +884,7 @@ app.post('/admin/fiat/:id/decide', requirePerm('users.manage'), async (req, res)
             `Your fiat withdrawal request of ${rec.amount} USDC from your ${rec.source} wallet was denied by an administrator. ${rec.source === 'trading' ? 'The funds have been returned to your trading wallet.' : 'No funds were held from your main wallet.'} Contact support if you believe this is a mistake.`,
             'error', true).catch(() => {});
     }
-    io.emit('fiat_withdrawal_update', { id: rec.id, status: rec.status, address: rec.address });
+    io.to('admins').emit('fiat_withdrawal_update', { id: rec.id, status: rec.status, address: rec.address });
     res.json({ ok: true, request: rec });
 });
 
@@ -900,7 +965,7 @@ app.post('/mail/inbound', async (req, res) => {
         const full = await mailbox.fetchReceivedBody(meta.email_id || meta.id);
         const out = mailbox.recordInbound({ ...payload, data: { ...meta, ...(full.html != null ? { html: full.html } : {}), ...(full.text != null ? { text: full.text } : {}) } });
         if (out.ok && !out.duplicate && out.email) {
-            io.emit('mail_inbound', { id: out.email.id, from: out.email.fromAddr, subject: out.email.subject });
+            io.to('admins').emit('mail_inbound', { id: out.email.id, from: out.email.fromAddr, subject: out.email.subject });
             siem.addEvent({
                 type: 'MAIL_RECEIVED',
                 severity: 'info',
@@ -982,9 +1047,9 @@ async function emitAdminStats() {
       bullBearRatio: payload.bullBearRatio
     });
 
-    io.emit('admin_stats_update', payload);
+    io.to('admins').emit('admin_stats_update', payload);
     // Also emit as 'dashboard_stats' for backward compatibility with existing frontend
-    io.emit('dashboard_stats', payload);
+    io.to('admins').emit('dashboard_stats', payload);
   } catch (err) {
     console.error("[Admin-Stats] Broadcast Error:", err);
   }
@@ -1149,35 +1214,69 @@ io.on('connection', (socket) => {
       socket.emit('price', { key, price: cache.prices[key], ts: cache.priceMeta[key]?.updatedAt || Date.now() });
     }
   });
-  socket.on('join_user', (address) => {
+  socket.on('join_user', async (payload) => {
+    // Ownership-verified room join: the payload carries the address, a signed
+    // challenge message and its signature. A throwaway socket that skips the
+    // signature lands in a quarantine room — it never receives another
+    // account's events. Signature freshness keeps a captured join from being
+    // replayed later; reconnects re-sign through the stored signer closure.
+    const { address, message, signature } = payload || {};
     const room = String(address || '').toLowerCase();
-    if (room) socket.join(room);
+    if (!/^0x[a-fA-F0-9]{40}$/.test(room)) {
+      socket.join('quarantine');
+      return;
+    }
+    if (message && signature && verifyAddressSignature(room, message, signature)) {
+      socket.join(room);
+    } else {
+      socket.join(`unverified_${room}`);
+    }
   });
+
+  // ADMIN ROOM — Supabase-authenticated: same bar as requireAdminAuth
+  // (valid bearer token backed by an active admin_users row). Admin telemetry
+  // (SIEM, stats, treasury, mail) lives here; the public socket never hears it.
+  socket.on('join_admin', async (token) => {
+    const admin = await verifyAdminSocketToken(String(token || ''));
+    if (!admin) return;
+    socket.join('admins');
+    // Verified admins get the connect-time statistics pulse right after the
+    // join (previously broadcast to every connecting socket).
+    await pushDashboardStatsTo(socket);
+  });
+
+  const pushDashboardStatsTo = async (target) => {
+    try {
+      const stats = profiles.getGlobalStats();
+      let treasuryBalance = "0.00";
+      if (config.TREASURY_ADDRESS && config.TREASURY_ADDRESS !== ethers.ZeroAddress) {
+        try { treasuryBalance = await rpc.getBalance(config.TREASURY_ADDRESS); } catch (_) {}
+      }
+      target.emit('dashboard_stats', {
+        ...stats,
+        activeCount: cache.sessions.size,
+        activeStakesTotal: Array.from(cache.trades.values())
+          .filter(t => t.status === 'PENDING')
+          .reduce((sum, t) => sum + t.amount, 0).toFixed(2),
+        treasuryBalance,
+        totalWallets: Object.keys(profiles.profiles).length,
+        daily: dailyChange.latest()
+      });
+    } catch (e) {
+      console.warn('[Socket] stats push failed:', e.message);
+    }
+  };
 
   // NOTE: there is deliberately NO socket 'send_broadcast' handler. Broadcasts
   // are transmitted exclusively through the auth-gated POST /admin/broadcast —
   // sockets carry no identity (no io.use auth middleware), so leaving the old
   // handler in place let any user client hijack the platform banner.
 
-  // Push latest stats on connection — run async so we can fetch the real
-  // treasury balance instead of emitting "LIVE" or undefined.
-  (async () => {
-    const stats = profiles.getGlobalStats();
-    let treasuryBalance = "0.00";
-    if (config.TREASURY_ADDRESS && config.TREASURY_ADDRESS !== ethers.ZeroAddress) {
-      try { treasuryBalance = await rpc.getBalance(config.TREASURY_ADDRESS); } catch (_) {}
-    }
-    socket.emit('dashboard_stats', {
-      ...stats,
-      activeCount: cache.sessions.size,
-      activeStakesTotal: Array.from(cache.trades.values())
-        .filter(t => t.status === 'PENDING')
-        .reduce((sum, t) => sum + t.amount, 0).toFixed(2),
-      treasuryBalance,
-      totalWallets: Object.keys(profiles.profiles).length,
-      daily: dailyChange.latest()
-    });
-  })();
+  // Push admin telemetry on explicit request (admins room members only).
+  socket.on('push_stats', () => {
+    if (!socket.rooms.has('admins')) return;
+    pushDashboardStatsTo(socket);
+  });
 
   // Push latest odds on connection
   if (oddsEngine.currentOdds) {
@@ -1199,8 +1298,11 @@ io.on('connection', (socket) => {
 
 app.post('/auth/discord', async (req, res) => {
   try {
-    const { code, address } = req.body;
+    const { code, address, signature, message } = req.body;
     if (!code || !address) return res.status(400).json({ error: 'Missing code or address' });
+    // Linking a Discord identity to an account must be signed by that account.
+    const sigErrorD = verifyFreshOwnership(address.toLowerCase(), message, signature, ['DISCORD LINK']);
+    if (sigErrorD) return res.status(401).json({ error: sigErrorD });
 
     const params = new URLSearchParams({
       client_id: process.env.DISCORD_CLIENT_ID,
@@ -1245,8 +1347,10 @@ app.post('/auth/discord', async (req, res) => {
 });
 
 app.post('/auth/discord/unlink', (req, res) => {
-  const { address } = req.body;
+  const { address, signature, message } = req.body;
   if (!address) return res.status(400).json({ error: 'Missing address' });
+  const sigError = verifyFreshOwnership(address.toLowerCase(), message, signature, ['DISCORD UNLINK']);
+  if (sigError) return res.status(401).json({ error: sigError });
   
   const profile = profiles.get(address.toLowerCase());
   if (profile) {
@@ -1446,7 +1550,12 @@ app.get('/notifications/:address', async (req, res) => {
 
 app.delete('/notifications/:address', async (req, res) => {
   try {
-    const ok = await notificationService.clearNotifications(req.params.address);
+    // Clear-all is identity-mutating: require a fresh ownership signature so
+    // nobody can wipe another wallet's notification history by URL alone.
+    const addr = String(req.params.address || '').toLowerCase();
+    const sigError = verifyFreshOwnership(addr, req.body?.message, req.body?.signature, ['NOTIFICATIONS CLEAR']);
+    if (sigError) return res.status(401).json({ error: sigError });
+    const ok = await notificationService.clearNotifications(addr);
     res.json({ success: ok });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1464,8 +1573,15 @@ app.delete('/notifications/:address', async (req, res) => {
  */
 app.post('/push-tx', (req, res) => {
   try {
-    const { address } = req.body || {};
+    const { address, signature, message } = req.body || {};
     if (!address) return res.status(400).json({ error: 'Missing address' });
+
+    // LEDGER PUSH = ledger row + notification + email — all three can be
+    // spoofed against a victim without a fresh signature from the wallet.
+    const userAddr = address.toLowerCase();
+    const sigError = verifyFreshOwnership(userAddr, message, signature, ['LEDGER PUSH']);
+    if (sigError) return res.status(401).json({ error: sigError });
+
     const tx = ledgerService.recordTransaction(address, req.body.transaction || req.body);
     if (!tx.row) return res.status(400).json({ error: 'Empty transaction payload' });
 
@@ -1517,21 +1633,40 @@ app.get('/transactions/:address', async (req, res) => {
  */
 app.post('/fund/confirm', async (req, res) => {
   try {
-    const { address, amount, fromToken, txHash } = req.body;
+    const { address, amount, fromToken, txHash, chainId: sourceChainId, signature, message } = req.body;
     if (!address || !amount || !txHash) return res.status(400).json({ error: "Missing deposit details" });
 
     const userAddr = address.toLowerCase();
     const sessionWallet = deriveSessionWallet(userAddr);
 
-    // Frontend already sent the final estimated amount. We use it directly.
+    // THE CREDIT ENDPOINT IS A MINT — it must never trust the client's word.
+    // 1) The wallet signs the deposit confirmation (fresh).
+    // 2) THE ACTUAL DEPOSIT TRANSACTION IS REPROOFED ON ITS SOURCE CHAIN:
+    //    a real, successful transfer whose recipient is this account's session
+    //    wallet and whose value matches the claimed amount. No proof, no credit.
+    const sigErrorFc = verifyFreshOwnership(userAddr, message, signature, ['CONFIRM DEPOSIT']);
+    if (sigErrorFc) return res.status(401).json({ error: sigErrorFc });
+
+    // Frontend already sent the final estimated amount. We verify it on-chain.
     const finalAmount = parseFloat(amount);
-    
+    const providerFc = (sourceChainId && fundingService.destProviders[String(sourceChainId)]) || null;
+    if (!providerFc) {
+      return res.status(400).json({ error: 'Missing or unsupported source chain — cannot verify this deposit' });
+    }
+    const verdictFc = await verifyDepositTx(providerFc, txHash, userAddr, sessionWallet.address, finalAmount, { decimals: 6, tolerance: 0.02 });
+    if (!verdictFc.verified) {
+      return res.status(400).json({ error: `Deposit not verifiable: ${verdictFc.reason || 'receipt mismatch'}` });
+    }
+
     const result = await fundingService.creditTradingWallet(
         userAddr, 
         finalAmount, 
         txHash, 
         sessionWallet.address
     );
+    if (!result || result.success === false) {
+      return res.status(409).json(result || { error: 'Credit refused' });
+    }
 
     // Update session balance in cache (optimistic sync)
     let session = cache.sessions.get(userAddr);
@@ -1581,12 +1716,25 @@ app.post('/fund/confirm', async (req, res) => {
  */
 app.post('/fund/monitor-cctp', async (req, res) => {
   try {
-    const { address, txHash, fromChain, destChain, amount } = req.body;
+    const { address, txHash, fromChain, destChain, amount, signature, message } = req.body;
     if (!txHash || !fromChain) return res.status(400).json({ error: 'Missing CCTP details' });
 
     console.log(`[CCTP] Burn registered: chain ${fromChain} â†’ ${destChain || 'auto'} | TX: ${txHash}`);
 
     const userAddr = address.toLowerCase();
+    // Dead-end in the current UI build, but alive on the wire previously:
+    // an unprotected call let anyone spam relay starts (and the old in-memory
+    // "optimistic" balance add was pure inflation money). Now: fresh
+    // signature from the depositor, one optimistic claim per tx hash, and
+    // NO session-credit before the chain actually attests the burn — the
+    // balance lands when fundingService settles the CCTP message.
+    const sigErrorC = verifyFreshOwnership(userAddr, message, signature, ['CCTP BRIDGE']);
+    if (sigErrorC) return res.status(401).json({ error: sigErrorC });
+    const claimKey = `${userAddr}:${txHash.toLowerCase()}`;
+    if (globalThis.__cctpOptimisticClaims?.has(claimKey)) {
+      return res.status(409).json({ error: 'This burn transaction is already registered' });
+    }
+    (globalThis.__cctpOptimisticClaims ||= new Set()).add(claimKey);
 
     // Trigger CCTP Initiated notification
     notificationService.notifyUser(
@@ -1596,25 +1744,11 @@ app.post('/fund/monitor-cctp', async (req, res) => {
         "info"
     );
 
-    // Instantly credit cached session balance and emit real-time socket event for immediate UX feedback
-    // (The actual on-chain USDC mint will follow asynchronously via IRIS attestation + receiveMessage)
-    const session = cache.sessions.get(userAddr);
-    if (session) {
-      session.balance = Number((session.balance + parseFloat(amount || 0)).toFixed(4));
-      io.to(userAddr).emit('balance_update', {
-        balance: String(session.balance),
-        reason: 'DEPOSIT',
-        txHash
-      });
-      console.log(`[CCTP-Relayer] Instantly credited ${amount} USDC to ${userAddr} (optimistic)`);
-    } else {
-      console.warn(`[CCTP-Relayer] No active session for ${userAddr} â€” balance will sync on next poll`);
-    }
-
-    // Offload full CCTP relay to background: poll IRIS, call receiveMessage on dest chain, finalize credit
+    // Finalize credit in the background: poll IRIS, call receiveMessage on
+    // dest chain, only then creditTradingWallet.
     fundingService.monitorAndSettleCCTP(userAddr, txHash, fromChain, amount, destChain);
 
-    res.json({ success: true, message: 'CCTP relay started. Balance pre-credited.' });
+    res.json({ success: true, message: 'CCTP relay started. Balance credits once the bridge settles.' });
   } catch (err) {
     console.error('[monitor-cctp] Error:', err.message);
     res.status(500).json({ error: err.message });
@@ -1650,6 +1784,13 @@ app.post('/fund/permit-bridge', async (req, res) => {
       return res.status(400).json({ error: "Missing required permit bridge parameters" });
     }
     const userAddr = address.toLowerCase();
+
+    // ATTRIBUTION TRAP — two client-supplied identities (`address` gets the
+    // credit, `userAddress` owns the permit). A mismatch would let a bridge
+    // paid from one wallet land in another account's ledger. Block it here.
+    if (String(userAddress).toLowerCase() !== userAddr) {
+      return res.status(400).json({ error: 'Signer wallet and account address do not match' });
+    }
 
     const result = await fundingService.executePermitBridge(
       userAddr,
@@ -1929,23 +2070,31 @@ app.get('/session/address/:address', (req, res) => {
 });
 
 // --- SOLANA PERMANENT WALLET ENDPOINTS ---
+/**
+ * POST /solana/stash-key
+ * Binds a generated Solana deposit wallet to the address. The wallet owner
+ * must sign the binding, and the private key is stored AES-256-GCM ENCRYPTED
+ * (KEY_ENCRYPTION_SECRET) — the database never sees a usable key.
+ */
 app.post('/solana/stash-key', (req, res) => {
-  const { address, privKey, pubKey } = req.body;
+  const { address, privKey, pubKey, signature, message } = req.body;
   if (!address || !privKey || !pubKey) return res.status(400).json({ error: "Missing data" });
-  
-  profiles.upsert(address.toLowerCase(), {
-    solanaWallet: { pubKey, privKey }
+  const addr = address.toLowerCase();
+  const sigError = verifyFreshOwnership(addr, message, signature, ['SOLANA WALLET BIND', pubKey]);
+  if (sigError) return res.status(401).json({ error: sigError });
+  if (!keyCustodyConfigured()) {
+    return res.status(500).json({ error: 'Solana custody is not configured on this server (KEY_ENCRYPTION_SECRET missing). No key was stored.' });
+  }
+
+  profiles.upsert(addr, {
+    solanaWallet: { pubKey, privKey: encryptSecret(String(privKey)) }
   });
   res.json({ success: true });
 });
 
-app.get('/solana/retrieve-key/:address', (req, res) => {
-  const addr = req.params.address.toLowerCase();
-  const profile = profiles.get(addr);
-  const privKey = profile?.solanaWallet?.privKey;
-  if (!privKey) return res.status(404).json({ error: "Key not found" });
-  res.json({ success: true, privKey });
-});
+// REMOVED: GET /solana/retrieve-key/:address handed a raw private key to
+// anyone who typed an address. Keys only leave the (encrypted) store for the
+// backend-signed funding path; the app never needs to read them back.
 
 app.get('/solana/address/:address', (req, res) => {
   const addr = req.params.address.toLowerCase();
@@ -1957,10 +2106,15 @@ app.get('/solana/address/:address', (req, res) => {
 });
 
 app.post('/solana/clear', (req, res) => {
-  const { address } = req.body;
+  const { address, signature, message } = req.body;
   if (!address) return res.status(400).json({ error: "Missing address" });
   
   const addr = address.toLowerCase();
+  // Clearing the bound deposit wallet is an identity operation — sign it, or
+  // anyone could unbind (then re-bind to their own) another user's address.
+  const sigError = verifyFreshOwnership(addr, message, signature, ['SOLANA WALLET CLEAR']);
+  if (sigError) return res.status(401).json({ error: sigError });
+
   const profile = profiles.get(addr);
   if (profile && profile.solanaWallet) {
     delete profile.solanaWallet;
@@ -1993,23 +2147,84 @@ app.post('/solana/fund', async (req, res) => {
     if (isNaN(amtNum) || amtNum <= 0) return res.status(400).json({ error: 'Invalid amount' });
 
     let txSignature = null;
+    // How much actually arrived, verified on-chain. For the backend-signed
+    // path this is the audited instruction amount; for a pre-signed client tx
+    // the observed deposit-account balance delta replaces it.
+    let creditedAmount = amtNum;
 
     if (signedTxBase64) {
       // Pre-signed transaction from user (e.g. Phantom/Solflare linked wallets)
-      const { Connection, Transaction, Keypair } = require('@solana/web3.js');
+      const { Connection, Transaction, Keypair, PublicKey, SystemProgram } = require('@solana/web3.js');
       const connection = new Connection(config.SOL_DEVNET_RPC, 'confirmed');
 
       try {
         const txBytes = Buffer.from(signedTxBase64, 'base64');
         const tx = Transaction.from(txBytes);
 
-        // Sign the transaction with the relayer's gas tank key to pay for fees
-        if (config.SOL_GAS_TANK_KEY) {
-          const bs58 = require('bs58');
-          const dec = bs58.default ? bs58.default.decode : bs58.decode;
-          const relayerKeypair = Keypair.fromSecretKey(dec(config.SOL_GAS_TANK_KEY));
-          tx.partialSign(relayerKeypair);
+        // RELAYER-SAFETY CHECKLIST — the gas-tank key must NEVER authorize a
+        // transfer of platform funds. The client tx may contain exactly:
+        //   [optional ATA create] + [one SPL token transfer user→relayer]
+        // and the USER must already have signed it. Anything else is refused
+        // rather than countersigned, so a hostile payload can never co-opt the
+        // relayer as a signer.
+        if (!config.SOL_GAS_TANK_KEY) return res.status(500).json({ error: 'Relayer gas tank key is not configured.' });
+        const bs58v = require('bs58');
+        const decV = bs58v.default ? bs58v.default.decode : bs58v.decode;
+        const relayerKeypair = Keypair.fromSecretKey(decV(config.SOL_GAS_TANK_KEY));
+        const relayerPub = relayerKeypair.publicKey.toBase58();
+        const TOKEN_PROGRAM = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+        const ATA_PROGRAM = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+        const usdcMintPk = new PublicKey(config.SOL_DEVNET_USDC_MINT || '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+        const getAtaFor = (owner) => PublicKey.findProgramAddressSync([owner.toBuffer(), TOKEN_PROGRAM.toBuffer(), usdcMintPk.toBuffer()], ATA_PROGRAM)[0];
+        const relayerAta = getAtaFor(relayerKeypair.publicKey);
+        if (!fromAddress || !/^0x/.test('') && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(fromAddress)) {
+          return res.status(400).json({ error: 'fromAddress (your Solana wallet) is required for linked-wallet funding' });
         }
+        const userSolPub = new PublicKey(fromAddress);
+        const userAta = getAtaFor(userSolPub);
+        const expectedAtoms = BigInt(Math.round(amtNum * 1_000_000));
+
+        let seenAmount = false;
+        for (const ix of tx.instructions) {
+          // The relayer may pay fees but must never be pulled in as an
+          // instruction signer (that would let a hostile message make the
+          // platform authorize whatever that instruction does).
+          for (const k of ix.keys) {
+            if (k.isSigner && k.pubkey.toBase58() === relayerPub) {
+              return res.status(400).json({ error: 'Unsupported transaction' });
+            }
+          }
+          if (ix.programId.toBase58() === SystemProgram.programId.toBase58()) continue; // fee mechanics only
+          if (ix.programId.toBase58() === ATA_PROGRAM.toBase58()) {
+            const ownerKey = ix.keys[2]?.pubkey?.toBase58();
+            if (ownerKey !== relayerPub) return res.status(400).json({ error: 'Unsupported transaction — only the platform deposit account may be created' });
+            continue;
+          }
+          if (ix.programId.toBase58() === TOKEN_PROGRAM.toBase58()) {
+            if (seenAmount) return res.status(400).json({ error: 'Unsupported transaction — multiple transfers present' });
+            if (ix.data.length < 9 || ix.data[0] !== 3) return res.status(400).json({ error: 'Unsupported token instruction' });
+            const fromAta = ix.keys[0].pubkey.toBase58();
+            const toAta = ix.keys[1].pubkey.toBase58();
+            if (toAta !== relayerAta.toBase58()) return res.status(400).json({ error: 'Funding must be sent to the platform deposit wallet you see in the app' });
+            if (fromAta !== userAta.toBase58()) return res.status(400).json({ error: 'Token transfer does not originate from your Solana wallet' });
+            const decodedAmount = Buffer.from(ix.data.slice(1, 9)).readBigUInt64LE(0);
+            if (decodedAmount !== expectedAtoms) return res.status(400).json({ error: 'Transaction amount does not match the requested funding amount' });
+            seenAmount = true;
+            continue;
+          }
+          return res.status(400).json({ error: 'Unsupported transaction — unexpected program in the payload' });
+        }
+        if (!seenAmount) return res.status(400).json({ error: 'Transaction does not contain a USDC transfer to the platform deposit wallet' });
+        const signedByUser = (tx.signatures || []).some(s => s.publicKey && s.publicKey.toBase58() === userSolPub.toBase58() && s.signature);
+        if (!signedByUser) return res.status(401).json({ error: 'The transaction was not signed by your Solana wallet' });
+
+        // OBSERVED DELTA: credit what the chain actually saw move into the
+        // deposit ATA — never the client's word for it.
+        const preInfo = await connection.getTokenAccountBalance(relayerAta).catch(() => null);
+        const preAtoms = preInfo ? BigInt(preInfo.amount || '0') : null;
+
+        // Sign the transaction with the relayer's gas tank key to pay for fees
+        tx.partialSign(relayerKeypair);
 
         txSignature = await connection.sendRawTransaction(tx.serialize(), {
           skipPreflight: false,
@@ -2017,7 +2232,19 @@ app.post('/solana/fund', async (req, res) => {
         });
         await connection.confirmTransaction(txSignature, 'confirmed');
         console.log(`[Solana/Fund] Pre-signed Tx confirmed: ${txSignature}`);
+
+        const postInfo = await connection.getTokenAccountBalance(relayerAta).catch(() => null);
+        const postAtoms = postInfo ? BigInt(postInfo.amount || '0') : null;
+        if (preAtoms != null && postAtoms != null && postAtoms > preAtoms) {
+          creditedAmount = Number(postAtoms - preAtoms) / 1_000_000;
+        } else {
+          creditedAmount = amtNum; // balance query unavailable — fall back to audited instruction amount
+        }
+        if (creditedAmount <= 0) return res.status(400).json({ error: 'No USDC reached the platform deposit wallet — nothing was credited' });
       } catch (broadcastErr) {
+        if (broadcastErr.responseBody || broadcastErr.message?.includes('Refused') || broadcastErr.calledFrom === 'sendTransaction') {
+          return res.status(400).json({ error: 'Transaction was rejected by the platform security checks' });
+        }
         console.error('[Solana/Fund] Pre-signed broadcast error:', broadcastErr.message);
         let logsMsg = '';
         if (broadcastErr.logs) {
@@ -2042,6 +2269,11 @@ app.post('/solana/fund', async (req, res) => {
       if (!userSolWallet || !userSolWallet.privKey || !userSolWallet.pubKey) {
         return res.status(404).json({ error: 'No stashed Solana wallet found for this user. Please generate one.' });
       }
+      // The key travels encrypted at rest; unwrap it only inside this scope.
+      const solPrivPlain = isEncrypted(userSolWallet.privKey) ? decryptSecret(userSolWallet.privKey) : userSolWallet.privKey;
+      if (!solPrivPlain) {
+        return res.status(500).json({ error: 'Stashed Solana wallet could not be decrypted (key material mismatch).' });
+      }
 
       if (!config.SOL_GAS_TANK_KEY) {
         return res.status(500).json({ error: 'Relayer gas tank key is not configured.' });
@@ -2050,7 +2282,7 @@ app.post('/solana/fund', async (req, res) => {
       const bs58 = require('bs58');
       const dec = bs58.default ? bs58.default.decode : bs58.decode;
 
-      const userKeypair = Keypair.fromSecretKey(dec(userSolWallet.privKey));
+      const userKeypair = Keypair.fromSecretKey(dec(solPrivPlain));
       const fromPubkey = userKeypair.publicKey;
       const relayerKeypair = Keypair.fromSecretKey(dec(config.SOL_GAS_TANK_KEY));
       const relayerPubkey = relayerKeypair.publicKey;
@@ -2142,13 +2374,13 @@ app.post('/solana/fund', async (req, res) => {
       }
     }
 
-    // Credit the user's Arc trading balance
+    // Credit the user's Arc trading balance — by the VERIFIED on-chain amount
     const session = cache.sessions.get(userAddr);
     if (session) {
-      session.balance = (session.balance || 0) + amtNum;
+      session.balance = (session.balance || 0) + creditedAmount;
       cache.sessions.set(userAddr, session);
     }
-    profiles.upsert(userAddr, { balance: (profiles.get(userAddr)?.balance || 0) + amtNum });
+    profiles.upsert(userAddr, { balance: (profiles.get(userAddr)?.balance || 0) + creditedAmount });
 
     // TRANSFER REAL TEST USDC ON ARC TESTNET
     try {
@@ -2158,8 +2390,8 @@ app.post('/solana/fund', async (req, res) => {
         const usdcAbi = ['function transfer(address to, uint256 value) external returns (bool)'];
         // Arc Testnet USDC is 0x3600000000000000000000000000000000000000
         const arcUsdc = new ethers.Contract('0x3600000000000000000000000000000000000000', usdcAbi, destRelayerWallet);
-        const amountWei = ethers.parseUnits(amtNum.toString(), 18); // Arc USDC has 18 decimals
-        console.log(`[Solana/Fund] Transferring ${amtNum} real USDC on Arc Testnet to ${sessionWallet.address}...`);
+        const amountWei = ethers.parseUnits(creditedAmount.toString(), 18); // Arc USDC has 18 decimals
+        console.log(`[Solana/Fund] Transferring ${creditedAmount} real USDC on Arc Testnet to ${sessionWallet.address}...`);
         
         // Execute transfer without waiting for confirmation to keep API fast
         arcUsdc.transfer(sessionWallet.address, amountWei).then(tx => {
@@ -2198,8 +2430,15 @@ app.post('/solana/fund', async (req, res) => {
  * we accept the trade as a balance-deduction trade using the in-process session.
  */
 app.post('/session/execute', async (req, res) => {
-  const { address, tradeParams, txHash: stakeTxHash } = req.body;
+  const { address, tradeParams, txHash: stakeTxHash, signature, message } = req.body;
   if (!address || !tradeParams) return res.status(400).json({ error: 'Missing params' });
+
+  // OWNERSHIP: every bet costs the account holder money — placing one on
+  // another user's behalf (or replaying someone else's trade id) must be
+  // backed by a fresh signature from that wallet.
+  const userAddrX = address.toLowerCase();
+  const sigErrorX = verifyFreshOwnership(userAddrX, message, signature, ['TRADE']);
+  if (sigErrorX) return res.status(401).json({ error: sigErrorX });
 
   try {
     // Use the classic engine which handles in-process balance + settlement queue
@@ -2290,7 +2529,7 @@ app.post('/session/execute', async (req, res) => {
     // Notify all connected admins of the new trade in real-time
     const newTrade = cache.trades.get(String(result.tradeId));
     if (newTrade) {
-      io.emit('global_trade_executed', {
+      io.to('admins').emit('global_trade_executed', {
         ...newTrade,
         userAddr: address,
         id: newTrade.id,
@@ -2328,24 +2567,15 @@ app.post('/session/cashout', async (req, res) => {
     const targetAddr = destination ? ethers.getAddress(destination) : ethers.getAddress(address);
 
     // --- SECURITY VERIFICATION ---
+    // EVERY cashout — including the plain "send to myself" one — must be
+    // authorized by a fresh signature from the wallet owner. Otherwise anyone
+    // who knows an address could force a sweep of that user's session wallet
+    // (even "to treasury" drains real user funds into the escrow).
+    // The signature must be fresh (10-minute window) AND must carry the exact
+    // destination address inside its message.
     const { signature, message } = req.body;
-    if (signature && message) {
-      try {
-        const recoveredAddr = ethers.verifyMessage(message, signature);
-        if (recoveredAddr.toLowerCase() !== userAddr) {
-          return res.status(401).json({ error: "Invalid signature: Address mismatch" });
-        }
-      } catch (sigErr) {
-        return res.status(401).json({ error: "Signature verification failed" });
-      }
-    } else if (destination && destination.toLowerCase() !== address.toLowerCase()) {
-      // For external transfers, we REQUIRE a signature for safety
-      if (destination.toLowerCase() !== config.FEE_COLLECTOR.toLowerCase()) {
-        return res.status(401).json({ error: "Signature required for external transfers" });
-      }
-    }
-    // Note: Internal withdrawals (to main wallet) could potentially be less strict if needed,
-    // but we've implemented signatures in the frontend now.
+    const sigError = verifyFreshOwnership(userAddr, message, signature, [targetAddr]);
+    if (sigError) return res.status(401).json({ error: sigError });
 
     // CRITICAL: Use a direct JsonRpcProvider (not FallbackProvider) for nonce and balance queries.
     const directProvider = rpc.providers[0];
@@ -2856,6 +3086,44 @@ app.get('/profiles/username/:username', async (req, res) => {
   res.json({ available: !r.taken, reason: r.reason, degraded: !!r.degraded });
 });
 
+/**
+ * PUBLIC PROFILE PROJECTION — everything the public GET may show. Feature
+ * fields ride along only if the UI lives on them; anything key-shaped,
+ * balance-shaped or contact-shaped stays server-side. Admins see the full
+ * record through /admin/users (permissioned).
+ */
+const PUBLIC_PROFILE_FIELDS = [
+  'address', 'walletAddress', 'username', 'avatar', 'country',
+  'firstName', 'lastName', 'xHandle', 'discordHandle', 'xProfileImage',
+  'onboarded', 'onboardedAt', 'suspended', 'suspendedAt', 'suspendNote',
+  'isProvider', 'providerStats', 'referralCode', 'referralEnrolled',
+  'updatedAt', 'online', 'createdAt'
+];
+function publicProfileView(profile, extras = {}) {
+  if (!profile) return null;
+  const out = {};
+  for (const f of PUBLIC_PROFILE_FIELDS) {
+    if (profile[f] !== undefined) out[f] = profile[f];
+  }
+  if (profile.providerApplication) {
+    out.providerApplication = {
+      status: profile.providerApplication.status,
+      appliedAt: profile.providerApplication.appliedAt,
+      copyFee: profile.providerApplication.copyFee || 0
+    };
+  }
+  if (profile.providerPortfolioWallet) {
+    out.providerPortfolioWallet = {
+      address: profile.providerPortfolioWallet.address,
+      balance: profile.providerPortfolioWallet.balance || 0
+    };
+  }
+  if (profile.solanaWallet) {
+    out.solanaWallet = { pubKey: profile.solanaWallet.pubKey || null };
+  }
+  return { ...out, ...extras };
+}
+
 app.get('/profiles/:address', async (req, res) => {
   const addr = req.params.address.toLowerCase();
   try {
@@ -2869,13 +3137,12 @@ app.get('/profiles/:address', async (req, res) => {
     const allTrades = [...activeUserTrades, ...historyTrades];
     const onboarded = profile.onboarded === true || !!profile.onboardedAt || !!profile.username;
 
-    res.json({
-      ...profile,
+    res.json(publicProfileView(profile, {
       onboarded,
       isInitial: !onboarded,
       stats: profiles.getProfileStats(addr, historyTrades),
       trades: allTrades
-    });
+    }));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -3018,7 +3285,7 @@ app.post('/profiles', async (req, res) => {
     console.warn('[Profiles] referral post-processing failed:', e.message);
   }
   emitAdminStats();
-  res.json({ success: true, profile, walletAddress: sessionWallet.address });
+  res.json({ success: true, profile: publicProfileView(profile, { isInitial: !profile.username && profile.onboarded !== true }), walletAddress: sessionWallet.address });
 });
 
 // â”€â”€â”€ Referral program â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -3047,6 +3314,8 @@ app.get('/referral/info/:address', async (req, res) => {
 
 app.post('/referral/apply/:address', async (req, res) => {
   try {
+    const sigErrorRA = verifyFreshOwnership(String(req.params.address || '').toLowerCase(), req.body?.message, req.body?.signature, ['REFERRAL APPLY']);
+    if (sigErrorRA) return res.status(401).json({ error: sigErrorRA });
     const result = await profiles.applyReferralCode(req.params.address, req.body?.code);
     if (!result.ok) return res.status(result.status).json({ error: result.error });
     res.json({ ok: true, referrer: result.referrer, referrerUsername: result.referrerUsername });
@@ -3069,13 +3338,15 @@ app.get('/referral/stats/:address', async (req, res) => {
 // requires this explicit step before a code/link/dashboard is shown.
 app.post('/referral/enroll/:address', async (req, res) => {
   try {
+    const sigErrorRE = verifyFreshOwnership(String(req.params.address || '').toLowerCase(), req.body?.message, req.body?.signature, ['REFERRAL ENROLL']);
+    if (sigErrorRE) return res.status(401).json({ error: sigErrorRE });
     const result = await profiles.enrollReferral(req.params.address);
     if (!result.ok) return res.status(result.status).json({ error: result.error });
     await profiles.syncToSupabase((req.params.address || '').toLowerCase()).catch(() => {});
     // Push the new participant to all connected admin dashboards immediately.
     try {
       const profile = profiles.get((req.params.address || '').toLowerCase());
-      io.emit('referral_enrolled', {
+      io.to('admins').emit('referral_enrolled', {
         address: (req.params.address || '').toLowerCase(),
         username: profile?.username || null,
         referralCode: result.referralCode || profile?.referralCode || null,
@@ -3098,6 +3369,8 @@ app.post('/referral/enroll/:address', async (req, res) => {
 // destination wallet address the user wants the funds on.
 app.post('/referral/withdraw/:address', async (req, res) => {
   try {
+    const sigErrorRW = verifyFreshOwnership(String(req.params.address || '').toLowerCase(), req.body?.message, req.body?.signature, ['REFERRAL WITHDRAW']);
+    if (sigErrorRW) return res.status(401).json({ error: sigErrorRW });
     const result = await profiles.requestRefWithdrawal(
       req.params.address,
       req.body?.amount,
@@ -3266,7 +3539,19 @@ app.patch('/profiles/:address', async (req, res) => {
     }
   }
 
-  const updates = { ...req.body };
+  // FIELD WHITELIST — a PATCH may only touch presentation + contact fields.
+  // Everything money- or credential-shaped (balance, wallets, keys, provider
+  // status, referral ledgers) is server-owned: spreading req.body wholesale
+  // used to let anyone rewrite any other account's entire record.
+  const ALLOWED_PATCH_FIELDS = new Set([
+    'username', 'avatar', 'country', 'xHandle', 'firstName', 'lastName',
+    'email', 'tradingWallet'
+  ]);
+  const rawUpdates = { ...req.body };
+  const updates = {};
+  for (const key of Object.keys(rawUpdates)) {
+    if (ALLOWED_PATCH_FIELDS.has(key)) updates[key] = rawUpdates[key];
+  }
   // Username format gate: 6â€“20 letters/numbers (no special characters).
   if (typeof updates.username === 'string') {
     if (updates.username.trim() && !USERNAME_RE.test(updates.username.trim())) {
@@ -3311,7 +3596,7 @@ app.patch('/profiles/:address', async (req, res) => {
   }
   const profile = profiles.upsert(addr, updates);
   await profiles.syncToSupabase(addr);
-  res.json({ success: true, profile });
+  res.json({ success: true, profile: publicProfileView(profile) });
 });
 
 // â”€â”€â”€ X (TWITTER) OAUTH INTEGRATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -3418,9 +3703,17 @@ app.get('/circle/transactions/:address', async (req, res) => {
 });
 
 app.post('/circle/transfer', async (req, res) => {
-  const { address, destinationAddress, amount, tokenId } = req.body;
+  const { address, destinationAddress, amount, tokenId, signature, message } = req.body;
   if (!address || !destinationAddress || !amount || !tokenId) {
     return res.status(400).json({ error: 'Missing transfer parameters' });
+  }
+
+  // A Circle wallet holds real USDC — the transfer must be signed by the
+  // holder, naming the exact destination (a captured signature must not be
+  // reusable to land funds elsewhere).
+  {
+    const sigError = verifyFreshOwnership(address.toLowerCase(), message, signature, ['CIRCLE TRANSFER', destinationAddress, String(amount)]);
+    if (sigError) return res.status(401).json({ error: sigError });
   }
 
   try {
@@ -3436,7 +3729,7 @@ app.post('/circle/transfer', async (req, res) => {
 
 // â”€â”€â”€ ADMIN ENDPOINTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-app.get('/admin/stats', async (req, res) => {
+app.get('/admin/stats', requirePerm('dashboard.overview'), async (req, res) => {
   // Use the global stats from profiles which aggregates data across all users
   const stats = profiles.getGlobalStats();
 
@@ -3600,7 +3893,7 @@ app.post('/admin/trades/resolve-stuck', requirePerm('trades.maintenance'), async
         });
         // Admin console echo (it is not in the user's room) so the feed row
         // stops hanging on its pending beam the moment support voids a trade.
-        io.emit('global_trade_resolved', {
+        io.to('admins').emit('global_trade_resolved', {
           betId: id,
           id,
           status: 'CANCELLED',
@@ -3628,7 +3921,7 @@ app.post('/admin/trades/resolve-stuck', requirePerm('trades.maintenance'), async
   }
 });
 
-app.get('/admin/trades', (req, res) => {
+app.get('/admin/trades', requirePerm('dashboard.overview'), (req, res) => {
   // Collect ALL settled trades from profile history
   const allSettled = [];
   for (const addr in profiles.profiles) {
@@ -3652,11 +3945,11 @@ app.get('/admin/trades', (req, res) => {
 });
 
 // Alias used by older admin build
-app.get('/history', (req, res) => {
+app.get('/history', requirePerm('dashboard.overview'), (req, res) => {
   return res.redirect('/admin/trades');
 });
 
-app.get('/admin/trade/:id', (req, res) => {
+app.get('/admin/trade/:id', requirePerm('dashboard.overview'), (req, res) => {
   const trade = cache.trades.get(req.params.id);
   if (trade) return res.json(trade);
   
@@ -3672,7 +3965,7 @@ app.get('/admin/trade/:id', (req, res) => {
 // Re-deliver a WON trade's payout whose on-chain settlement failed. The
 // engine refuses rows that are not flagged payoutFailed, so a re-run is a
 // no-op and a live bet is never double-handled.
-app.post('/admin/trades/:id/payout-retry', async (req, res) => {
+app.post('/admin/trades/:id/payout-retry', requirePerm('trades.maintenance'), async (req, res) => {
   try {
     const result = await classicEngine.retryFailedPayout(req.params.id);
     if (!result?.success) return res.status(400).json(result || { success: false, error: 'retry refused' });
@@ -3904,7 +4197,7 @@ let activeCampaigns = [];
 let campaignEnrollments = {};
 
 app.get('/campaigns', (req, res) => res.json(activeCampaigns));
-app.post('/admin/campaigns', (req, res) => {
+app.post('/admin/campaigns', requirePerm('broadcast.send'), (req, res) => {
   const newCampaign = {
     id: `camp-${Date.now()}`,
     title: req.body.title,
@@ -3913,7 +4206,7 @@ app.post('/admin/campaigns', (req, res) => {
     endTime: req.body.endTime || (Date.now() + 86400000 * 7)
   };
   activeCampaigns.push(newCampaign);
-  io.emit('new_campaign', newCampaign);
+  io.to('admins').emit('new_campaign', newCampaign);
   res.json({ success: true, campaign: newCampaign });
 });
 
@@ -3944,7 +4237,7 @@ app.get('/leaderboard', (req, res) => {
   res.json(leaderboard);
 });
 
-app.get('/admin/campaign-report', (req, res) => {
+app.get('/admin/campaign-report', requirePerm('broadcast.send'), (req, res) => {
   const { campaignId } = req.query;
   const campaign = activeCampaigns.find(c => c.id === campaignId);
   if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
@@ -3992,8 +4285,12 @@ app.get('/admin/campaign-report', (req, res) => {
 });
 
 app.post('/enroll', (req, res) => {
-  const { campaignId, address } = req.body;
+  const { campaignId, address, signature, message } = req.body;
   if (!campaignId || !address) return res.status(400).json({ error: 'Missing parameters' });
+  // Enrollment drives notifications (and looks like participation) — prove
+  // the address owner actually asked for it.
+  const sigErrorEn = verifyFreshOwnership(String(address).toLowerCase(), message, signature, ['CAMPAIGN ENROLL']);
+  if (sigErrorEn) return res.status(401).json({ error: sigErrorEn });
   
   if (!campaignEnrollments[campaignId]) campaignEnrollments[campaignId] = [];
   
@@ -4024,7 +4321,7 @@ app.get('/enroll', (req, res) => {
 
 app.get('/winner-banner', (req, res) => res.json(null));
 app.post('/active-market', (req, res) => res.json({ success: true }));
-app.post('/record-fee', (req, res) => res.json({ success: true }));
+app.post('/record-fee', requireAdminAuth, (req, res) => res.json({ success: true }));
 
 // Chart history is not stored anywhere by design: every login starts from
 // an empty buffer that fills with live streamed ticks. No endpoints needed.
@@ -4059,10 +4356,15 @@ app.get('/copy-trading/wallet/:address', async (req, res) => {
 
     // Generate if not exists
     if (!profile.copyTradingWallet) {
+      if (!keyCustodyConfigured()) {
+        return res.status(500).json({ error: 'Copy-trading custody is not configured on this server (KEY_ENCRYPTION_SECRET missing). No key was stored.' });
+      }
       const newWallet = ethers.Wallet.createRandom();
       profile.copyTradingWallet = {
         address: newWallet.address,
-        privateKey: newWallet.privateKey, // Store securely in production
+        // Encrypted at rest — the private key never lands in Supabase or the
+        // profile file in a usable form. Same rule as the Solana stash.
+        privateKeyEnc: encryptSecret(newWallet.privateKey),
         balance: 0 // Track isolated balance
       };
       profiles.upsert(userAddr, profile);
@@ -4106,20 +4408,25 @@ app.get('/copy-trading/wallet/:address', async (req, res) => {
  */
 app.post('/copy-trading/deposit', async (req, res) => {
   try {
-    const { address, amount } = req.body;
+    const { address, amount, signature, message } = req.body;
     if (!address || !amount || amount <= 0) {
       return res.status(400).json({ error: "Missing or invalid parameters" });
     }
+    const sigErrorD = verifyFreshOwnership(String(address).toLowerCase(), message, signature, ['COPY DEPOSIT']);
+    if (sigErrorD) return res.status(401).json({ error: sigErrorD });
 
     const userAddr = address.toLowerCase();
     let profile = profiles.get(userAddr);
     if (!profile) return res.status(404).json({ error: "Profile not found" });
 
     if (!profile.copyTradingWallet) {
+      if (!keyCustodyConfigured()) {
+        return res.status(500).json({ error: 'Copy-trading custody is not configured on this server (KEY_ENCRYPTION_SECRET missing). No key was stored.' });
+      }
       const newWallet = ethers.Wallet.createRandom();
       profile.copyTradingWallet = {
         address: newWallet.address,
-        privateKey: newWallet.privateKey,
+        privateKeyEnc: encryptSecret(newWallet.privateKey),
         balance: 0
       };
     }
@@ -4155,10 +4462,12 @@ app.post('/copy-trading/deposit', async (req, res) => {
  */
 app.post('/copy-trading/withdraw', async (req, res) => {
   try {
-    const { address, amount } = req.body;
+    const { address, amount, signature, message } = req.body;
     if (!address || !amount || amount <= 0) {
       return res.status(400).json({ error: "Missing or invalid parameters" });
     }
+    const sigErrorWr = verifyFreshOwnership(String(address).toLowerCase(), message, signature, ['COPY WITHDRAW']);
+    if (sigErrorWr) return res.status(401).json({ error: sigErrorWr });
 
     const userAddr = address.toLowerCase();
     const profile = profiles.get(userAddr);
@@ -4188,8 +4497,14 @@ app.post('/copy-trading/withdraw', async (req, res) => {
   }
 });
 
-// Simple in-memory OTP storage (address -> { code, email, expiresAt })
+// Simple in-memory OTP storage (address -> { codeSalt, codeHash, email, expiresAt }).
+// Codes are hashed with a per-OTP salt the instant they are generated — the
+// plaintext exists only inside the outgoing email, never in node memory,
+// console output or any store. Requires crypto (crypto-based hash chain).
 const otpStore = {};
+// Per-address send-OTP resend cooldown (1 minute) — never resets on restart,
+// which is fine (worst case one extra 60s wait after a deploy).
+const otpSendCooldowns = new Map();
 
 /**
  * POST /copy-trading/send-otp
@@ -4197,15 +4512,29 @@ const otpStore = {};
  */
 app.post('/copy-trading/send-otp', async (req, res) => {
     try {
-        const { address, email } = req.body;
+        const { address, email, signature, message } = req.body;
         if (!address || !email) return res.status(400).json({ error: "Missing address or email" });
 
-        const userAddr = address.toLowerCase();
+        // Two gates: the sending wallet must sign (you don't get to launch
+        // emailed codes for someone else's address), and one OTP per minute
+        // per address (no mail bombing through this endpoint).
+        const userAddr0 = address.toLowerCase();
+        const sigErrorO = verifyFreshOwnership(userAddr0, message, signature, ['EMAIL OTP']);
+        if (sigErrorO) return res.status(401).json({ error: sigErrorO });
+        const lastSent = otpSendCooldowns.get(userAddr0) || 0;
+        if (Date.now() - lastSent < 60 * 1000) {
+            return res.status(429).json({ error: "Please wait a minute before requesting another code" });
+        }
+        otpSendCooldowns.set(userAddr0, Date.now());
+
+        const userAddr = userAddr0;
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-        otpStore[userAddr] = { code, email, expiresAt };
-        console.log(`[OTP] Stored code for ${userAddr}: ${code}`);
+        // Salted hash at rest — nobody reading memory/logs/DB can see the code.
+        const codeSalt = require('crypto').randomBytes(8).toString('hex');
+        const codeHash = require('crypto').createHash('sha256').update(codeSalt + code).digest('hex');
+        otpStore[userAddr] = { codeSalt, codeHash, email, expiresAt };
 
         const sent = await notificationService.sendOtpEmail(email, code);
         if (sent) {
@@ -4225,10 +4554,13 @@ app.post('/copy-trading/send-otp', async (req, res) => {
  */
 app.post('/copy-trading/verify-otp', (req, res) => {
     try {
-        const { address, code } = req.body;
+        const { address, code, signature, message } = req.body;
         if (!address || !code) return res.status(400).json({ error: "Missing address or code" });
 
         const userAddr = address.toLowerCase();
+        // Same ownership rule as every other user mutation.
+        const sigError = verifyFreshOwnership(userAddr, message, signature, ['EMAIL OTP']);
+        if (sigError) return res.status(401).json({ error: sigError });
         const record = otpStore[userAddr];
 
         if (!record) {
@@ -4240,7 +4572,22 @@ app.post('/copy-trading/verify-otp', (req, res) => {
             return res.status(400).json({ error: "OTP has expired. Request a new one." });
         }
 
-        if (record.code !== code.trim()) {
+        // Timing-safe check against the salted hash. Attempt counter, not an
+        // unbounded grind: five guesses kill the challenge and the user must
+        // re-request.
+        record.attempts = (record.attempts || 0) + 1;
+        if (record.attempts > 5) {
+            delete otpStore[userAddr];
+            return res.status(429).json({ error: "Too many attempts — request a new code" });
+        }
+
+        const norm = String(code || '').replace(/\D/g, '');
+        const supplied = require('crypto').createHash('sha256')
+            .update(`${record.codeSalt}${norm}`).digest('hex');
+        const expected = Buffer.from(record.codeHash, 'hex');
+        const ok = norm.length === 6
+            && require('crypto').timingSafeEqual(Buffer.from(supplied, 'hex'), expected);
+        if (!ok) {
             return res.status(400).json({ error: "Invalid verification code" });
         }
 
@@ -4264,12 +4611,21 @@ app.post('/copy-trading/verify-otp', (req, res) => {
  * POST /copy-trading/apply
  * User applies to be a copy trading provider
  */
+/**
+ * POST /copy-trading/apply
+ * Files a PROVIDER APPLICATION against the signer's OWN wallet. Unauthenticated
+ * versions let anyone file impersonating applications carrying arbitrary
+ * contact details under someone else's address.
+ */
 app.post('/copy-trading/apply', (req, res) => {
   try {
-    const { primaryWallet, name, twitter, telegram, email, copyFee, onChainData } = req.body;
+    const { primaryWallet, name, twitter, telegram, email, copyFee, onChainData, signature, message } = req.body;
     if (!primaryWallet) return res.status(400).json({ error: "Missing address" });
-    
+
     const userAddr = primaryWallet.toLowerCase();
+    const sigError = verifyFreshOwnership(userAddr, message, signature, ['PROVIDER APPLICATION']);
+    if (sigError) return res.status(401).json({ error: sigError });
+
     const stats = profiles.getProfileStats(userAddr);
     
     const profile = profiles.get(userAddr) || {};
@@ -4291,17 +4647,16 @@ app.post('/copy-trading/apply', (req, res) => {
       address: userAddr,
       username: profile.providerApplication.contactInfo?.name || profile.discord?.username || profile.username || `${userAddr.substring(0, 6)}...`,
       primaryWallet: profile.providerApplication.primaryWallet || userAddr,
-      contactInfo: profile.providerApplication.contactInfo || {},
+      // Contact details never ride the socket — only admins (verified) see
+      // them, and only through the REST endpoint they query themselves.
+      contactInfo: { name: profile.providerApplication.contactInfo?.name || '' },
       copyFee: profile.providerApplication.copyFee || 0,
       onChainData: profile.providerApplication.onChainData || {},
       appliedAt: profile.providerApplication.appliedAt,
       metrics: profile.providerApplication.metricsSnapshot
     };
 
-    const count = io.engine?.clientsCount || 0;
-    console.log(`[CopyTrading] Application saved for ${userAddr}, connected sockets: ${count}`);
-    io.emit('new_copy_application', payload);
-    console.log(`[CopyTrading] Emitted 'new_copy_application' for ${userAddr}`);
+    io.to('admins').emit('new_copy_application', payload);
     
     res.json({ success: true, message: "Application submitted successfully" });
   } catch (err) {
@@ -4314,7 +4669,7 @@ app.post('/copy-trading/apply', (req, res) => {
  * GET /admin/copy-trading/applications
  * Admin fetches pending applications
  */
-app.get('/admin/copy-trading/applications', (req, res) => {
+app.get('/admin/copy-trading/applications', requireAdminAuth, (req, res) => {
   try {
     const apps = [];
     for (const addr in profiles.profiles) {
@@ -4345,7 +4700,7 @@ app.get('/admin/copy-trading/applications', (req, res) => {
  * POST /admin/copy-trading/approve
  * Admin approves or rejects an application
  */
-app.post('/admin/copy-trading/approve', (req, res) => {
+app.post('/admin/copy-trading/approve', requirePerm('users.manage'), (req, res) => {
   try {
     const { address, approved, reason } = req.body;
     if (!address) return res.status(400).json({ error: "Missing address" });
@@ -4388,8 +4743,9 @@ app.post('/admin/copy-trading/approve', (req, res) => {
   }
 });
 
-// Clear all provider applications
-app.post('/admin/copy-trading/clear', (req, res) => {
+// Clear all provider applications (admin action — permissioned like other
+// roster mutations so a stray request cannot wipe every application).
+app.post('/admin/copy-trading/clear', requirePerm('users.manage'), (req, res) => {
   try {
     const allProfiles = profiles.getAll();
     let cleared = 0;
@@ -4464,8 +4820,13 @@ app.get('/copy-trading/investors/:address/copies', (req, res) => {
  */
 app.post('/copy-trading/trade', (req, res) => {
   try {
-    const { investorAddress, providerAddress, providerName, asset, direction, amount } = req.body;
+    const { investorAddress, providerAddress, providerName, asset, direction, amount, signature, message } = req.body;
     if (!investorAddress || !asset) return res.status(400).json({ error: "Missing required fields" });
+    // The copy row belongs to the INVESTOR's ledger — it may only be written
+    // by the investor's own (fresh) signature. This endpoint otherwise lets
+    // anyone forge fake copy-trade history into any account.
+    const sigErrorCt = verifyFreshOwnership(String(investorAddress).toLowerCase(), message, signature, ['COPY TRADE AUTH']);
+    if (sigErrorCt) return res.status(401).json({ error: sigErrorCt });
 
     const provider = profiles.get(providerAddress?.toLowerCase());
     const trade = profiles.pushCopyTrade(investorAddress, {
@@ -4529,11 +4890,15 @@ app.get('/copy-trading/providers', (req, res) => {
  */
 app.post('/copy-trading/activate', (req, res) => {
   try {
-    const { investorAddress, providerAddress, mode, allocated, stakePerTrade } = req.body;
+    const { investorAddress, providerAddress, mode, allocated, stakePerTrade, signature, message } = req.body;
     if (!investorAddress || !providerAddress) return res.status(400).json({ error: "Missing addresses" });
 
     const investorAddr = investorAddress.toLowerCase();
     const providerAddr = providerAddress.toLowerCase();
+
+    // Activation charges the investor — it must be authorized by the investor.
+    const sigErrorAct = verifyFreshOwnership(investorAddr, message, signature, ['COPY ACTIVATION', providerAddr]);
+    if (sigErrorAct) return res.status(401).json({ error: sigErrorAct });
 
     const investor = profiles.get(investorAddr);
     if (!investor || !investor.copyTradingWallet) {
@@ -4808,11 +5173,17 @@ app.get('/copy-trading/providers/:address/portfolio', (req, res) => {
 app.post('/copy-trading/providers/:address/generate-portfolio-wallet', (req, res) => {
   try {
     const providerAddr = req.params.address.toLowerCase();
+    // Wallet generation returns (and stores) key material — provider-only.
+    const sigErrorGw = verifyFreshOwnership(providerAddr, req.body?.message, req.body?.signature, ['PORTFOLIO WALLET']);
+    if (sigErrorGw) return res.status(401).json({ error: sigErrorGw });
     const provider = profiles.get(providerAddr);
     if (!provider) return res.status(404).json({ error: "Provider not found" });
 
     if (provider.providerPortfolioWallet) {
       return res.json({ success: true, wallet: { address: provider.providerPortfolioWallet.address, balance: provider.providerPortfolioWallet.balance || 0 }, alreadyGenerated: true });
+    }
+    if (!keyCustodyConfigured()) {
+      return res.status(500).json({ error: 'Portfolio custody is not configured on this server (KEY_ENCRYPTION_SECRET missing). No key was stored.' });
     }
 
     const newWallet = ethers.Wallet.createRandom();
@@ -4828,7 +5199,7 @@ app.post('/copy-trading/providers/:address/generate-portfolio-wallet', (req, res
 
     provider.providerPortfolioWallet = {
       address: newWallet.address,
-      privateKey: newWallet.privateKey,
+      privateKeyEnc: encryptSecret(newWallet.privateKey),
       balance: credited
     };
     provider.pendingPortfolioRevenue = 0;
@@ -4853,6 +5224,8 @@ app.post('/copy-trading/providers/:address/generate-portfolio-wallet', (req, res
 app.post('/copy-trading/providers/:address/claim-revenue', (req, res) => {
   try {
     const providerAddr = req.params.address.toLowerCase();
+    const sigErrorCr = verifyFreshOwnership(providerAddr, req.body?.message, req.body?.signature, ['CLAIM REVENUE']);
+    if (sigErrorCr) return res.status(401).json({ error: sigErrorCr });
     const provider = profiles.get(providerAddr);
     if (!provider) return res.status(404).json({ error: "Provider not found" });
 
@@ -4887,10 +5260,20 @@ app.post('/copy-trading/providers/:address/claim-revenue', (req, res) => {
 app.post('/copy-trading/providers/:address/withdraw', async (req, res) => {
   try {
     const providerAddr = req.params.address.toLowerCase();
-    const { amount, targetAddress } = req.body;
+    const { amount, signature, message } = req.body;
+
+    // ONLY THE PROVIDER may withdraw their own portfolio — with a fresh
+    // signature that names the amount. This route broadcasts from the platform
+    // operator key, so an unauthenticated version turned "knowing an address"
+    // into "spending the platform treasury".
+    const sigErrorW = verifyFreshOwnership(providerAddr, message, signature, ['PORTFOLIO WITHDRAW', `AMOUNT: ${amount}`]);
+    if (sigErrorW) return res.status(401).json({ error: sigErrorW });
+
+    // The payout destination is locked to the provider's own wallet — no
+    // client-supplied pass-through address, ever.
+    const payoutTarget = ethers.getAddress(providerAddr);
 
     if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid withdrawal amount" });
-    if (!targetAddress) return res.status(400).json({ error: "Target address required" });
 
     const provider = profiles.get(providerAddr);
     if (!provider) return res.status(404).json({ error: "Provider not found" });
@@ -4911,7 +5294,7 @@ app.post('/copy-trading/providers/:address/withdraw', async (req, res) => {
         const tx = await rpc.broadcastWithFailover(
           config.PRIVATE_KEY,
           {
-            to: targetAddress,
+            to: payoutTarget,
             value: ethers.parseEther(String(amount)),
             gasLimit: 21000n,
             gasPrice: ethers.parseUnits("60", "gwei"),
@@ -4923,10 +5306,10 @@ app.post('/copy-trading/providers/:address/withdraw', async (req, res) => {
         if (!receipt || receipt.status !== 1) {
           console.error('[withdraw] Transfer reverted on-chain');
         } else {
-          console.log(`[withdraw] Sent ${amount} USDC to ${targetAddress} (tx: ${tx.hash})`);
+          console.log(`[withdraw] Sent ${amount} USDC to ${payoutTarget} (tx: ${tx.hash})`);
         }
       } else {
-        console.log(`[withdraw] On-chain transfer skipped (no treasury key). Recorded ${amount} USDC withdrawal for ${targetAddress}`);
+        console.log(`[withdraw] On-chain transfer skipped (no treasury key). Recorded ${amount} USDC withdrawal for ${payoutTarget}`);
       }
     } catch (e) {
       console.warn('[withdraw] On-chain transfer failed, balance already deducted:', e.message?.substring(0, 100));
@@ -4936,7 +5319,7 @@ app.post('/copy-trading/providers/:address/withdraw', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Withdrawal of ${amount} USDC submitted to ${targetAddress}`,
+      message: `Withdrawal of ${amount} USDC submitted to ${payoutTarget}`,
       newBalance: provider.providerPortfolioWallet.balance
     });
   } catch (err) {

@@ -2,7 +2,7 @@
 require('dotenv').config();
 const { ethers } = require('ethers');
 
-const ARC_RPC = process.env.ARC_RPC || "https://arc-testnet.g.alchemy.com/v2/gmklUsP-qeITLeu6a8Pw1";
+const ARC_RPC = process.env.ARC_RPC || "https://rpc.testnet.arc.io";
 const CONTRACT_ADDRESS = process.env.ARC_CONTRACT_ADDRESS;
 
 async function testArcDecimals() {

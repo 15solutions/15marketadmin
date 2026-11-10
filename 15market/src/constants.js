@@ -196,13 +196,15 @@ if (!isLocal && KEEPER_URL_ARC.includes('localhost')) {
 if (!isLocal && !envUrlArc) {
     console.warn(`⚠️ [Config] VITE_KEEPER_URL_ARC is not set at build time — falling back to ${PRODUCTION_BACKEND}. Set it in Render to pin the API host.`);
 }
-export const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN;
+// (VITE_ADMIN_TOKEN removed — the client bundle must never carry an admin
+// token; no backend route consumes one, and /record-fee is a no-op stub.)
+
 
 // ─── Supabase Auth (admin portal identity) ──────────────────────────────
 // Admins sign in with email+password against Supabase Auth; the ONLY thing
 // the browser ever needs is the project URL + anon key (public by design —
 // RLS on admin_users blocks anon access entirely, the backend verifies).
-export const SUPABASE_AUTH_URL = import.meta.env.VITE_SUPABASE_AUTH_URL || import.meta.env.VITE_SUPABASE_URL || 'https://cwzbdxvninfagfbaehre.supabase.co';
+export const SUPABASE_AUTH_URL = import.meta.env.VITE_SUPABASE_AUTH_URL || import.meta.env.VITE_SUPABASE_URL || '';
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // ─── Country → fiat gateway matching ─────────────────────────────────────

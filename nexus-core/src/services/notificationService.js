@@ -629,11 +629,17 @@ function getOtpEmailTemplate(code) {
 
 async function sendOtpEmail(emailAddress, code) {
     if (!resend) {
-        console.log(`[OTP-Email] Resend not configured. Would send code ${code} to ${emailAddress}`);
+        // Never say the code or the address here: the log line is the one
+        // place a shoulder-surfer on the server console would look.
+        console.log('[OTP-Email] Resend not configured — a verification code could not be delivered.');
         return true;
     }
     try {
         const htmlContent = getOtpEmailTemplate(code);
+        // MAIL-CONSOLE REDACTION: the outbox mirror (Supabase mail_outbox +
+        // the admin mail console) stores the email WITHOUT the code. Codes
+        // are readable only in the recipient's mailbox, per platform policy.
+        const redactedHtml = htmlContent.split(code).join('••••••');
         const { data, error } = await resend.emails.send({
             from: process.env.RESEND_FROM || EMAIL_FROM_DEFAULT,
             replyTo: EMAIL_SUPPORT_ADDRESS,
@@ -643,11 +649,11 @@ async function sendOtpEmail(emailAddress, code) {
         });
         if (error) {
             console.error('[OTP-Email] Resend error:', error.message);
-            recordOutbox({ kind: 'system', to: emailAddress, subject: 'Your Email Verification Code', title: 'Email verification', message: `A verification code was issued (delivery failed: ${error.message})`, html: htmlContent, status: 'failed', detail: error.message });
+            recordOutbox({ kind: 'system', to: emailAddress, subject: 'Your Email Verification Code', title: 'Email verification', message: `A verification code was issued (delivery failed: ${error.message}) — the code itself is only ever visible in the recipient's mailbox.`, html: redactedHtml, status: 'failed', detail: error.message });
             return false;
         }
         console.log('[OTP-Email] Sent to', emailAddress, 'ID:', data?.id);
-        recordOutbox({ kind: 'system', to: emailAddress, subject: 'Your Email Verification Code', title: 'Email verification', message: 'A verification code was issued and delivered.', html: htmlContent, status: 'sent', detail: data?.id || '' });
+        recordOutbox({ kind: 'system', to: emailAddress, subject: 'Your Email Verification Code', title: 'Email verification', message: 'A verification code was issued and delivered. (Redacted from the mail console — only the recipient can see the code.)', html: redactedHtml, status: 'sent', detail: data?.id || '' });
         return true;
     } catch (err) {
         console.error('[OTP-Email] Failed:', err.message);

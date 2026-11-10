@@ -111,12 +111,6 @@ export function CircleWalletSection({ address, isLight, notify, onOpen }) {
                                 >
                                     <Copy size={10} className="opacity-40" />
                                 </button>
-                                <button 
-                                    onClick={() => fetchWalletInfo(true)}
-                                    className={`p-1 rounded-md ${isLight ? 'bg-black/5 hover:bg-black/10' : 'bg-white/5 hover:bg-white/10'} ${isRefreshing ? 'animate-spin' : ''}`}
-                                >
-                                    <RefreshCw size={10} className="opacity-40" />
-                                </button>
                             </div>
                         </div>
                     </div>

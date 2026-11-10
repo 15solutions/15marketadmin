@@ -201,7 +201,7 @@ class ClassicEngine {
       // The ADMIN console is not in the user's room: broadcast globally so the
       // trade feed swaps its beam for a DISPUTE marker the moment the engine
       // parks the trade, instead of waiting for the next snapshot poll.
-      this.io.emit('global_trade_disputed', {
+      this.io.to('admins').emit('global_trade_disputed', {
         betId: trade.id,
         id: trade.id,
         status: 'DISPUTE',
@@ -496,7 +496,7 @@ class ClassicEngine {
       payout: payoutAmount
     });
 
-    this.io.emit('global_trade_settled', {
+    this.io.to('admins').emit('global_trade_settled', {
       betId: trade.id,
       id: trade.id,
       won: true,
@@ -628,7 +628,7 @@ class ClassicEngine {
       // row on "Resolving…" forever even though the user side had already
       // settled. Emit it with the payoutFailed flag so the admin row flips to
       // WON + PAY FAIL with a retry affordance instead of hanging.
-      this.io.emit('global_trade_settled', {
+      this.io.to('admins').emit('global_trade_settled', {
         betId: trade.id,
         id: trade.id,
         won: true,
@@ -729,7 +729,7 @@ class ClassicEngine {
 
     this.io.to(addr).emit('payout_completed', { tradeId: id, betId: id, payout, retried: true });
 
-    this.io.emit('global_trade_settled', {
+    this.io.to('admins').emit('global_trade_settled', {
       betId: id,
       id,
       won: true,
@@ -825,7 +825,7 @@ class ClassicEngine {
         betId: id,
         message: 'Settlement failed again. The payout retry did not confirm on-chain.'
       });
-      this.io.emit('global_trade_settled', {
+      this.io.to('admins').emit('global_trade_settled', {
         betId: id,
         id,
         won: true,
@@ -929,19 +929,24 @@ class ClassicEngine {
     const SYMBOL_MAP = ['eth', 'btc', 'sol', 'mon', 'jup', 'xrp', 'avax'];
     const symbol = SYMBOL_MAP[marketId] || 'eth';
 
-    // ENTRY PRICE = price at the EXACT moment the user clicked YES/NO.
-    // The frontend reads the live price in the same frame as the click and sends
-    // it here (scaled integer: SOL=1e6, other assets=1e2). Prefer that precise
-    // click-time price over this engine's own (slightly later) feed read so the
-    // entry matches exactly what the user saw when they pressed the button.
+    // ENTRY PRICE = the SERVER's live feed at the moment of execution. The
+    // frontend still sends its click-frame price, but a client-controlled
+    // entry decides the verdict (entry vs server exit), so an attacker could
+    // set entry a hair past the exit for a guaranteed win. Anything more than
+    // 0.25% off the server feed is treated as tampering and the server price
+    // wins; within tolerance the client's click-frame price keeps its UX.
     const SCALE = marketId === 2 ? 1000000 : 100;
+    const serverPrice = Number(cache.prices[symbol]);
     let entryPrice = 0;
     const clientPriceRaw = Number(tradeParams.entryPrice);
     if (clientPriceRaw && isFinite(clientPriceRaw) && clientPriceRaw > 0) {
       entryPrice = Number((clientPriceRaw / SCALE).toFixed(12));
     }
     if (!entryPrice || isNaN(entryPrice) || entryPrice <= 0) {
-      entryPrice = Number(cache.prices[symbol]);
+      entryPrice = serverPrice;
+    }
+    if (serverPrice > 0 && Math.abs(entryPrice - serverPrice) / serverPrice > 0.0025) {
+      entryPrice = serverPrice;
     }
     if (!entryPrice || isNaN(entryPrice) || entryPrice <= 0) {
       return { success: false, error: 'Price feed not available. Please wait and retry.' };
@@ -1204,7 +1209,7 @@ class ClassicEngine {
 
     this.settleCopyTrades(trade, 0);
 
-    this.io.emit('global_trade_settled', {
+    this.io.to('admins').emit('global_trade_settled', {
       betId: trade.id,
       id: trade.id,
       won: false,

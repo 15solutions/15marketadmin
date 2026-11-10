@@ -52,9 +52,7 @@ class SocketService {
         this.socket.on("connect", () => {
             console.log("[Socket] Platform Link Active");
             this.reconnectAttempts = 0;
-            if (this.userRoom) {
-                this.socket.emit('join_user', this.userRoom);
-            }
+            this._emitJoinUser();
             // A reconnect means every live event in the gap was missed. Tell
             // subscribers so the UI reconciles immediately instead of showing
             // stale PENDING rows until the next poll cycle.
@@ -93,11 +91,40 @@ class SocketService {
     /**
      * Join the user's personal room. Remembers the address so it is re-sent
      * automatically after every reconnect (see "connect" handler above).
+     *
+     * Rooms are ownership-verified server-side: instead of the raw address,
+     * pass an async `signatureProvider` that returns
+     * { address, message, signature } — a fresh wallet-signed challenge. The
+     * server drops sockets that skip it into a quarantine room that receives
+     * no per-account events.
      */
-    joinUser(address) {
+    joinUser(address, signatureProvider = null) {
         this.userRoom = String(address || '').toLowerCase();
+        this._joinAuthProvider = signatureProvider || null;
         if (!this.userRoom) return;
-        this.emit('join_user', this.userRoom);
+        this._emitJoinUser();
+    }
+
+    /** (Re-)send join_user on connect — signatures are produced lazily so a
+     * reconnect after the 10-minute server window re-signs instead of replaying
+     * a stale challenge. */
+    _emitJoinUser() {
+        if (!this.socket?.connected || !this.userRoom) return;
+        if (this._joinAuthProvider) {
+            Promise.resolve(this._joinAuthProvider())
+                .then(payload => {
+                    if (payload && this.socket?.connected) {
+                        this.socket.emit('join_user', payload);
+                    }
+                })
+                .catch(() => {
+                    // Signing declined — join unverified (no sensitive events
+                    // flow) rather than crashing the connection.
+                    this.socket.emit('join_user', this.userRoom);
+                });
+        } else {
+            this.socket.emit('join_user', this.userRoom);
+        }
     }
 
     on(event, callback) {

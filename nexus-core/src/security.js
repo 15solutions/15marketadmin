@@ -245,6 +245,25 @@ function requireAnyPerm(perms) {
   };
 }
 
+/**
+ * SOCKET: verify an admin bearer token for Socket.IO's join_admin handler.
+ * Same bar as requireAdminAuth (valid Supabase token + live admin_users row,
+ * not suspended) — returns a minimal identity or null. Used only to grant the
+ * "admins" socket room; never to mutate state.
+ */
+async function verifyAdminSocketToken(token) {
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !token) return null;
+    const user = await verifySupabaseToken(String(token));
+    if (!user) return null;
+    const rec = await getAdminRecord(user.id);
+    if (!rec || rec.suspended === true) return null;
+    return { id: rec.id, email: (rec.email || user.email || '').toLowerCase(), role: rec.role || 'moderator', isRoot: rec.role === 'root' };
+  } catch (e) {
+    return null;
+  }
+}
+
 const requireRoot = (req, res, next) => {
   requireAdminAuth(req, res, () => {
     if (req.admin?.role !== 'root') return res.status(403).json({ error: 'Root admin only' });
@@ -700,6 +719,7 @@ module.exports = {
   handleAdminUpdate,
   handleAdminDelete,
   verifyDepositTx,
+  verifyAdminSocketToken,
   checkRateLimit,
   verifyAddressSignature,
   sanitizeProfile,

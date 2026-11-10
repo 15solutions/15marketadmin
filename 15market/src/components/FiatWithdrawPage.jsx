@@ -90,7 +90,7 @@ const statusChip = {
     denied: { icon: XCircle, cls: 'bg-red-500/10 text-red-500 border-red-500/30', label: 'Denied' }
 };
 
-export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBalance, evmBalance, sendToEscrow }) {
+export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBalance, evmBalance, sendToEscrow, signMessage }) {
     // Balances come straight from the app's own live values: the trading
     // wallet is the session ledger, the main wallet is the Privy on-chain
     // balance. Only the request ledger is fetched here.
@@ -171,13 +171,20 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                 setBusyLabel('Moving funds to the fiat vault…');
             }
             setBusyLabel('Filing the request…');
+            // A fiat claim files a real money movement — the backend only
+            // accepts one signed by the wallet owner, naming the amount.
+            const fiatMsg = `--- 15MARKET PROTOCOL ---\nACTION: FIAT WITHDRAWAL\nADDRESS: ${address.toLowerCase()}\nSOURCE: ${source === 'main' ? 'MAIN WALLET' : 'TRADING WALLET'}\nAMOUNT: ${amt}\nTIMESTAMP: ${Date.now()}`;
+            const fiatSig = signMessage ? await signMessage(fiatMsg) : null;
+            if (!fiatSig) throw new Error('Approve the withdrawal request signature in your wallet to continue');
             const res = await fetch(`${KEEPER_URL_ARC}/fiat/withdraw/${address.toLowerCase()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     source, amount: amt, country: methods?.country || country.trim(),
                     bankName, accountName: accountName.trim(), accountNumber: accountNumber.replace(/\s+/g, ''),
-                    txHash: escrowTx
+                    txHash: escrowTx,
+                    message: fiatMsg,
+                    signature: fiatSig
                 })
             });
             const data = await res.json().catch(() => ({}));
@@ -207,10 +214,6 @@ export function FiatWithdrawPage({ address, isLight, notify, onBack, sessionBala
                         </button>
                         <h2 className={`text-xl font-black uppercase tracking-tighter ${isLight ? 'text-black/80' : 'text-white'} leading-none`}>Fiat Withdrawal</h2>
                     </div>
-                    <button onClick={() => setRefreshTick(t => t + 1)}
-                        className={`p-3 rounded-full ${isLight ? 'bg-black/5 hover:bg-black/10 text-black/80' : 'bg-white/5 hover:bg-white/10 text-white'} transition-all`}>
-                        <RefreshCw size={20} />
-                    </button>
                 </div>
             </div>
 

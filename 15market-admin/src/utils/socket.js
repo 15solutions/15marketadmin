@@ -9,6 +9,7 @@ class SocketService {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 15;
         this.userRoom = null; // last joined user room — re-joined on every connect
+        this._adminTokenGetter = null; // live session token source for the admins room
     }
 
     connect() {
@@ -55,6 +56,16 @@ class SocketService {
             if (this.userRoom) {
                 this.socket.emit('join_user', this.userRoom);
             }
+            // Admin telemetry (SIEM alerts, stats pulses, treasury, mail) is
+            // broadcast into the server-side "admins" room only. Re-join on
+            // every (re)connect with a FRESH bearer token — a reconnect spawns
+            // a new server-side socket with no rooms.
+            if (this._adminTokenGetter) {
+                try {
+                    const token = this._adminTokenGetter();
+                    if (token) this.socket.emit('join_admin', token);
+                } catch (_) {}
+            }
             // A reconnect means every live event in the gap was missed. Tell
             // subscribers so the UI reconciles immediately instead of showing
             // stale PENDING rows until the next poll cycle.
@@ -93,7 +104,20 @@ class SocketService {
     /**
      * Join the user's personal room. Remembers the address so it is re-sent
      * automatically after every reconnect (see "connect" handler above).
+     *
+     * joinAdmin: pass a function that returns the CURRENT admin bearer token
+     * (read live on every connect so refreshes/expiries are picked up).
      */
+    joinAdmin(tokenGetter) {
+        this._adminTokenGetter = typeof tokenGetter === 'function' ? tokenGetter : null;
+        if (this.socket?.connected && this._adminTokenGetter) {
+            try {
+                const token = this._adminTokenGetter();
+                if (token) this.socket.emit('join_admin', token);
+            } catch (_) {}
+        }
+    }
+
     joinUser(address) {
         this.userRoom = String(address || '').toLowerCase();
         if (!this.userRoom) return;

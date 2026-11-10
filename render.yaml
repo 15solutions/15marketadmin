@@ -45,6 +45,10 @@ services:
         value: https://api.15market.online
       - key: VITE_KEEPER_URL_ARC
         value: https://api.15market.online
+      # Public project URL (the anon key is the only credential and it is
+      # intentionally public; it lives in the Render dashboard).
+      - key: VITE_SUPABASE_URL
+        value: https://cwzbdxvninfagfbaehre.supabase.co
       - key: VITE_TURNKEY_ORGANIZATION_ID
         value: 29276b8b-8776-4c78-8c2e-c63cc6dde605
       - key: VITE_TURNKEY_AUTH_PROXY_CONFIG_ID

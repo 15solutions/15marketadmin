@@ -60,10 +60,35 @@ const TOWER_EXECUTOR_ABI = [
 
 class TowerService {
   constructor() {
-    this.apiKey = config.TOWER_API_KEY || 'sk_test_d6482e27882e48b0cf7ed682c36dcf6fb3adfbfa69ebf8e5';
+    // Env-only: no key literal may ever ship in the source tree. An empty key
+    // makes live Tower API calls fail fast, and getQuote() falls back to the
+    // on-chain quote path — swaps keep working without the remote service.
+    this.apiKey = config.TOWER_API_KEY || '';
+    // Circuit breaker: tower.exchange adds ~4 s per call (measured) and
+    // answers 4xx when the key is stale. Two consecutive failures snap the
+    // breaker OPEN for 10 minutes — quote/build then fall back to the local
+    // Arc AMM engine instantly instead of burning the wait on every swap.
+    this._breakerOpenUntil = 0;
+    this._breakerStreak = 0;
+    // Quote cache: identical pair+amount re-quotes inside the TTL resolve
+    // from memory (the client re-quotes on every wallet/pair flip).
+    this._quoteCache = new Map(); // key -> { quote, expiresAt }
     this.apiUrl = (config.TOWER_API_URL || 'https://www.tower.exchange').replace(/\/$/, '');
     this.erc20Interface = new ethers.Interface(ERC20_ABI);
     this.executorInterface = new ethers.Interface(TOWER_EXECUTOR_ABI);
+  }
+
+  _apiOpen() {
+    return Date.now() < this._breakerOpenUntil;
+  }
+
+  _noteApiFailure(err, label) {
+    this._breakerStreak++;
+    if (this._breakerStreak >= 2) {
+      this._breakerOpenUntil = Date.now() + 10 * 60 * 1000;
+      this._breakerStreak = 0;
+      console.log(`[Tower Exchange] Breaker OPEN for 10 min after repeated ${label} failures (${err.message}).`);
+    }
   }
 
   getTokens() {
@@ -104,36 +129,55 @@ class TowerService {
     // Compute atomic base units according to token decimals
     const atomicInputAmount = ethers.parseUnits(numAmount.toFixed(fromToken.decimals), fromToken.decimals).toString();
 
-    // 1. Attempt to query live Tower Exchange API
-    try {
-      const liveQuote = await this._fetchTowerApi('/api/public/swap/quote', 'POST', {
-        inputToken: fromToken.symbol,
-        outputToken: toToken.symbol,
-        inputAmount: atomicInputAmount,
-        slippageTolerance: Number(slippageTolerance)
-      }, 4000);
+    // Warm cache first — identical pair+amount within the TTL answers in ~0 ms.
+    const cacheKey = `${fromToken.symbol}-${toToken.symbol}-${atomicInputAmount}`;
+    const cached = this._quoteCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      console.log(`[Tower Exchange] Cached quote ${fromToken.symbol} -> ${toToken.symbol}`);
+      return cached.quote;
+    }
 
-      if (liveQuote && (liveQuote.expectedOutput || liveQuote.outputAmount || liveQuote.quote)) {
-        console.log(`[Tower Exchange] Live quote received for ${fromToken.symbol} -> ${toToken.symbol}`);
-        return {
-          success: true,
-          source: 'tower-live',
-          quote: liveQuote
-        };
+    // 1. Attempt to query live Tower Exchange API — skipped entirely while
+    //    the breaker is open (two consecutive failures = 10 min off).
+    if (!this._apiOpen()) {
+      try {
+        const liveQuote = await this._fetchTowerApi('/api/public/swap/quote', 'POST', {
+          inputToken: fromToken.symbol,
+          outputToken: toToken.symbol,
+          inputAmount: atomicInputAmount,
+          slippageTolerance: Number(slippageTolerance)
+        }, 2500);
+
+        if (liveQuote && (liveQuote.expectedOutput || liveQuote.outputAmount || liveQuote.quote)) {
+          this._breakerStreak = 0;
+          const out = {
+            success: true,
+            source: 'tower-live',
+            quote: liveQuote
+          };
+          this._quoteCache.set(cacheKey, { quote: out, expiresAt: Date.now() + 15000 });
+          if (this._quoteCache.size > 200) this._quoteCache.clear();
+          console.log(`[Tower Exchange] Live quote received for ${fromToken.symbol} -> ${toToken.symbol}`);
+          return out;
+        }
+      } catch (apiErr) {
+        // Endpoint may be firewalled or in sandbox test mode; fall back gracefully to Arc AMM engine
+        console.log(`[Tower Exchange] API note (${apiErr.message}), using Arc AMM routing engine.`);
+        this._noteApiFailure(apiErr, 'quote');
       }
-    } catch (apiErr) {
-      // Endpoint may be firewalled or in sandbox test mode; fall back gracefully to Arc AMM engine
-      console.log(`[Tower Exchange] API note (${apiErr.message}), using Arc AMM routing engine.`);
     }
 
     // 2. Resilient Arc AMM routing quote calculation
-    return this._calculateFallbackQuote({
+    const fallback = await this._calculateFallbackQuote({
       fromToken,
       toToken,
       inputAmount: numAmount,
       atomicInputAmount,
       slippageTolerance
     });
+    this._quoteCache.set(cacheKey, { quote: fallback, expiresAt: Date.now() + 15000 });
+    if (this._quoteCache.size > 200) this._quoteCache.clear();
+    return fallback;
   }
 
   /**
@@ -149,24 +193,29 @@ class TowerService {
       throw new Error('Quote object is required');
     }
 
-    // 1. Attempt to query live Tower Exchange API build-tx
-    try {
-      const liveTx = await this._fetchTowerApi('/api/public/swap/build-tx', 'POST', {
-        quote: quote.raw || quote,
-        userAddress: userAddress.toLowerCase()
-      }, 4000);
+    // 1. Attempt to query live Tower Exchange API build-tx — skipped while
+    //    the breaker is open so users never eat the remote-timeout wait.
+    if (!this._apiOpen()) {
+      try {
+        const liveTx = await this._fetchTowerApi('/api/public/swap/build-tx', 'POST', {
+          quote: quote.raw || quote,
+          userAddress: userAddress.toLowerCase()
+        }, 2500);
 
-      if (liveTx && (liveTx.swap || liveTx.to)) {
-        console.log(`[Tower Exchange] Live transaction payload built for ${userAddress}`);
-        return {
-          success: true,
-          source: 'tower-live',
-          approval: liveTx.approval || null,
-          swap: liveTx.swap || liveTx
-        };
+        if (liveTx && (liveTx.swap || liveTx.to)) {
+          this._breakerStreak = 0;
+          console.log(`[Tower Exchange] Live transaction payload built for ${userAddress}`);
+          return {
+            success: true,
+            source: 'tower-live',
+            approval: liveTx.approval || null,
+            swap: liveTx.swap || liveTx
+          };
+        }
+      } catch (apiErr) {
+        console.log(`[Tower Exchange] Build-tx API note (${apiErr.message}), building direct Arc transaction.`);
+        this._noteApiFailure(apiErr, 'build-tx');
       }
-    } catch (apiErr) {
-      console.log(`[Tower Exchange] Build-tx API note (${apiErr.message}), building direct Arc transaction.`);
     }
 
     // 2. Build direct Arc Testnet transaction payload

@@ -171,12 +171,28 @@ export function CircleWalletPage({
             const newKeypair = Keypair.generate();
             const privKey = bs58.encode(newKeypair.secretKey);
             const pubKey = newKeypair.publicKey.toString();
-            
+
+            // Bind the new deposit wallet to the OWNER's EVM identity — the
+            // backend refuses unsigned (or spoofed) stash attempts, and the
+            // private key it stores is encrypted at rest.
+            const bindMsg = `--- 15MARKET PROTOCOL ---\nACTION: SOLANA WALLET BIND\nADDRESS: ${fundingSourceAddress.toLowerCase()}\nPUBKEY: ${pubKey}\nTIMESTAMP: ${Date.now()}`;
+            const bindWalletCfg = wallets?.find(w => w.walletClientType === 'privy')
+                || wallets?.find(w => w.address?.toLowerCase() === fundingSourceAddress?.toLowerCase());
+            let signature = null;
+            try {
+                const ethProvBind = await bindWalletCfg.getEthereumProvider();
+                const bindProvider = new ethers.BrowserProvider(ethProvBind, 'any');
+                const bindSigner = await bindProvider.getSigner();
+                signature = await bindSigner.signMessage(bindMsg);
+            } catch (bindErr) {
+                throw new Error('Approve the wallet binding in your browser wallet to continue');
+            }
+
             // Stash private key and public key in backend profiles db
             const res = await fetch(`${KEEPER_URL_ARC}/solana/stash-key`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ address: fundingSourceAddress, privKey, pubKey })
+                body: JSON.stringify({ address: fundingSourceAddress, privKey, pubKey, message: bindMsg, signature })
             });
             if (!res.ok) throw new Error("Failed to stash key in secure cache");
 
@@ -479,7 +495,8 @@ export function CircleWalletPage({
 
             // Durable record + notification: swaps settle in the browser, so
             // /push-tx is the event — it also raises the "Swap Completed"
-            // notification and its email on the node.
+            // notification and its email on the node. Signed so nobody else
+            // can fabricate rows into this wallet's ledger.
             const swapLedgerTx = {
                 id: `swap_${Date.now()}`,
                 type: 'SWAP',
@@ -489,10 +506,13 @@ export function CircleWalletPage({
                 network: 'arc'
             };
             setLocalTx(prev => [swapLedgerTx, ...prev]);
+            const swapPushMsg = `--- 15MARKET PROTOCOL ---\nACTION: LEDGER PUSH\nKIND: SWAP\nAMOUNT: ${String(amt)} USDC\nTX: ${swapTx.hash}\nTIMESTAMP: ${Date.now()}`;
+            let swapPushSig = null;
+            try { swapPushSig = await signer.signMessage(swapPushMsg); } catch (_) { }
             fetch(`${KEEPER_URL_ARC}/push-tx`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ address: eoaWallet.address, transaction: swapLedgerTx })
+                body: JSON.stringify({ address: eoaWallet.address, transaction: swapLedgerTx, message: swapPushMsg, signature: swapPushSig })
             }).catch(() => { });
         } catch (err) {
             notify(err?.shortMessage || err?.message || 'Swap failed', 'error');
@@ -1268,12 +1288,17 @@ export function CircleWalletPage({
                     };
                     const fromAddr = eoaWallet?.address || address;
                     setLocalTx(prev => [sentTx, ...prev]);
+                    // The "Funds Sent" event ride — signed by the wallet that
+                    // actually sent the tx, so nobody else can inject rows
+                    // into this address's ledger or notification feed.
+                    const sentPushMsg = `--- 15MARKET PROTOCOL ---\nACTION: LEDGER PUSH\nKIND: TRANSFER\nAMOUNT: ${String(amt)} USDC\nTO: ${destAddress}\nTX: ${txHash}\nTIMESTAMP: ${Date.now()}`;
+                    let sentPushSig = null;
+                    try { sentPushSig = await provider.getSigner().then(s => s.signMessage(sentPushMsg)); } catch (_) { }
                     fetch(`${KEEPER_URL_ARC}/push-tx`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ address: fromAddr, transaction: sentTx })
-                    }).catch(() => { });
-                }
+                        body: JSON.stringify({ address: fromAddr, transaction: sentTx, message: sentPushMsg, signature: sentPushSig })
+                    }).catch(() => { });                }
             }
         } catch (err) {
             notify(err.message, "error");
@@ -1757,6 +1782,27 @@ export function CircleWalletPage({
             if (!isCCTP) {
                 if (notify) notify('Transaction sent! Crediting your balance...', 'pending');
 
+                // Sign the deposit confirmation — the backend refuses unsigned
+                // (or replayed) credits and re-proofs the transfer on-chain.
+                const canonical = [
+                    '--- 15MARKET PROTOCOL ---',
+                    'ACTION: CONFIRM DEPOSIT',
+                    `AMOUNT: ${Number(amount).toFixed(6)} USDC`,
+                    `TX: ${txHash}`,
+                    `TIMESTAMP: ${Date.now()}`
+                ].join('\n');
+                const signWalletCfg = wallets?.find(w => w.walletClientType === 'privy')
+                    || wallets?.find(w => w.address?.toLowerCase() === address?.toLowerCase());
+                let signature = null;
+                try {
+                    const ethProviderSign = await signWalletCfg.getEthereumProvider();
+                    const signerProvider = new ethers.BrowserProvider(ethProviderSign, 'any');
+                    const signerAccount = await signerProvider.getSigner();
+                    signature = await signerAccount.signMessage(canonical);
+                } catch (signErr) {
+                    console.warn('[Fund] Deposit confirmation signature failed:', signErr?.message);
+                }
+
                 // Call /fund/confirm to instantly credit the trading wallet balance in backend cache
                 const confirmRes = await fetch(`${KEEPER_URL_ARC}/fund/confirm`, {
                     method: 'POST',
@@ -1765,7 +1811,10 @@ export function CircleWalletPage({
                         address,
                         txHash,
                         amount: amount.toString(),
-                        fromToken: fundingType === 'usdc' ? 'USDC' : selectedToken.symbol
+                        fromToken: fundingType === 'usdc' ? 'USDC' : selectedToken.symbol,
+                        chainId: targetChainId,
+                        message: canonical,
+                        signature
                     })
                 });
 
@@ -1865,15 +1914,9 @@ export function CircleWalletPage({
                                 {fundingType ? 'Select Source' : 'Transfer Hub'}
                             </h2>
                         </div>
-                        <button onClick={() => {
-                            fetchWalletInfo(true);
-                            fetchAllBalances();
-                            if (triggerGlobalRefresh) {
-                                triggerGlobalRefresh(true);
-                            }
-                        }} className={`p-3 rounded-full ${isLight ? 'bg-black/5 hover:bg-black/10 text-black/80' : 'bg-white/5 hover:bg-white/10 text-white'} ${isRefreshing ? 'animate-spin' : ''}`}>
-                            <RefreshCw size={20} />
-                        </button>
+                        {/* Live by design: balances + activity stream update in
+                            realtime (socket + polling), so there is no refresh
+                            button in the Transfer Hub. */}
                     </div>
                 </div>
 
@@ -2640,27 +2683,46 @@ export function CircleWalletPage({
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex flex-col gap-4">
-                                    {activityRows.length === 0 ? (
-                                        <div className={`p-10 rounded-[40px] border text-center ${isLight ? 'bg-[#C2D2CA] border-black/5' : 'bg-[#111] border-white/5'}`}>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-white opacity-50">No activity yet</p>
-                                        </div>
-                                    ) : activityRows.map(tx => (
-                                        <div key={tx.key} className={`p-8 rounded-[40px] border ${isLight ? 'bg-[#C2D2CA] border-black/5 shadow-sm' : 'bg-[#111] border-white/5'} flex items-center justify-between transition-all hover:scale-[1.01]`}>
-                                            <div className="flex items-center gap-5">
-                                                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${tx.incoming ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-orange-500/10 text-orange-500'}`}>
-                                                    {tx.incoming ? <ArrowDownLeft size={24} /> : <Send size={24} />}
-                                                </div>
-                                                <div>
-                                                    <p className={`text-sm font-black uppercase tracking-wider text-white`}>{tx.incoming ? (tx.kind === 'TRANSFER' ? 'Transfer In' : 'Deposit') : (tx.kind === 'SWAP' ? 'Swap' : (tx.kind === 'TRANSFER' ? 'Transfer Out' : 'Withdrawal'))}</p>
-                                                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest text-white">{tx.when ? new Date(tx.when).toLocaleDateString() : '—'}</p>
-                                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    {/* Activity ledger — same DNA as the admin Overview
+                                        trade index: thin column header + compact divided
+                                        rows instead of chunky wonderland cards. */}
+                                    <div className={`grid grid-cols-[26px_minmax(0,1fr)_74px_86px] gap-3 px-1 pb-2 text-[8px] font-black uppercase tracking-widest opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>
+                                        <span>#</span><span>Action</span><span>Time</span><span className="text-right">Amount</span>
+                                    </div>
+                                    <div className={`flex flex-col max-h-[520px] overflow-y-auto no-scrollbar divide-y ${isLight ? 'divide-black/5' : 'divide-white/5'}`}>
+                                        {activityRows.length === 0 ? (
+                                            <div className="py-10 text-center opacity-20 text-[9px] font-black uppercase tracking-widest text-white">
+                                                No activity yet
                                             </div>
-                                            <p className={`text-xl font-black text-white`}>
-                                                {tx.incoming ? '+' : '-'}{tx.amt.toFixed(4)}
-                                            </p>
-                                        </div>
-                                    ))}
+                                        ) : activityRows.map((tx, i) => (
+                                            <motion.div
+                                                key={tx.key}
+                                                initial={{ x: -12, opacity: 0 }}
+                                                animate={{ x: 0, opacity: 1 }}
+                                                transition={{ delay: Math.min(i * 0.015, 0.25) }}
+                                                className={`px-1 py-2.5 grid grid-cols-[26px_minmax(0,1fr)_74px_86px] items-center gap-3 min-w-0 transition-colors ${isLight ? 'hover:bg-black/[0.03]' : 'hover:bg-white/[0.03]'}`}
+                                            >
+                                                <span className={`text-[9px] font-mono opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>{String(i + 1).padStart(2, '0')}</span>
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <div className={`w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center flex-none ${tx.incoming ? 'bg-[#0E4D30]/10 text-[#0E4D30]' : 'bg-orange-500/10 text-orange-500'}`}>
+                                                        {tx.incoming ? <ArrowDownLeft size={12} /> : <Send size={12} />}
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest truncate ${isLight ? 'text-black' : 'text-white'}`}>{tx.incoming ? (tx.kind === 'TRANSFER' ? 'Transfer In' : 'Deposit') : (tx.kind === 'SWAP' ? 'Swap' : (tx.kind === 'TRANSFER' ? 'Transfer Out' : 'Withdrawal'))}</span>
+                                                        <span className="text-[7px] font-mono opacity-40 uppercase truncate">{String(tx.kind || 'tx').toLowerCase()}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className={`text-[9px] font-bold ${isLight ? 'text-black/60' : 'text-white/60'}`}>{tx.when ? new Date(tx.when).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—'}</span>
+                                                    <span className={`text-[8px] font-mono opacity-30 ${isLight ? 'text-black' : 'text-white'}`}>{tx.when ? new Date(tx.when).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                                </div>
+                                                <span className={`text-right flex-none text-[11px] font-black font-mono ${tx.incoming ? 'text-[#0E4D30]' : isLight ? 'text-[#c2410c]' : 'text-orange-500'}`}>
+                                                    {tx.incoming ? '+' : '-'}{tx.amt.toFixed(4)}
+                                                </span>
+                                            </motion.div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>
